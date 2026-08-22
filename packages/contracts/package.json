@@ -1,0 +1,14 @@
+{
+  "name": "@archaeologist/contracts",
+  "version": "0.1.0",
+  "description": "Shared schema contracts and TypeScript types for Project Archaeologist",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}
