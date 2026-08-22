@@ -11,6 +11,7 @@ from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
     from app.models.commit import Commit
+    from app.models.dependency import CodeDependency
     from app.models.investigation import Investigation
     from app.models.issue import Issue
     from app.models.pull_request import PullRequest
@@ -44,6 +45,9 @@ class Repository(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     files: Mapped[List["SourceFile"]] = relationship(
         "SourceFile", back_populates="repository", cascade="all, delete-orphan"
+    )
+    dependencies: Mapped[List["CodeDependency"]] = relationship(
+        "CodeDependency", back_populates="repository", cascade="all, delete-orphan"
     )
     commits: Mapped[List["Commit"]] = relationship(
         "Commit", back_populates="repository", cascade="all, delete-orphan"

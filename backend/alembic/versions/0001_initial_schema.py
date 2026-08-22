@@ -5,6 +5,8 @@ Revises:
 Create Date: 2026-08-22 00:00:00.000000
 
 """
+from __future__ import annotations
+
 from collections.abc import Sequence
 
 import pgvector

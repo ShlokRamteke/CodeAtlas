@@ -5,15 +5,29 @@ from app.schemas.investigation import (
     InvestigationCreate,
     InvestigationRead,
 )
-from app.schemas.repository import RepositoryBase, RepositoryCreate, RepositoryRead
+from app.schemas.repository import (
+    ArchitectureOverviewResponse,
+    CodeDependencyRead,
+    ComponentOverview,
+    ComponentRelationshipSchema,
+    IngestFilesRequest,
+    RepositoryCreate,
+    RepositoryRead,
+    SymbolRead,
+)
 
 __all__ = [
-    "EvidenceItemSchema",
     "HealthResponse",
-    "InvestigationClaimSchema",
-    "InvestigationCreate",
-    "InvestigationRead",
-    "RepositoryBase",
     "RepositoryCreate",
     "RepositoryRead",
+    "SymbolRead",
+    "CodeDependencyRead",
+    "ComponentOverview",
+    "ComponentRelationshipSchema",
+    "ArchitectureOverviewResponse",
+    "IngestFilesRequest",
+    "InvestigationCreate",
+    "InvestigationRead",
+    "EvidenceItemSchema",
+    "InvestigationClaimSchema",
 ]

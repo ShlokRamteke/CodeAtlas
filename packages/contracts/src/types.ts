@@ -29,6 +29,7 @@ export interface SourceFile {
   language: string;
   contentHash: string;
   sizeBytes: number;
+  summary?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -46,6 +47,47 @@ export interface SymbolItem {
   signature?: string | null;
   docstring?: string | null;
   createdAt: string;
+}
+
+export interface CodeDependencyItem {
+  id: string;
+  sourceFileId: string;
+  sourcePath: string;
+  targetPath: string;
+  importedSymbol?: string | null;
+  kind: 'internal' | 'external' | 'relative';
+}
+
+export interface ComponentRelationship {
+  sourceName: string;
+  sourcePath: string;
+  targetName: string;
+  targetPath: string;
+  type: 'imports' | 'calls' | 'extends' | 'implements' | 'tested_by';
+}
+
+export interface ArchitectureOverview {
+  repositoryId: string;
+  fileCount: number;
+  symbolCount: number;
+  dependencyCount: number;
+  languages: Record<string, number>;
+  majorComponents: Array<{
+    name: string;
+    path: string;
+    symbolCount: number;
+    dependencies: string[];
+    testedBy?: string | null;
+  }>;
+  relationships: ComponentRelationship[];
+}
+
+export interface RepositoryTreeItem {
+  path: string;
+  type: 'file' | 'directory';
+  language?: string;
+  symbolCount?: number;
+  children?: RepositoryTreeItem[];
 }
 
 export interface CommitItem {
