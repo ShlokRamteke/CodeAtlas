@@ -22,8 +22,17 @@ Do not load all documents or all phase files for every task.
 4. Read the current phase document.
 5. Read only the relevant architecture section.
 6. Inspect existing code before modifying it.
+7. Create or switch to a dedicated branch for new changes/features (`git checkout -b feat/<task-name>`). Never commit new feature work directly to `main`.
+
+## Branching & Pull Request Rules
+
+- Always create a new branch from `main` for each new task, feature, or bugfix (e.g. `feat/phase-02-tree-sitter`, `fix/...`).
+- Keep branch commits focused and atomic.
+- When the task satisfies the Definition of Done and tests pass, push the branch to GitHub (`git push -u origin <branch-name>`).
+- Use the pushed branch to create a Pull Request targeting `main`.
 
 ## Implementation Rules
+
 
 - Make the smallest change that satisfies the current task.
 - Prefer existing patterns over new abstractions.
