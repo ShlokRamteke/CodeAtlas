@@ -3,11 +3,13 @@ name = "archaeologist-backend"
 version = "0.1.0"
 description = "Project Archaeologist Backend API & Ingestion Engine"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.9"
+
 dependencies = [
     "fastapi>=0.111.0",
-    "uvicorn[standard]>=0.30.0",
+    "uvicorn>=0.30.0",
     "pydantic>=2.7.0",
+
     "pydantic-settings>=2.2.0",
     "sqlalchemy[asyncio]>=2.0.30",
     "asyncpg>=0.29.0",
@@ -30,8 +32,14 @@ dev = [
 ]
 
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+
+
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
