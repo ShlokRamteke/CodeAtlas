@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import uuid
-from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
 from app.core.db import get_db
 from app.models.investigation import Investigation
 from app.models.repository import Repository
@@ -14,11 +15,11 @@ from app.schemas.investigation import InvestigationCreate, InvestigationRead
 router = APIRouter()
 
 
-@router.get("/repository/{repository_id}", response_model=List[InvestigationRead])
+@router.get("/repository/{repository_id}", response_model=list[InvestigationRead])
 async def list_repository_investigations(
     repository_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-) -> List[Investigation]:
+) -> list[Investigation]:
     query = (
         select(Investigation)
         .where(Investigation.repository_id == repository_id)

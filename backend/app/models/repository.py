@@ -3,16 +3,18 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional
+
 from sqlalchemy import DateTime, Enum, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
-    from app.models.source_file import SourceFile
     from app.models.commit import Commit
-    from app.models.pull_request import PullRequest
-    from app.models.issue import Issue
     from app.models.investigation import Investigation
+    from app.models.issue import Issue
+    from app.models.pull_request import PullRequest
+    from app.models.source_file import SourceFile
 
 
 class RepositoryStatus(str, enum.Enum):

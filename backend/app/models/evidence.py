@@ -3,9 +3,11 @@ from __future__ import annotations
 import enum
 import uuid
 from typing import TYPE_CHECKING, Any, Dict, Optional
-from sqlalchemy import Enum, Float, ForeignKey, Integer, JSON, String, Text, Uuid
+
+from sqlalchemy import JSON, Enum, Float, ForeignKey, Integer, String, Text, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:

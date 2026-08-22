@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import uuid
-from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.db import get_db
 from app.models.repository import Repository
 from app.schemas.repository import RepositoryCreate, RepositoryRead
@@ -12,12 +13,12 @@ from app.schemas.repository import RepositoryCreate, RepositoryRead
 router = APIRouter()
 
 
-@router.get("/", response_model=List[RepositoryRead])
+@router.get("/", response_model=list[RepositoryRead])
 async def list_repositories(
     skip: int = 0,
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
-) -> List[Repository]:
+) -> list[Repository]:
     query = select(Repository).offset(skip).limit(limit)
     result = await db.execute(query)
     return list(result.scalars().all())

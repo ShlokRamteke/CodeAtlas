@@ -46,12 +46,18 @@ jobs:
           cd backend
           alembic upgrade head
 
+      - name: Lint with Ruff
+        run: |
+          cd backend
+          ruff check .
+
       - name: Run Pytest
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/archaeologist
         run: |
           cd backend
           pytest -v
+
 
   frontend:
     name: Frontend Build & Typecheck

@@ -3,14 +3,16 @@ from __future__ import annotations
 import enum
 import uuid
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
-from sqlalchemy import Enum, ForeignKey, Integer, JSON, String, Text, Uuid
+
+from sqlalchemy import JSON, Enum, ForeignKey, Integer, Text, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
-    from app.models.repository import Repository
     from app.models.evidence import Evidence
+    from app.models.repository import Repository
 
 
 class InvestigationType(str, enum.Enum):

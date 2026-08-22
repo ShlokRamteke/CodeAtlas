@@ -15,7 +15,10 @@ dependencies = [
     "pgvector>=0.2.5",
     "httpx>=0.27.0",
     "python-multipart>=0.0.9",
+    "eval-type-backport>=0.2.0;python_version<'3.10'",
+    "greenlet>=3.0.0",
 ]
+
 
 [project.optional-dependencies]
 dev = [
@@ -39,4 +42,16 @@ pythonpath = ["."]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["B008", "E501", "UP042", "UP017", "UP045", "UP006", "UP035", "UP037"]
+
+
+
+
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.params.Depends"]
+
