@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
 from app.api.v1.api import api_router
 from app.core.config import settings
@@ -9,9 +10,9 @@ from app.core.config import settings
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    docs_url=f"{settings.API_V1_STR}/docs",
-    redoc_url=f"{settings.API_V1_STR}/redoc",
+    openapi_url="/openapi.json",
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
 if settings.BACKEND_CORS_ORIGINS:
@@ -31,6 +32,11 @@ async def root_health():
         "version": settings.VERSION,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+@app.get("/api/v1/docs", include_in_schema=False)
+async def api_v1_docs_redirect():
+    return RedirectResponse(url="/docs")
 
 
 app.include_router(api_router, prefix=settings.API_V1_STR)

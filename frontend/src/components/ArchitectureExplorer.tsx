@@ -24,14 +24,143 @@ import {
   Network,
   RefreshCw,
   FolderTree,
+  UploadCloud,
+  FilePlus,
+  Play,
+  Check,
 } from "lucide-react";
 
 interface ArchitectureExplorerProps {
   repository: Repository;
 }
 
+const TEMPLATES: Record<
+  string,
+  { label: string; desc: string; files: Record<string, string> }
+> = {
+  ecommerce: {
+    label: "E-Commerce Checkout & Payment",
+    desc: "TypeScript services with Order processing, Stripe payments, and linked tests",
+    files: {
+      "src/models/Order.ts": `export interface OrderItem {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
+export interface Order {
+  id: string;
+  userId: string;
+  items: OrderItem[];
+  totalAmount: number;
+  status: 'pending' | 'paid' | 'shipped';
+}`,
+      "src/services/PaymentService.ts": `import { Order } from '../models/Order';
+import stripe from 'stripe';
+
+export interface PaymentReceipt {
+  transactionId: string;
+  success: boolean;
+}
+
+export class PaymentService {
+  async processPayment(order: Order): Promise<PaymentReceipt> {
+    // Process transaction
+    return { transactionId: 'tx_123', success: true };
+  }
+}`,
+      "src/services/PaymentService.test.ts": `import { PaymentService } from './PaymentService';
+import { Order } from '../models/Order';
+
+export const testPaymentSuccess = async () => {
+  const service = new PaymentService();
+  const sampleOrder: Order = {
+    id: '1',
+    userId: 'u1',
+    items: [],
+    totalAmount: 99.99,
+    status: 'pending',
+  };
+  return await service.processPayment(sampleOrder);
+};`,
+      "src/services/CheckoutService.ts": `import { Order } from '../models/Order';
+import { PaymentService } from './PaymentService';
+
+export class CheckoutService {
+  private paymentService: PaymentService;
+
+  constructor() {
+    this.paymentService = new PaymentService();
+  }
+
+  async executeCheckout(order: Order): Promise<boolean> {
+    const result = await this.paymentService.processPayment(order);
+    return result.success;
+  }
+}`,
+    },
+  },
+  auth: {
+    label: "Authentication & Token Engine",
+    desc: "User credential verification, JWT token issuance, and unit tests",
+    files: {
+      "src/models/User.ts": `export interface User {
+  id: string;
+  email: string;
+  role: 'admin' | 'user';
+}`,
+      "src/auth/AuthService.ts": `import { User } from '../models/User';
+import jwt from 'jsonwebtoken';
+
+export class AuthService {
+  async login(email: string, pass: string): Promise<string> {
+    return 'token_jwt_xyz';
+  }
+
+  verifyToken(token: string): boolean {
+    return token.length > 10;
+  }
+}`,
+      "src/auth/AuthService.test.ts": `import { AuthService } from './AuthService';
+
+export const testLogin = async () => {
+  const auth = new AuthService();
+  return await auth.login('user@domain.com', 'secret');
+};`,
+    },
+  },
+  python_backend: {
+    label: "Python FastAPI Backend",
+    desc: "Python classes, async functions, docstrings, and test_*.py test files",
+    files: {
+      "app/services/analytics.py": `import os
+from typing import List, Dict
+
+class AnalyticsEngine:
+    """Computes daily platform telemetry and metric trends."""
+
+    def __init__(self, sample_rate: float = 1.0):
+        self.sample_rate = sample_rate
+
+    async def compute_aggregates(self, events: List[Dict]) -> Dict:
+        """Calculate event summaries."""
+        return {"count": len(events)}
+`,
+      "app/services/test_analytics.py": `from app.services.analytics import AnalyticsEngine
+
+def test_aggregates():
+    engine = AnalyticsEngine()
+    assert engine.sample_rate == 1.0
+`,
+    },
+  },
+};
+
 export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) {
-  const [activeTab, setActiveTab] = useState<"components" | "symbols" | "relationships" | "ingest">("components");
+  const [activeTab, setActiveTab] = useState<
+    "components" | "symbols" | "relationships" | "ingest"
+  >("components");
   const [architecture, setArchitecture] = useState<ArchitectureOverview | null>(null);
   const [symbols, setSymbols] = useState<SymbolItem[]>([]);
   const [symbolQuery, setSymbolQuery] = useState("");
@@ -39,6 +168,14 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
   const [dependencies, setDependencies] = useState<CodeDependencyItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [ingesting, setIngesting] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Custom File Editor state for Ingest tab
+  const [customPath, setCustomPath] = useState("src/utils/calculator.ts");
+  const [customCode, setCustomCode] = useState(
+    `export function calculateSum(a: number, b: number): number {\n  return a + b;\n}`
+  );
+  const [stagedFiles, setStagedFiles] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadData();
@@ -46,8 +183,11 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
 
   useEffect(() => {
     if (activeTab === "symbols") {
-      fetchRepositorySymbols(repository.id, symbolQuery || undefined, kindFilter || undefined)
-        .then(setSymbols);
+      fetchRepositorySymbols(
+        repository.id,
+        symbolQuery || undefined,
+        kindFilter || undefined
+      ).then(setSymbols);
     }
   }, [activeTab, symbolQuery, kindFilter, repository.id]);
 
@@ -62,75 +202,48 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
     setLoading(false);
   }
 
-  async function handleDemoIngest() {
+  async function handleIngestTemplate(templateKey: string) {
     setIngesting(true);
-    const demoFiles: Record<string, string> = {
-      "src/auth/AuthService.ts": `
-import { User, Session } from '../models/User';
-import { TokenGenerator } from './TokenGenerator';
-import axios from 'axios';
+    setSuccessMsg(null);
+    const tpl = TEMPLATES[templateKey];
+    if (!tpl) return;
 
-export interface LoginCredentials {
-  email: string;
-  secretHash: string;
-}
-
-export class AuthService {
-  private generator: TokenGenerator;
-
-  constructor() {
-    this.generator = new TokenGenerator();
-  }
-
-  async authenticate(creds: LoginCredentials): Promise<Session> {
-    return { token: "sample_jwt_123", valid: true };
-  }
-}
-`,
-      "src/auth/AuthService.test.ts": `
-import { AuthService } from './AuthService';
-
-export const testAuthFlow = async () => {
-  const service = new AuthService();
-  return await service.authenticate({ email: "dev@example.com", secretHash: "abc" });
-};
-`,
-      "src/models/User.ts": `
-export interface User {
-  id: string;
-  email: string;
-  role: 'admin' | 'member';
-}
-
-export interface Session {
-  token: string;
-  valid: boolean;
-}
-`,
-      "src/services/PaymentGateway.ts": `
-import { User } from '../models/User';
-import stripe from 'stripe';
-
-export class PaymentGateway {
-  async chargeUser(user: User, amountCents: number): Promise<boolean> {
-    return true;
-  }
-}
-`,
-      "src/services/PaymentGateway.test.ts": `
-import { PaymentGateway } from './PaymentGateway';
-
-export const testPayment = async () => {
-  const gateway = new PaymentGateway();
-  return await gateway.chargeUser({ id: '1', email: 'a@b.com', role: 'member' }, 5000);
-};
-`,
-    };
-
-    const arch = await ingestRepositoryFiles(repository.id, demoFiles);
+    const arch = await ingestRepositoryFiles(repository.id, tpl.files);
     if (arch) {
       setArchitecture(arch);
-      setActiveTab("components");
+      setSuccessMsg(`Successfully indexed ${tpl.label} (${arch.symbolCount} symbols extracted)`);
+      setTimeout(() => {
+        setActiveTab("components");
+        setSuccessMsg(null);
+      }, 1200);
+    }
+    setIngesting(false);
+  }
+
+  async function handleStageFile() {
+    if (!customPath.trim() || !customCode.trim()) return;
+    setStagedFiles({
+      ...stagedFiles,
+      [customPath.trim()]: customCode,
+    });
+    setCustomPath("");
+    setCustomCode("");
+  }
+
+  async function handleIngestStaged() {
+    if (Object.keys(stagedFiles).length === 0) return;
+    setIngesting(true);
+    setSuccessMsg(null);
+
+    const arch = await ingestRepositoryFiles(repository.id, stagedFiles);
+    if (arch) {
+      setArchitecture(arch);
+      setStagedFiles({});
+      setSuccessMsg(`Indexed ${arch.fileCount} custom files (${arch.symbolCount} symbols)!`);
+      setTimeout(() => {
+        setActiveTab("components");
+        setSuccessMsg(null);
+      }, 1200);
     }
     setIngesting(false);
   }
@@ -146,12 +259,12 @@ export const testPayment = async () => {
           <div>
             <h3 className="text-base font-semibold text-white flex items-center gap-2">
               Current System Architecture
-              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                Deterministic Model
+              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
+                Tree-sitter AST
               </span>
             </h3>
             <p className="text-xs text-slate-400">
-              Tree-sitter AST symbol graphs, test relationships, and dependency maps
+              Deterministic symbol graphs, test relationships, and dependency maps
             </p>
           </div>
         </div>
@@ -159,12 +272,19 @@ export const testPayment = async () => {
         {/* Action Buttons */}
         <div className="flex items-center gap-2">
           <button
-            onClick={handleDemoIngest}
-            disabled={ingesting}
-            className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-medium transition shadow-sm"
+            onClick={() => setActiveTab("ingest")}
+            className="flex items-center gap-2 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition shadow-sm"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${ingesting ? "animate-spin" : ""}`} />
-            {ingesting ? "Parsing AST..." : "Ingest & Index Code"}
+            <UploadCloud className="w-3.5 h-3.5" />
+            Add / Index Code
+          </button>
+          <button
+            onClick={loadData}
+            disabled={loading}
+            className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs transition"
+            title="Refresh"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
           </button>
         </div>
       </div>
@@ -206,10 +326,10 @@ export const testPayment = async () => {
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex border-b border-slate-800 px-6 bg-slate-950/20 text-xs font-medium text-slate-400">
+      <div className="flex border-b border-slate-800 px-6 bg-slate-950/20 text-xs font-medium text-slate-400 overflow-x-auto">
         <button
           onClick={() => setActiveTab("components")}
-          className={`py-3 px-4 border-b-2 flex items-center gap-2 transition ${
+          className={`py-3 px-4 border-b-2 flex items-center gap-2 transition whitespace-nowrap ${
             activeTab === "components"
               ? "border-indigo-500 text-indigo-400 font-semibold"
               : "border-transparent hover:text-slate-200"
@@ -220,7 +340,7 @@ export const testPayment = async () => {
         </button>
         <button
           onClick={() => setActiveTab("symbols")}
-          className={`py-3 px-4 border-b-2 flex items-center gap-2 transition ${
+          className={`py-3 px-4 border-b-2 flex items-center gap-2 transition whitespace-nowrap ${
             activeTab === "symbols"
               ? "border-indigo-500 text-indigo-400 font-semibold"
               : "border-transparent hover:text-slate-200"
@@ -231,7 +351,7 @@ export const testPayment = async () => {
         </button>
         <button
           onClick={() => setActiveTab("relationships")}
-          className={`py-3 px-4 border-b-2 flex items-center gap-2 transition ${
+          className={`py-3 px-4 border-b-2 flex items-center gap-2 transition whitespace-nowrap ${
             activeTab === "relationships"
               ? "border-indigo-500 text-indigo-400 font-semibold"
               : "border-transparent hover:text-slate-200"
@@ -240,10 +360,28 @@ export const testPayment = async () => {
           <Network className="w-4 h-4" />
           Relationships ({architecture?.relationships.length || 0})
         </button>
+        <button
+          onClick={() => setActiveTab("ingest")}
+          className={`py-3 px-4 border-b-2 flex items-center gap-2 transition whitespace-nowrap ${
+            activeTab === "ingest"
+              ? "border-indigo-500 text-indigo-400 font-semibold"
+              : "border-transparent hover:text-slate-200"
+          }`}
+        >
+          <UploadCloud className="w-4 h-4" />
+          Add / Index Code
+        </button>
       </div>
 
       {/* Tab Content */}
-      <div className="p-6 min-h-[300px]">
+      <div className="p-6 min-h-[320px]">
+        {successMsg && (
+          <div className="mb-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
+            <Check className="w-4 h-4" />
+            {successMsg}
+          </div>
+        )}
+
         {loading ? (
           <div className="py-12 text-center text-slate-500 text-sm">
             Loading architecture graph...
@@ -253,10 +391,16 @@ export const testPayment = async () => {
             {!architecture || architecture.majorComponents.length === 0 ? (
               <div className="py-12 text-center">
                 <FolderTree className="w-8 h-8 text-slate-600 mx-auto mb-3" />
-                <p className="text-slate-400 text-sm font-medium">No component index found yet.</p>
+                <p className="text-slate-400 text-sm font-medium">No components indexed yet.</p>
                 <p className="text-slate-500 text-xs mt-1">
-                  Click <strong>&quot;Ingest &amp; Index Code&quot;</strong> to run Tree-sitter AST extraction.
+                  Click the <strong>&quot;Add / Index Code&quot;</strong> tab to load templates or custom code.
                 </p>
+                <button
+                  onClick={() => setActiveTab("ingest")}
+                  className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition"
+                >
+                  Choose Repository Template
+                </button>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -381,9 +525,8 @@ export const testPayment = async () => {
               </table>
             </div>
           </div>
-        ) : (
+        ) : activeTab === "relationships" ? (
           <div>
-            {/* Relationships View */}
             {!architecture || architecture.relationships.length === 0 ? (
               <div className="py-12 text-center text-slate-500 text-sm">
                 No relationship edges discovered yet.
@@ -421,6 +564,128 @@ export const testPayment = async () => {
                 ))}
               </div>
             )}
+          </div>
+        ) : (
+          /* Ingest / Add Code Tab */
+          <div className="space-y-8">
+            {/* 1. Quick Ingest Templates */}
+            <div>
+              <h4 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
+                <Play className="w-4 h-4 text-indigo-400" />
+                Option 1: Load Pre-Built Codebase Templates
+              </h4>
+              <p className="text-xs text-slate-400 mb-4">
+                Instant full-stack architectures with modules, interfaces, and test relationships.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {Object.entries(TEMPLATES).map(([key, tpl]) => (
+                  <div
+                    key={key}
+                    className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex flex-col justify-between"
+                  >
+                    <div>
+                      <h5 className="text-sm font-semibold text-white">{tpl.label}</h5>
+                      <p className="text-xs text-slate-400 mt-1">{tpl.desc}</p>
+                      <div className="text-[11px] font-mono text-slate-500 mt-2">
+                        {Object.keys(tpl.files).length} files included
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleIngestTemplate(key)}
+                      disabled={ingesting}
+                      className="mt-4 w-full py-2 bg-slate-800 hover:bg-indigo-600 disabled:opacity-50 text-white rounded-lg text-xs font-medium transition flex items-center justify-center gap-2"
+                    >
+                      <UploadCloud className="w-3.5 h-3.5" />
+                      {ingesting ? "Indexing..." : "Load & Index Template"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 2. Custom Code Editor */}
+            <div className="pt-6 border-t border-slate-800">
+              <h4 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
+                <FilePlus className="w-4 h-4 text-indigo-400" />
+                Option 2: Add Custom Code Files
+              </h4>
+              <p className="text-xs text-slate-400 mb-4">
+                Paste any TypeScript, JavaScript, or Python code to parse with Tree-sitter.
+              </p>
+
+              <div className="space-y-3 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">File Path:</label>
+                  <input
+                    type="text"
+                    value={customPath}
+                    onChange={(e) => setCustomPath(e.target.value)}
+                    placeholder="e.g. src/services/PaymentService.ts or app/models.py"
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Code Contents:</label>
+                  <textarea
+                    rows={6}
+                    value={customCode}
+                    onChange={(e) => setCustomCode(e.target.value)}
+                    placeholder="Paste code here..."
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-3 text-xs text-white font-mono focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                  <button
+                    onClick={handleStageFile}
+                    className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-medium transition"
+                  >
+                    + Stage File ({Object.keys(stagedFiles).length} staged)
+                  </button>
+
+                  <button
+                    onClick={async () => {
+                      if (customPath && customCode) {
+                        const files = { ...stagedFiles, [customPath]: customCode };
+                        setIngesting(true);
+                        const arch = await ingestRepositoryFiles(repository.id, files);
+                        if (arch) {
+                          setArchitecture(arch);
+                          setStagedFiles({});
+                          setSuccessMsg(`Successfully indexed files!`);
+                          setTimeout(() => {
+                            setActiveTab("components");
+                            setSuccessMsg(null);
+                          }, 1200);
+                        }
+                        setIngesting(false);
+                      } else {
+                        await handleIngestStaged();
+                      }
+                    }}
+                    disabled={ingesting || (!customPath.trim() && Object.keys(stagedFiles).length === 0)}
+                    className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-medium transition flex items-center gap-1.5 shadow-sm"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${ingesting ? "animate-spin" : ""}`} />
+                    {ingesting ? "Parsing AST..." : "Parse & Index Now"}
+                  </button>
+                </div>
+
+                {Object.keys(stagedFiles).length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-slate-800/80">
+                    <div className="text-xs text-slate-400 font-medium mb-1">Staged Files:</div>
+                    <ul className="text-xs font-mono text-indigo-400 space-y-1">
+                      {Object.keys(stagedFiles).map((p) => (
+                        <li key={p}>• {p}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
