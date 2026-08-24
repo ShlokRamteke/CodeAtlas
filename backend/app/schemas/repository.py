@@ -90,3 +90,14 @@ class ArchitectureOverviewResponse(BaseModel):
 
 class IngestFilesRequest(BaseModel):
     files: Dict[str, str]
+
+
+class ConnectGitHubRequest(BaseModel):
+    url_or_slug: str
+    github_token: Optional[str] = None
+
+
+class ConnectGitHubResponse(BaseModel):
+    repository: RepositoryRead
+    architecture: ArchitectureOverviewResponse
+

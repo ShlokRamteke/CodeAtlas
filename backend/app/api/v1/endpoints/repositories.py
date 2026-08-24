@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
 from app.ingestion.engine import IngestionEngine
+from app.ingestion.github_fetcher import GitHubRepoFetcher
 from app.models.dependency import CodeDependency
 from app.models.repository import Repository
 from app.models.source_file import SourceFile
@@ -20,6 +21,8 @@ from app.schemas.repository import (
     CodeDependencyRead,
     ComponentOverview,
     ComponentRelationshipSchema,
+    ConnectGitHubRequest,
+    ConnectGitHubResponse,
     IngestFilesRequest,
     RepositoryCreate,
     RepositoryRead,
@@ -27,6 +30,86 @@ from app.schemas.repository import (
 )
 
 router = APIRouter()
+
+
+@router.post("/connect-github", response_model=ConnectGitHubResponse)
+async def connect_and_ingest_github_repo(
+    payload: ConnectGitHubRequest,
+    db: AsyncSession = Depends(get_db),
+) -> ConnectGitHubResponse:
+    fetcher = GitHubRepoFetcher()
+    try:
+        owner, name = fetcher.parse_repo_url(payload.url_or_slug)
+        full_name = f"{owner}/{name}"
+
+        # 1. Fetch files from GitHub
+        files, default_branch = await fetcher.fetch_public_repo_files(
+            owner=owner,
+            repo=name,
+            github_token=payload.github_token,
+        )
+
+        if not files:
+            raise ValueError(f"No supported code files found in repository '{full_name}'.")
+
+        # 2. Get or create Repository
+        stmt = select(Repository).where(Repository.full_name == full_name)
+        repo = (await db.execute(stmt)).scalar_one_or_none()
+        if not repo:
+            repo = Repository(
+                owner=owner,
+                name=name,
+                full_name=full_name,
+                default_branch=default_branch,
+            )
+            db.add(repo)
+            await db.commit()
+            await db.refresh(repo)
+
+        # 3. Ingest files with Tree-sitter
+        engine = IngestionEngine(db)
+        arch = await engine.ingest_files(repo.id, files)
+
+        # 4. Refresh repo
+        await db.refresh(repo)
+
+        return ConnectGitHubResponse(
+            repository=RepositoryRead.model_validate(repo),
+            architecture=ArchitectureOverviewResponse(
+                repository_id=repo.id,
+                file_count=arch.file_count,
+                symbol_count=arch.symbol_count,
+                dependency_count=arch.dependency_count,
+                languages=arch.languages,
+                major_components=[
+                    ComponentOverview(
+                        name=c.name,
+                        path=c.path,
+                        symbol_count=c.symbol_count,
+                        file_count=c.file_count,
+                        dependencies=c.dependencies,
+                        tested_by=c.tested_by,
+                    )
+                    for c in arch.major_components
+                ],
+                relationships=[
+                    ComponentRelationshipSchema(
+                        source_name=r.source_name,
+                        source_path=r.source_path,
+                        target_name=r.target_name,
+                        target_path=r.target_path,
+                        type=r.type,
+                    )
+                    for r in arch.relationships
+                ],
+            ),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+
 
 
 @router.get("", response_model=List[RepositoryRead])

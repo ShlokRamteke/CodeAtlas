@@ -42,29 +42,54 @@ export async function fetchRepositories(): Promise<Repository[]> {
   }
 }
 
-export async function createRepository(payload: {
-  owner: string;
-  name: string;
-  fullName: string;
-  defaultBranch?: string;
-}): Promise<Repository | null> {
+export async function connectGitHubRepository(
+  urlOrSlug: string,
+  githubToken?: string
+): Promise<{ repository: Repository; architecture: ArchitectureOverview } | null> {
   try {
-    const res = await fetch(`${API_BASE}/api/v1/repositories/`, {
+    const res = await fetch(`${API_BASE}/api/v1/repositories/connect-github`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        owner: payload.owner,
-        name: payload.name,
-        full_name: payload.fullName,
-        default_branch: payload.defaultBranch || "main",
+        url_or_slug: urlOrSlug,
+        github_token: githubToken || undefined,
       }),
     });
-    if (!res.ok) return null;
-    return await res.json();
-  } catch (error) {
-    return null;
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || "Failed to connect repository");
+    }
+    const data = await res.json();
+    return {
+      repository: data.repository,
+      architecture: {
+        repositoryId: data.architecture.repository_id,
+        fileCount: data.architecture.file_count,
+        symbolCount: data.architecture.symbol_count,
+        dependencyCount: data.architecture.dependency_count,
+        languages: data.architecture.languages,
+        majorComponents: data.architecture.major_components.map((c: any) => ({
+          name: c.name,
+          path: c.path,
+          symbolCount: c.symbol_count,
+          dependencies: c.dependencies,
+          testedBy: c.tested_by,
+        })),
+        relationships: data.architecture.relationships.map((r: any) => ({
+          sourceName: r.source_name,
+          sourcePath: r.source_path,
+          targetName: r.target_name,
+          targetPath: r.target_path,
+          type: r.type,
+        })),
+      },
+    };
+  } catch (error: any) {
+    console.error("connectGitHubRepository error:", error);
+    throw error;
   }
 }
+
 
 export async function ingestRepositoryFiles(
   repositoryId: string,

@@ -5,16 +5,17 @@ import {
   Compass,
   Database,
   Layers,
-  Search,
   Sparkles,
-  CheckCircle2,
   Code2,
   History,
   FolderGit2,
-  Plus,
+  Github,
+  ArrowRight,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 import type { HealthResponse, Repository } from "@archaeologist/contracts";
-import { fetchHealth, fetchRepositories, createRepository } from "@/lib/api";
+import { fetchHealth, fetchRepositories, connectGitHubRepository } from "@/lib/api";
 import { ArchitectureExplorer } from "@/components/ArchitectureExplorer";
 
 export default function Home() {
@@ -22,9 +23,12 @@ export default function Home() {
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [selectedRepo, setSelectedRepo] = useState<Repository | null>(null);
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState("");
-  const [newRepoName, setNewRepoName] = useState("");
-  const [creating, setCreating] = useState(false);
+
+  // GitHub Connect state
+  const [githubInput, setGithubInput] = useState("https://github.com/ShlokRamteke/archlogist-prg");
+  const [connecting, setConnecting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -39,27 +43,33 @@ export default function Home() {
     loadData();
   }, []);
 
-  async function handleCreateRepository(e: React.FormEvent) {
+  async function handleConnectGitHub(e: React.FormEvent) {
     e.preventDefault();
-    if (!newRepoName.trim()) return;
-    setCreating(true);
+    if (!githubInput.trim()) return;
 
-    const [owner, name] = newRepoName.includes("/")
-      ? newRepoName.split("/")
-      : ["demo-org", newRepoName.trim()];
+    setConnecting(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
 
-    const repo = await createRepository({
-      owner,
-      name,
-      fullName: `${owner}/${name}`,
-    });
-
-    if (repo) {
-      setRepositories([repo, ...repositories]);
-      setSelectedRepo(repo);
-      setNewRepoName("");
+    try {
+      const result = await connectGitHubRepository(githubInput.trim());
+      if (result) {
+        setRepositories((prev) => {
+          const exists = prev.some((r) => r.id === result.repository.id);
+          return exists
+            ? prev.map((r) => (r.id === result.repository.id ? result.repository : r))
+            : [result.repository, ...prev];
+        });
+        setSelectedRepo(result.repository);
+        setSuccessMsg(
+          `Successfully connected and parsed ${result.repository.fullName} with ${result.architecture.symbolCount} AST symbols!`
+        );
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to fetch and parse repository from GitHub.");
+    } finally {
+      setConnecting(false);
     }
-    setCreating(false);
   }
 
   return (
@@ -126,32 +136,52 @@ export default function Home() {
           </h1>
 
           <p className="text-muted-foreground text-base sm:text-lg leading-relaxed">
-            Deterministic AST symbol graphs, test relationships, and dependency maps powering
-            deep codebase comprehension.
+            Deterministic Tree-sitter AST symbol graphs, test relationships, and dependency maps
+            powering deep codebase comprehension.
           </p>
 
-          {/* Quick Search Preview */}
+          {/* GitHub Repository Connect Form */}
           <div className="pt-2 max-w-2xl mx-auto">
-            <div className="relative flex items-center">
-              <Search className="absolute left-4 h-5 w-5 text-muted-foreground" />
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Ask: Why does this retry workaround exist? How does auth work?"
-                className="w-full pl-12 pr-28 py-3 rounded-xl bg-card border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm shadow-lg shadow-black/20"
-              />
-              <button
-                type="button"
-                className="absolute right-2 px-4 py-1.5 rounded-lg bg-indigo-600 text-white font-medium text-xs hover:bg-indigo-500 transition-colors"
-              >
-                Investigate
-              </button>
-            </div>
+            <form onSubmit={handleConnectGitHub} className="space-y-3">
+              <div className="relative flex items-center shadow-lg shadow-black/20">
+                <div className="absolute left-4 flex items-center gap-1.5 text-slate-400">
+                  <Github className="h-5 w-5 text-indigo-400" />
+                </div>
+                <input
+                  type="text"
+                  value={githubInput}
+                  onChange={(e) => setGithubInput(e.target.value)}
+                  placeholder="Enter GitHub URL or slug (e.g. facebook/react, ShlokRamteke/archlogist-prg)"
+                  className="w-full pl-12 pr-36 py-3.5 rounded-xl bg-card border border-border focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm font-mono text-white placeholder:text-slate-500"
+                />
+                <button
+                  type="submit"
+                  disabled={connecting || !githubInput.trim()}
+                  className="absolute right-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium text-xs transition-colors flex items-center gap-1.5 shadow-sm"
+                >
+                  {connecting ? "Fetching & Indexing..." : "Connect & Index"}
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {errorMsg && (
+                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+
+              {successMsg && (
+                <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                  <span>{successMsg}</span>
+                </div>
+              )}
+            </form>
           </div>
         </section>
 
-        {/* Repository Selector / Creator Bar */}
+        {/* Repository Selector Bar */}
         <section className="bg-slate-900/80 border border-slate-800 p-4 rounded-xl flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <FolderGit2 className="w-5 h-5 text-indigo-400" />
@@ -167,32 +197,14 @@ export default function Home() {
               >
                 {repositories.map((repo) => (
                   <option key={repo.id} value={repo.id}>
-                    {repo.fullName} ({repo.status})
+                    {repo.fullName} ({repo.fileCount} files, {repo.symbolCount} symbols)
                   </option>
                 ))}
               </select>
             ) : (
-              <span className="text-xs text-slate-500">No repositories yet</span>
+              <span className="text-xs text-slate-500">No repositories yet &mdash; connect one above!</span>
             )}
           </div>
-
-          <form onSubmit={handleCreateRepository} className="flex items-center gap-2">
-            <input
-              type="text"
-              placeholder="e.g. org/payments-service"
-              value={newRepoName}
-              onChange={(e) => setNewRepoName(e.target.value)}
-              className="bg-slate-950 border border-slate-700 text-white text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-500 font-mono"
-            />
-            <button
-              type="submit"
-              disabled={creating || !newRepoName.trim()}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-medium transition shadow-sm"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              {creating ? "Adding..." : "Add Repo"}
-            </button>
-          </form>
         </section>
 
         {/* Phase 2: Architecture Explorer */}
@@ -201,7 +213,9 @@ export default function Home() {
         ) : (
           <div className="p-12 text-center bg-slate-900/40 border border-slate-800 rounded-xl">
             <FolderGit2 className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-            <p className="text-white font-medium text-sm">Add or select a repository above to explore architecture.</p>
+            <p className="text-white font-medium text-sm">
+              Connect a GitHub repository above to parse and understand its architecture.
+            </p>
           </div>
         )}
 
