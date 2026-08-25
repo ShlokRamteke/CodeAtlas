@@ -2,60 +2,115 @@
 
 ## Goal
 
-Extend the current-system context layer with evidence that explains how the software became what it is.
+Extend the canonical current-system context layer with historical and engineering evidence that explains how the software became what it is.
 
 Core question:
 
-> How did it get here?
+> **How did this software/component get here?**
 
-## Prerequisites
+Phase 3 finds and organizes the deterministic evidence. Phase 4 uses AI to explain it.
 
-Phase 2 complete.
+---
 
-## Product Model
+## Target Architecture
 
 ```text
-Current System
-      +
-Historical Context
-      +
-Engineering Context
-      ↓
-Project Intelligence
+Current Project Context
+        ↓
+Git History (Commits, Authors, Timestamps)
+        ↓
+Commit → PR → Issue Relationships
+        ↓
+Historical Retrieval & Engineering Context (Docs, ADRs)
+        ↓
+Enriched ProjectContext
+        ↓
+Historical Timeline / Developer View
 ```
 
-## Tasks
+---
 
-### Git Ingestion
-- Ingest commit history
-- Associate commits with changed files and symbols
-- Extract commit messages and author metadata
-- Support incremental history sync
+## Tasks Breakdown
 
-### Pull Requests & Issues
-- Ingest pull request titles, descriptions, and review discussions
-- Ingest issue titles, descriptions, and comments
-- Link PRs to issues and commits
+### PH3-01 — Git History Indexing
+Build the historical dataset:
+- Ingest commits, changed files, diff stats, author identities, timestamps.
+- Build file-level history and identify introducing commit for each file/entity.
+- Output: Current entities can be linked to Git history.
 
-### Engineering Artifacts
-- Index markdown/documentation files
-- Index ADRs and architecture records
-- Extract design constraints and requirements
+### PH3-02 — Commit → PR → Issue Linking
+Connect historical artifacts:
+```text
+Code / Entity
+     ↓
+   Commit
+     ↓
+  Pull Request
+     ↓
+   Issue
+```
+- Parse PR and issue reference patterns from commit messages (e.g. `Fixes #123`, `Merge pull request #45`).
+- Ingest GitHub PR metadata (title, body, author, merged_at) and issue metadata (title, body, labels, state).
+- Output: A developer can trace a change beyond the commit itself.
 
-### Relationships & Evolution
-- Connect current components/symbols to historical changes
-- Build feature evolution timelines
-- Link test changes to bug fixes
+### PH3-03 — Historical Retrieval
+Add deterministic retrieval specifically for historical questions:
+- Search commits by message, author, file path, date range.
+- Search PRs and issues by keyword and status.
+- Find historical change events scoped to a specific component or symbol.
+- Retrieve relevant historical evidence records without invoking an LLM.
+- Output: A component or query retrieves relevant historical evidence.
 
-### Vector & Semantic Layer
-- Generate embeddings for commits, PRs, issues, docs
-- Store in pgvector
-- Build hybrid retrieval (keyword + vector + graph traversal)
+### PH3-04 — Engineering Context
+Add non-Git engineering context:
+- Index `README.md`, `docs/`, architecture docs.
+- Index ADRs (Architecture Decision Records) if present.
+- Extract design constraints and testing rationale.
+- Output: Unified knowledge consisting of Current System + History + Engineering Context.
 
-## Acceptance Criteria
+### PH3-05 — Enrich ProjectContext
+Key integration task. Extend the single canonical `ProjectContext` with historical and contextual evidence:
+```text
+ProjectContext
+├── Current State (Files, Symbols, Languages)
+├── Relationships (Imports, Callers, Dependencies)
+├── Tests (Test suites, Test bindings)
+├── Historical Changes (Commits, Authors, Timelines)
+├── Related PRs (Pull requests, Discussions)
+├── Related Issues (Issues, Labels, Resolving commits)
+├── Documentation (Docs, ADRs, Constraints)
+└── Evidence (Grounded provenance records)
+```
+- Do not create `HistoricalContext` as a separate competing model.
 
-- [ ] Git history can be ingested and linked to current components
-- [ ] PRs, issues, and docs can be queried and retrieved
-- [ ] Timeline of a component or symbol can be reconstructed
-- [ ] Hybrid retrieval returns relevant historical evidence for a query
-- [ ] All unit/integration tests pass
+### PH3-06 — Historical Timeline / Developer View
+Expose the result interactively to the developer:
+- Interactive timeline showing component milestones (e.g. Introduction &rarr; Feature additions &rarr; Refactors).
+- Every event links directly to evidence (commits, PRs, issues, ADRs).
+- Full interactive UI view on Next.js frontend.
+
+---
+
+## Phase 3 Definition of Done
+
+A task is complete only when:
+
+```text
+Select component
+      ↓
+Current Project Context
+      ↓
+Historical events discovered
+      ↓
+Relevant commits/PRs/issues linked
+      ↓
+Engineering context added
+      ↓
+Timeline/evidence displayed
+```
+
+And the user can answer:
+
+> **"How did this component get here?"**
+
+without an LLM.

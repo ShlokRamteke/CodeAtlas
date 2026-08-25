@@ -2,15 +2,16 @@
 
 ## Current Phase
 
-Phase 2 — Repository Understanding
+Phase 3 — Historical + Engineering Context
 
 ## Current Task
 
-Phase 2 Complete — Ready for Phase 3 (Historical Intelligence)
+PH3-01 — Git History Indexing
 
 ## Status
 
-COMPLETED
+IN PROGRESS
+
 
 ## Product Focus
 

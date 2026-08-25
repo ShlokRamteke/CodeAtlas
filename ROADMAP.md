@@ -93,20 +93,19 @@ This phase answers:
 
 > **How did it get here?**
 
-### Includes
-- Git history
-- commits
-- PRs
-- issues
-- documentation
-- decision/context relationships
-- embeddings
-- retrieval layer
+### Structured Tasks
+- **PH3-01 — Git History Indexing**: Commits, file histories, authors, introducing commits.
+- **PH3-02 — Commit → PR → Issue Linking**: Code &rarr; Commit &rarr; PR &rarr; Issue traceability.
+- **PH3-03 — Historical Retrieval**: Deterministic component/query historical search without LLMs.
+- **PH3-04 — Engineering Context**: Documentation, READMEs, ADRs, design constraints.
+- **PH3-05 — Enrich ProjectContext**: Single unified canonical model enriched with history and engineering context.
+- **PH3-06 — Historical Timeline / Developer View**: Interactive component evolution timeline linking each event to evidence.
 
 ### Done when
-A developer or agent can trace how a component, symbol, or behavior evolved over time.
+A developer or agent can trace how a component, symbol, or behavior evolved over time without requiring an LLM.
 
 ---
+
 
 ## Phase 4 — Archaeology & Investigation
 
