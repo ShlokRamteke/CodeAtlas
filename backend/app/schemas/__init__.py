@@ -1,4 +1,12 @@
 from app.schemas.health import HealthResponse
+from app.schemas.history import (
+    CommitFileChangeRead,
+    CommitRead,
+    ComponentHistoryResponse,
+    FileHistoryResponse,
+    IngestCommitsRequest,
+    IngestCommitsResponse,
+)
 from app.schemas.investigation import (
     EvidenceItemSchema,
     InvestigationClaimSchema,
@@ -48,4 +56,10 @@ __all__ = [
     "InvestigationRead",
     "EvidenceItemSchema",
     "InvestigationClaimSchema",
+    "CommitFileChangeRead",
+    "CommitRead",
+    "FileHistoryResponse",
+    "ComponentHistoryResponse",
+    "IngestCommitsRequest",
+    "IngestCommitsResponse",
 ]

@@ -172,6 +172,16 @@ export interface RepositoryTreeItem {
   children?: RepositoryTreeItem[];
 }
 
+export interface CommitFileChangeItem {
+  id: string;
+  commitId: string;
+  filePath: string;
+  changeType: 'added' | 'modified' | 'deleted' | 'renamed';
+  insertions: number;
+  deletions: number;
+  oldPath?: string | null;
+}
+
 export interface CommitItem {
   id: string;
   repositoryId: string;
@@ -180,7 +190,51 @@ export interface CommitItem {
   authorEmail: string;
   committedAt: string;
   message: string;
+  filesChangedCount?: number;
+  insertions?: number;
+  deletions?: number;
+  fileChanges?: CommitFileChangeItem[];
 }
+
+export interface FileHistoryResponse {
+  filePath: string;
+  totalCommits: number;
+  introducingCommit?: {
+    commit_hash: string;
+    author_name: string;
+    author_email: string;
+    committed_at: string;
+    message: string;
+    change_type: string;
+    insertions: number;
+    deletions: number;
+  } | null;
+  commits: Array<{
+    commit_hash: string;
+    author_name: string;
+    author_email: string;
+    committed_at: string;
+    message: string;
+    change_type: string;
+    insertions: number;
+    deletions: number;
+  }>;
+  authors: Array<{
+    name: string;
+    email: string;
+    commit_count: number;
+  }>;
+}
+
+export interface ComponentHistoryResponse {
+  componentPath: string;
+  totalCommits: number;
+  introducingCommit?: Record<string, any> | null;
+  commits: Array<Record<string, any>>;
+  topAuthors: Array<{ name: string; commits: number }>;
+  filesTouched: Array<{ path: string; modifications: number }>;
+}
+
 
 export interface PullRequestItem {
   id: string;

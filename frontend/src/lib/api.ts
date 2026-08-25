@@ -8,7 +8,11 @@ import type {
   CodeDependencyItem,
   ContextBriefResponse,
   ProjectContext,
+  CommitItem,
+  FileHistoryResponse,
+  ComponentHistoryResponse,
 } from "@archaeologist/contracts";
+
 
 
 
@@ -344,3 +348,90 @@ export async function createInvestigation(
     return null;
   }
 }
+
+export async function fetchRepositoryCommits(
+  repositoryId: string,
+  filePath?: string,
+  author?: string
+): Promise<CommitItem[]> {
+  try {
+    const url = new URL(`${API_BASE}/api/v1/repositories/${repositoryId}/commits`);
+    if (filePath) url.searchParams.set("file_path", filePath);
+    if (author) url.searchParams.set("author", author);
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.map((c: any) => ({
+      id: c.id,
+      repositoryId: c.repository_id,
+      commitHash: c.commit_hash,
+      authorName: c.author_name,
+      authorEmail: c.author_email,
+      committedAt: c.committed_at,
+      message: c.message,
+      filesChangedCount: c.files_changed_count,
+      insertions: c.insertions,
+      deletions: c.deletions,
+      fileChanges: (c.file_changes || []).map((fc: any) => ({
+        id: fc.id,
+        commitId: fc.commit_id,
+        filePath: fc.file_path,
+        changeType: fc.change_type,
+        insertions: fc.insertions,
+        deletions: fc.deletions,
+        oldPath: fc.old_path,
+      })),
+    }));
+  } catch (error) {
+    return [];
+  }
+}
+
+export async function fetchFileHistory(
+  repositoryId: string,
+  filePath: string
+): Promise<FileHistoryResponse | null> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/v1/repositories/${repositoryId}/files/${encodeURIComponent(filePath)}/history`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function fetchComponentHistory(
+  repositoryId: string,
+  componentPath: string
+): Promise<ComponentHistoryResponse | null> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/v1/repositories/${repositoryId}/components/${encodeURIComponent(componentPath)}/history`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function ingestRepositoryCommits(
+  repositoryId: string,
+  commits: any[]
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/repositories/${repositoryId}/commits/ingest`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ commits }),
+    });
+    return res.ok;
+  } catch (error) {
+    return false;
+  }
+}
+

@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import os
 import re
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 import httpx
 
+from app.history.git_indexer import ChangeType, ParsedCommit, ParsedFileChange
 from app.ingestion.engine import IGNORED_DIRS, SUPPORTED_EXTENSIONS
 
 
@@ -99,3 +101,94 @@ class GitHubRepoFetcher:
                     continue
 
             return files_content, default_branch
+
+    async def fetch_public_repo_commits(
+        self,
+        owner: str,
+        repo: str,
+        max_commits: int = 30,
+        github_token: Optional[str] = None,
+    ) -> List[ParsedCommit]:
+        """
+        Fetch recent commit history and changed files via GitHub REST API.
+        """
+        from app.history.git_indexer import ParsedCommit, ParsedFileChange
+
+        headers = {
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "Project-Archaeologist",
+        }
+        token = github_token or os.getenv("GITHUB_TOKEN")
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+
+        parsed_commits: List[ParsedCommit] = []
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            res = await client.get(
+                f"https://api.github.com/repos/{owner}/{repo}/commits?per_page={max_commits}",
+                headers=headers,
+            )
+            if res.status_code != 200:
+                return []
+
+            commits_list = res.json()
+            for c in commits_list:
+                sha = c.get("sha", "")
+                commit_info = c.get("commit", {})
+                author_info = commit_info.get("author", {})
+                author_name = author_info.get("name", "Unknown")
+                author_email = author_info.get("email", "unknown@domain.com")
+                raw_date = author_info.get("date")
+                message = commit_info.get("message", "")
+
+                try:
+                    committed_at = datetime.fromisoformat(raw_date.replace("Z", "+00:00")) if raw_date else datetime.now(timezone.utc)
+                except Exception:
+                    committed_at = datetime.now(timezone.utc)
+
+                parent_hashes = [p.get("sha", "") for p in c.get("parents", [])]
+
+                # Fetch individual commit details to obtain changed files if needed
+                file_changes: List[ParsedFileChange] = []
+                try:
+                    detail_res = await client.get(
+                        f"https://api.github.com/repos/{owner}/{repo}/commits/{sha}",
+                        headers=headers,
+                    )
+                    if detail_res.status_code == 200:
+                        detail_data = detail_res.json()
+                        for f in detail_data.get("files", []):
+                            status_str = f.get("status", "modified")
+                            ctype = (
+                                ChangeType.ADDED if status_str == "added"
+                                else ChangeType.DELETED if status_str == "removed"
+                                else ChangeType.RENAMED if status_str == "renamed"
+                                else ChangeType.MODIFIED
+                            )
+                            file_changes.append(
+                                ParsedFileChange(
+                                    file_path=f.get("filename", ""),
+                                    change_type=ctype,
+                                    insertions=f.get("additions", 0),
+                                    deletions=f.get("deletions", 0),
+                                    old_path=f.get("previous_filename"),
+                                )
+                            )
+                except Exception:
+                    pass
+
+                parsed_commits.append(
+                    ParsedCommit(
+                        commit_hash=sha,
+                        author_name=author_name,
+                        author_email=author_email,
+                        committed_at=committed_at,
+                        message=message,
+                        parent_hashes=parent_hashes,
+                        file_changes=file_changes,
+                    )
+                )
+
+        return parsed_commits
+
