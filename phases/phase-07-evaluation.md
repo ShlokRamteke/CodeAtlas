@@ -1,44 +1,25 @@
-# Phase 7 — Evaluation + Hardening
+# Phase 7 — Evaluation & Production Hardening
 
 ## Goal
 
-Make the product measurable, secure, observable, and stable.
+Validate investigation accuracy, citation groundedness, speed, safety, and reliability across benchmark repositories.
 
 ## Prerequisites
 
-Core archaeology workflow complete.
+Phase 4 complete.
 
-## Evaluation Areas
+## Tasks
 
-- current-system understanding
-- feature tracing
-- historical reconstruction
-- why reasoning
-- pre-change briefs
+- Build evaluation benchmark suite with representative codebases
+- Test groundedness and citation accuracy (no hallucinations)
+- Measure token usage and latency per investigation type
+- Security and permission boundary audit
+- Performance optimization for indexing and retrieval
+- Document operational playbooks
 
-## Metrics
+## Acceptance Criteria
 
-- retrieval recall
-- citation accuracy
-- groundedness
-- historical accuracy
-- tool selection accuracy
-- agent success rate
-- token usage
-- latency
-
-## Security
-
-Review:
-- GitHub permissions
-- authorization
-- tenant isolation
-- secret handling
-- prompt injection
-- MCP boundaries
-- logging/privacy
-
-## Definition of Done
-
-The benchmark is repeatable, AI behavior is measurable, security boundaries are
-tested, and the end-to-end SaaS workflow is stable.
+- [ ] Groundedness score meets target (>95% verified citations)
+- [ ] Token usage stays within budget (<$0.05 per standard query)
+- [ ] Latency meets SLO (<5s for standard investigation)
+- [ ] All security checks pass

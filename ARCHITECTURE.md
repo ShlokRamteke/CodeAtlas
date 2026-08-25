@@ -2,27 +2,22 @@
 
 ## 1. Architecture Goal
 
-Project Archaeologist turns a repository into **Project Intelligence** that
-combines:
+Turn a repository into **Project Intelligence** with three layers:
 
-1. Current System — what exists today
-2. Historical Context — how it evolved
-3. Engineering Context — documentation, decisions, tests, issues, and constraints
+1. **Current System** — what exists today
+2. **Historical Context** — how it evolved
+3. **Engineering Context** — docs, decisions, tests, issues, constraints
 
-The agentic layer investigates this intelligence to answer developer questions
-with evidence.
+The agentic layer investigates this intelligence to answer developer questions with evidence.
 
 ## 2. Core Architecture
 
 ```mermaid
 flowchart TB
-    USER[Developer]
-        --> WEB[Next.js SaaS]
-
+    USER[Developer] --> WEB[Next.js SaaS]
     WEB --> API[FastAPI]
 
     API --> GH[GitHub App<br/>Read Only]
-
     GH --> ING[Repository Ingestion]
 
     ING --> CURRENT[Current System Analysis]
@@ -33,69 +28,204 @@ flowchart TB
     HISTORY --> KNOWLEDGE
     CONTEXT --> KNOWLEDGE
 
-    KNOWLEDGE --> RET[Hybrid Retrieval]
+    KNOWLEDGE --> RET[Retrieval]
 
     API --> INVEST[Archaeological Investigation]
-
     INVEST --> RET
-    RET --> EVIDENCE[Evidence Set]
-    EVIDENCE --> REASON[AI Reasoning]
+
+    RET --> BUILDER[Context Builder]
+    BUILDER --> HUMAN[Human View]
+    BUILDER --> REASON[LLM Reasoning]
+
     REASON --> VERIFY[Evidence Verification]
     VERIFY --> RESULT[Answer + Sources]
-
     RESULT --> WEB
 ```
 
-## 3. Three Intelligence Layers
+## 3. Major Components
 
-### Current System
+### Frontend
+- Next.js
+- TypeScript
+- Tailwind CSS
+- shadcn/ui
+- React Flow
 
-Deterministic representation of what exists now:
+### Backend
+- Python
+- FastAPI
 
+### AI
+- LangGraph
+- LiteLLM
+- OpenAI / Anthropic / Gemini-compatible providers
+
+### Storage
+- PostgreSQL
+- pgvector
+- PostgreSQL relationship tables initially
+
+### Code Intelligence
+- Tree-sitter
+- TypeScript Compiler API where useful
+- GitPython
+- GitHub REST/GraphQL APIs
+
+### Async
+- Inngest
+- Redis only when needed for caching/short-lived state
+
+### Observability
+- OpenTelemetry
+- Langfuse
+- Sentry
+
+### Integration
+- GitHub App
+- MCP Python SDK
+
+## 4. Current System Context Layer
+
+Phase 2 builds a **reliable current-system context layer**.
+
+The goal is not to perfectly understand every runtime behavior or every programming language.
+
+The goal is to produce enough trustworthy structure that:
+- a human can understand an unfamiliar component,
+- retrieval can find the right code and relationships,
+- the LLM can receive a compact, useful briefing.
+
+### Structural Analysis
+
+Use deterministic tooling for:
 - files
 - symbols
-- classes/functions
+- imports/exports
+- functions/classes
+- basic references
+- basic calls
 - APIs
-- dependencies
-- tests
+- test locations
+
+Tree-sitter is the primary structural parser.
+
+### Semantic Analysis
+
+Use language-aware tooling where useful for:
+- symbol resolution
+- types
+- call targets
+- import resolution
+
+For the initial TypeScript/JavaScript implementation, use the TypeScript Compiler API where it materially improves resolution.
+
+Do not attempt perfect dynamic-runtime analysis.
+
+### Metadata Analysis
+
+Collect:
+- package/framework metadata
 - configuration
-- architecture relationships
+- test framework
+- database/service indicators
+- repository structure
 
-### Historical Context
+### Relationship Confidence
 
-Representation of how the software changed:
+Relationships should carry provenance and confidence when applicable.
 
-- commits
-- file history
-- blame
-- pull requests
-- issues
-- migrations
-- major changes
+```text
+PaymentService
+    ↓ calls
+StripePayment.refund()
 
-### Engineering Context
+confidence: 0.98
+resolution_method: typescript_type_checker
+```
 
-Supporting information that explains the system:
+Heuristic relationships should be labeled accordingly.
 
-- documentation
-- architecture decisions
-- tests
-- known issues
-- feature requirements where available
-- constraints and surrounding engineering artifacts
+### Current-System Model
 
-The three layers are intentionally combined before AI reasoning.
+The normalized model should support:
 
----
+```text
+Repository
+├── Applications
+├── Services / Modules
+├── Components
+├── APIs
+├── Symbols
+├── Dependencies
+├── Tests
+└── External Dependencies
+```
 
-## 4. Repository Ingestion
+### Context Builder
 
-Ingestion is primarily deterministic and asynchronous.
+Phase 2 introduces a lightweight Context Builder.
+
+It converts machine-readable facts into compact human/LLM context.
+
+Example:
+
+```text
+COMPONENT: PaymentService
+
+CALLERS:
+CheckoutService
+RefundWorker
+
+DEPENDENCIES:
+StripeClient
+OrderRepository
+Redis
+
+TESTS:
+PaymentService.test.ts
+Refund.test.ts
+```
+
+Human view:
+
+```text
+PaymentService
+
+Handles payment processing and refunds.
+
+Used by:
+CheckoutService
+RefundWorker
+
+Dependencies:
+Stripe
+Redis
+OrderRepository
+
+Tests:
+4 related tests
+```
+
+The Context Builder is the bridge between repository analysis and later AI reasoning.
+
+### Phase 2 Questions
+
+Phase 2 should support current-state questions such as:
+- Where is X?
+- What does X depend on?
+- What depends on X?
+- Which tests relate to X?
+- How does X connect to the rest of the system?
+
+Historical "why" questions are deferred to Phase 3/4.
+
+## 5. Repository Ingestion
+
+Ingestion is deterministic and asynchronous.
 
 ```mermaid
 flowchart LR
     GH[GitHub] --> FETCH[Fetcher]
-
     FETCH --> SOURCE[Source Files]
     FETCH --> GIT[Git History]
     FETCH --> PR[Pull Requests]
@@ -114,81 +244,26 @@ flowchart LR
 
 Never execute repository code during indexing.
 
----
-
-## 5. Current System Analysis
-
-Tree-sitter and deterministic analysis extract:
-
-- files
-- symbols
-- imports/exports
-- functions/classes
-- APIs
-- dependencies
-- test relationships where detectable
-
-Initial language support:
-- TypeScript/JavaScript
-
-Python can be added after the first working vertical slice.
-
-Example:
-
-```text
-PaymentService
-├── imports StripeClient
-├── imports Redis
-├── calls OrderRepository
-├── called by CheckoutService
-└── tested by PaymentService.test.ts
-```
-
----
-
 ## 6. Historical Analysis
 
-Git history is a major input to Project Intelligence.
+Git history is a first-class source for the later archaeology layer.
 
 ```mermaid
 flowchart LR
-    CODE[Current Component]
-        --> BLAME[Git Blame / File History]
-
-    BLAME --> COMMIT[Introducing Commit]
+    CODE[Current Component] --> BLAME[File History / Blame]
+    BLAME --> COMMIT[Introducing Change]
     COMMIT --> PR[Pull Request]
     PR --> ISSUE[Issue / Requirement]
-
     ISSUE --> CONTEXT[Historical Context]
     PR --> CONTEXT
     COMMIT --> CONTEXT
 ```
 
-The system should reconstruct change paths, not simply display raw Git history.
-
-Example:
-
-```text
-PaymentService
-  ↓
-Webhook retry introduced
-  ↓
-PR #481
-  ↓
-PAY-912
-  ↓
-Webhook delivery failures
-```
-
-This becomes the historical evidence behind an AI explanation.
-
----
+The goal is not simply to display Git history; it is to connect changes to current system context.
 
 ## 7. Project Intelligence Storage
 
-Use PostgreSQL as the primary store and pgvector for semantic retrieval.
-
-Persist:
+PostgreSQL stores:
 - repositories
 - files
 - symbols
@@ -196,76 +271,69 @@ Persist:
 - pull requests
 - issues
 - docs
+- tests
 - evidence
 - investigations
 - agent runs
 - metadata
-- embeddings
-- relationship tables
+- relationships
 
-Represent graph relationships in PostgreSQL initially.
+Relationships should store provenance/confidence where practical.
 
-Do not introduce a separate graph database until real workload requires it.
+pgvector stores embeddings for semantic retrieval.
 
----
+Do not add a separate graph database until real workload requires it.
 
-## 8. Hybrid RAG
+## 8. Retrieval
 
-Project Archaeologist does not rely on vector search alone.
+Retrieval is progressive.
+
+### Phase 2
+- exact symbol/path search
+- metadata filtering
+- relationship traversal
+
+### Phase 3
+- vector search
+- keyword/full-text search
+- historical search
+- richer evidence ranking
+
+The final retrieval layer combines these paths.
+
+## 9. Context Builder
+
+The Context Builder is a core system boundary.
+
+Input:
+- user question
+- retrieved current-system evidence
+- retrieved historical/engineering evidence
+
+Output:
+- compact human-facing context
+- compact LLM context
+- source references
+- confidence/provenance
+
+The Context Builder should remove irrelevant evidence before model submission.
+
+## 10. Investigation Engine
+
+Use a bounded LangGraph workflow, not a large autonomous swarm.
 
 ```mermaid
 flowchart TB
-    Q[Developer Question]
-
-    Q --> SEM[Semantic Search]
-    Q --> KEY[Keyword / Full Text]
-    Q --> GRAPH[Relationship Traversal]
-    Q --> HIST[Historical Search]
-
-    SEM --> RANK[Evidence Ranking]
-    KEY --> RANK
-    GRAPH --> RANK
-    HIST --> RANK
-
-    RANK --> EVIDENCE[Compact Evidence Set]
-```
-
-Use:
-
-- semantic retrieval for conceptual similarity,
-- keyword retrieval for exact symbols/names,
-- graph traversal for relationships,
-- historical retrieval for temporal questions,
-- metadata filters for repository/commit scope.
-
----
-
-## 9. Investigation Engine
-
-The investigation engine is the product's AI layer.
-
-It should use a bounded LangGraph workflow, not a large autonomous swarm.
-
-```mermaid
-flowchart TB
-    Q[Question]
-        --> P[Investigation Planner]
-
-    P --> TOOLS[Read-only Investigation Tools]
-
+    Q[Question] --> P[Planner]
+    P --> TOOLS[Read-only Tools]
     TOOLS --> EVIDENCE[Evidence Pool]
-
-    EVIDENCE --> CORR[Evidence Correlator]
-
-    CORR --> REASON[Reasoning Agent]
-
+    EVIDENCE --> BUILDER[Context Builder]
+    BUILDER --> REASON[Reasoning Agent]
     REASON --> VERIFY[Evidence Verifier]
-
-    VERIFY --> RESULT[Structured Answer]
+    VERIFY --> RESULT[Structured Result]
 ```
 
-### Tool examples
-
+Initial tools:
 - search_code()
 - get_file()
 - get_symbol()
@@ -280,128 +348,77 @@ flowchart TB
 - trace_feature()
 - get_architecture()
 
----
-
-## 10. Investigation Types
+## 11. Investigation Types
 
 ### Understand
-
-> How does checkout work?
-
-Uses current system relationships and relevant context.
+How does this component/feature work?
 
 ### Why
-
-> Why does this workaround exist?
-
-Uses current code + historical evidence + surrounding engineering context.
+Why does this workaround or design exist?
 
 ### History
-
-> How did authentication evolve?
-
-Reconstructs historical changes and their relationships.
+How did this component evolve?
 
 ### Before Change
+What should I know before modifying this component?
 
-> What should I know before modifying PaymentService?
+## 12. Evidence Model
 
-Combines current dependencies, historical changes, known issues, tests, and
-important decisions.
+Claims are classified as:
+- fact
+- inference
+- unknown
 
-The same engine supports all four.
+Important claims reference Evidence IDs.
 
----
-
-## 11. Evidence and Reasoning
-
-Evidence is gathered before the model reasons.
-
-Example:
-
-```text
-Code:
-retryCount > 3
-
-Commit:
-Added webhook retry
-
-PR:
-Handle failed webhook delivery
-
-Issue:
-PAY-912
-
-Test:
-WebhookRetry.spec.ts
-```
-
-The reasoning layer synthesizes the relationship.
-
-The answer must distinguish:
-
-### Fact
-Directly supported evidence.
-
-### Inference
-Conclusion derived from multiple sources.
-
-### Unknown
-Evidence is insufficient.
-
-Every important claim should reference Evidence IDs.
-
----
-
-## 12. LLM Usage
+## 13. LLM Usage
 
 Use LLMs for:
 - question interpretation
 - investigation planning
 - evidence correlation
-- reasoning
-- answer synthesis
+- historical reasoning
+- synthesis
 - optional verification
 
-Do not use LLMs for:
-- parsing code
-- finding imports
-- reading Git metadata
-- basic dependency queries
-- exact symbol lookup
+Do not use LLMs for deterministic extraction.
 
-Target normal investigation cost:
+Target normal investigation:
 - optional planner call
 - one reasoning call
 - optional lightweight verification
 
 Never send the whole repository to a model.
 
----
-
-## 13. Token Efficiency
+## 14. Token Efficiency
 
 Core principle:
 
-> **Index once, retrieve narrowly, reason once.**
+> **Index once, retrieve narrowly, build a compact context, reason once.**
 
-Techniques:
+Use:
 - deterministic preprocessing
-- content hashes
 - incremental indexing
+- content hashes
 - cached embeddings
 - metadata filtering
-- hybrid retrieval
-- compact structured tool results
-- minimal evidence sets
+- compact tool output
+- small evidence sets
 
-AI usage should be measured per investigation.
+## 15. Security
 
----
+- GitHub App read-only in MVP.
+- Server-side authorization.
+- Tenant/repository isolation.
+- Repository content treated as untrusted data.
+- Secret scanning before persistence/model submission.
+- Never execute repository code during indexing.
+- No arbitrary shell/code execution tools.
+- Read-only MCP.
+- Minimal LLM context.
+- Minimize raw source retention.
 
-## 14. Privacy-Aware RAG
-
-Preferred model:
+## 16. Privacy-Aware RAG
 
 ```text
 GitHub = source of truth
@@ -415,91 +432,34 @@ Persist mainly:
 - Git metadata
 - relationships
 
-When exact code is needed:
-1. resolve repository + commit + path,
-2. authorize access,
-3. retrieve source,
-4. redact secrets,
-5. provide only the necessary excerpt to the model.
+When raw source is needed:
+1. resolve repository + commit + path
+2. authorize
+3. retrieve exact source
+4. redact secrets
+5. send only required context to the model
 
-Embeddings remain confidential customer data.
+Treat embeddings as sensitive customer data.
 
----
+## 17. MCP
 
-## 15. Incremental Indexing
-
-Use content hashes.
-
-```mermaid
-flowchart LR
-    FILE[File / Chunk]
-        --> HASH[Content Hash]
-
-    HASH --> CHECK{Changed?}
-
-    CHECK -->|No| REUSE[Reuse Existing Data]
-    CHECK -->|Yes| PROCESS[Reparse + Re-embed]
-```
-
-The repository should not be reprocessed when only a small subset changed.
-
----
-
-## 16. Security
-
-- GitHub App read-only for MVP.
-- Server-side authorization for every repository-scoped request.
-- Tenant and repository isolation.
-- Secret scanning.
-- No repository code execution.
-- Repository content treated as untrusted data.
-- No arbitrary shell/code execution tools.
-- Read-only MCP.
-- Minimal LLM context.
-- Minimize raw source retention.
-
----
-
-## 17. SaaS
-
-Initial deployment:
-
-- Vercel → Next.js
-- Railway/Render → FastAPI + workers
-- Supabase → PostgreSQL + pgvector
-- Inngest → background jobs
-- external LLM provider or BYOK
-- GitHub Actions → CI
-
-Avoid unnecessary infrastructure.
-
----
-
-## 18. MCP
-
-Expose the same Project Intelligence through read-only MCP tools.
-
-Examples:
+Expose read-only tools such as:
 - why_does_this_exist()
 - trace_feature()
 - search_history()
 - get_architecture()
 - get_change_context()
-- get_related_issues()
 
-The MCP layer must enforce the same authorization and data boundaries as the web
-API.
+Use the same authorization boundary as the web API.
 
----
+## 18. Evaluation
 
-## 19. Evaluation
-
-Evaluate all four investigation types:
-
-- current-system understanding,
-- why reasoning,
-- historical reconstruction,
-- pre-change context.
+Evaluate:
+- current-system understanding
+- feature tracing
+- historical reconstruction
+- why reasoning
+- pre-change context
 
 Metrics:
 - retrieval recall

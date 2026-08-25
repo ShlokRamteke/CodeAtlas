@@ -1,9 +1,8 @@
-# Phase 5 — SaaS Experience
+# Phase 5 — SaaS Core
 
 ## Goal
 
-Make the project intelligence and archaeology capabilities accessible as a
-developer-facing SaaS.
+Turn the application into a secure, multi-tenant SaaS product.
 
 ## Prerequisites
 
@@ -11,15 +10,18 @@ Phase 4 complete.
 
 ## Tasks
 
-- repository overview
-- architecture explorer
-- historical timeline
-- Ask the Archaeologist
-- Feature Archaeology
-- Pre-Change Brief
-- evidence navigation
+- GitHub App integration (OAuth, webhooks, installation flow)
+- Multi-tenant data isolation and authorization
+- Asynchronous indexing worker (Inngest / background tasks)
+- Rate limiting, token tracking, and cost controls
+- User / team management and permissions
+- Caching layer for frequent queries
+- Audit logging for security and compliance
 
-## Definition of Done
+## Acceptance Criteria
 
-A developer can connect an unfamiliar repository, understand its current
-structure, explore its evolution, and investigate why important code exists.
+- [ ] Users can authenticate via GitHub
+- [ ] Repositories can be indexed asynchronously
+- [ ] Tenant data is strictly isolated
+- [ ] Token usage and costs are tracked per tenant
+- [ ] All unit/integration tests pass

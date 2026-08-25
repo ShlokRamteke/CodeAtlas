@@ -2,36 +2,60 @@
 
 ## Goal
 
-Build the historical and surrounding engineering evidence that explains the
-current system.
+Extend the current-system context layer with evidence that explains how the software became what it is.
 
 Core question:
 
-> **How did this software become what it is?**
+> How did it get here?
 
 ## Prerequisites
 
 Phase 2 complete.
 
+## Product Model
+
+```text
+Current System
+      +
+Historical Context
+      +
+Engineering Context
+      ↓
+Project Intelligence
+```
+
 ## Tasks
 
-- commits
-- file history
-- introducing changes
-- pull requests
-- issues
-- documentation
-- embeddings
-- hybrid retrieval
-- evidence relationships
+### Git Ingestion
+- Ingest commit history
+- Associate commits with changed files and symbols
+- Extract commit messages and author metadata
+- Support incremental history sync
 
-## Key Output
+### Pull Requests & Issues
+- Ingest pull request titles, descriptions, and review discussions
+- Ingest issue titles, descriptions, and comments
+- Link PRs to issues and commits
 
-A project intelligence layer combining:
-- current state,
-- history,
-- engineering context.
+### Engineering Artifacts
+- Index markdown/documentation files
+- Index ADRs and architecture records
+- Extract design constraints and requirements
 
-## Definition of Done
+### Relationships & Evolution
+- Connect current components/symbols to historical changes
+- Build feature evolution timelines
+- Link test changes to bug fixes
 
-Representative questions can retrieve relevant current and historical evidence.
+### Vector & Semantic Layer
+- Generate embeddings for commits, PRs, issues, docs
+- Store in pgvector
+- Build hybrid retrieval (keyword + vector + graph traversal)
+
+## Acceptance Criteria
+
+- [ ] Git history can be ingested and linked to current components
+- [ ] PRs, issues, and docs can be queried and retrieved
+- [ ] Timeline of a component or symbol can be reconstructed
+- [ ] Hybrid retrieval returns relevant historical evidence for a query
+- [ ] All unit/integration tests pass
