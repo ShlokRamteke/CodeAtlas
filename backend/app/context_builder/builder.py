@@ -1,8 +1,276 @@
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
+
+from app.context_builder.project_context import (
+    ContextEntity,
+    ContextEvidence,
+    ContextRelationship,
+    ContextUnknown,
+    ProjectContext,
+)
+
+
+class CurrentSystemContextBuilder:
+    """
+    Constructs one canonical ProjectContext shared by the human UI and AI/agent workflows.
+    Ensures zero separate knowledge pipelines.
+    """
+
+    def build_project_context(
+        self,
+        target_id: str,
+        target_name: str,
+        target_type: str,  # repository, component, file
+        files: List[dict],
+        symbols: List[dict],
+        dependencies: List[dict],
+        relationships: List[dict],
+        component_filter: Optional[str] = None,
+    ) -> ProjectContext:
+        # 1. Filter files if scoped to a specific component or path
+        if component_filter:
+            target_files = [
+                f for f in files
+                if f.get("path", "").startswith(component_filter)
+                or Path(f.get("path", "")).stem.lower() == component_filter.lower()
+            ]
+            if not target_files and files:
+                target_files = files
+        else:
+            target_files = files
+
+        target_file_ids = {f.get("id") for f in target_files if f.get("id")}
+        target_file_paths = {f.get("path") for f in target_files if f.get("path")}
+
+        # 2. Build Entities
+        entities: List[ContextEntity] = []
+
+        # Add File Entities
+        for f in target_files:
+            entities.append(
+                ContextEntity(
+                    id=str(f.get("id") or uuid.uuid4()),
+                    name=Path(f.get("path", "")).name,
+                    kind="file",
+                    path=f.get("path", ""),
+                    language=f.get("language"),
+                )
+            )
+
+        # Add Symbol Entities
+        target_symbols = [s for s in symbols if not target_file_ids or s.get("file_id") in target_file_ids]
+        for s in target_symbols:
+            entities.append(
+                ContextEntity(
+                    id=str(s.get("id") or uuid.uuid4()),
+                    name=s.get("name", ""),
+                    kind="symbol",
+                    path=s.get("path") or "",
+                    signature=s.get("signature"),
+                    line_start=s.get("line_start"),
+                    line_end=s.get("line_end"),
+                )
+            )
+
+        # 3. Build Canonical Relationships
+        context_relationships: List[ContextRelationship] = []
+        for r in relationships:
+            src_path = r.get("source_path", "")
+            tgt_path = r.get("target_path", "")
+            if not component_filter or src_path in target_file_paths or tgt_path in target_file_paths:
+                context_relationships.append(
+                    ContextRelationship(
+                        source_name=r.get("source_name", ""),
+                        source_path=src_path,
+                        target_name=r.get("target_name", ""),
+                        target_path=tgt_path,
+                        type=r.get("type", "imports"),
+                        confidence=float(r.get("confidence", 1.0)),
+                        resolution_method=r.get("resolution_method", "tree_sitter_ast"),
+                    )
+                )
+
+        # 4. Build Evidence Records
+        evidence: List[ContextEvidence] = []
+        for s in target_symbols[:20]:
+            evidence.append(
+                ContextEvidence(
+                    id=str(uuid.uuid4()),
+                    source_path=s.get("path") or target_name,
+                    kind="ast_symbol",
+                    content=f"{s.get('kind', 'symbol')} {s.get('name')}: {s.get('signature', '')}",
+                    confidence=1.0,
+                    provenance="tree_sitter_ast",
+                )
+            )
+
+        for d in dependencies:
+            if not target_file_ids or d.get("source_file_id") in target_file_ids:
+                evidence.append(
+                    ContextEvidence(
+                        id=str(uuid.uuid4()),
+                        source_path=d.get("source_path", target_name),
+                        kind="import_statement",
+                        content=f"import {d.get('imported_symbol') or '*'} from '{d.get('target_path')}'",
+                        confidence=float(d.get("confidence", 1.0)),
+                        provenance="tree_sitter_ast",
+                    )
+                )
+
+        for r in context_relationships:
+            if r.type == "tested_by":
+                evidence.append(
+                    ContextEvidence(
+                        id=str(uuid.uuid4()),
+                        source_path=r.source_path,
+                        kind="test_binding",
+                        content=f"{r.source_name} verified by test file {r.target_path}",
+                        confidence=r.confidence,
+                        provenance=r.resolution_method,
+                    )
+                )
+
+        # 5. Detect Unknowns & Uncertainties
+        unknowns: List[ContextUnknown] = []
+
+        # Check for untested source files
+        tested_sources = {r.source_path for r in context_relationships if r.type == "tested_by"}
+        for f in target_files:
+            p = f.get("path", "")
+            if not self._is_test_path(p) and p not in tested_sources:
+                unknowns.append(
+                    ContextUnknown(
+                        kind="untested",
+                        target=p,
+                        description=f"No associated unit or integration test suite linked to '{p}'.",
+                        severity="medium",
+                    )
+                )
+
+        # Check for unresolved external dependencies
+        for d in dependencies:
+            if not target_file_ids or d.get("source_file_id") in target_file_ids:
+                if d.get("kind") == "external":
+                    unknowns.append(
+                        ContextUnknown(
+                            kind="unresolved_dependency",
+                            target=d.get("target_path", "external_package"),
+                            description=f"External package '{d.get('target_path')}' imported without local source inspection.",
+                            severity="low",
+                        )
+                    )
+
+        # Check for empty files (no AST symbols extracted)
+        symbol_file_ids = {s.get("file_id") for s in symbols if s.get("file_id")}
+        for f in target_files:
+            if f.get("id") and f.get("id") not in symbol_file_ids and not self._is_test_path(f.get("path", "")):
+                unknowns.append(
+                    ContextUnknown(
+                        kind="empty_file",
+                        target=f.get("path", ""),
+                        description=f"No structural AST symbols were extracted from '{f.get('path')}'.",
+                        severity="low",
+                    )
+                )
+
+        # Check for heuristic/low-confidence relationships
+        for r in context_relationships:
+            if r.confidence < 1.0:
+                unknowns.append(
+                    ContextUnknown(
+                        kind="low_confidence",
+                        target=f"{r.source_name} -> {r.target_name}",
+                        description=f"Relationship '{r.type}' inferred via {r.resolution_method} with {int(r.confidence * 100)}% confidence.",
+                        severity="low",
+                    )
+                )
+
+        # 6. Overall Confidence Calculation
+        if context_relationships:
+            avg_rel_conf = sum(r.confidence for r in context_relationships) / len(context_relationships)
+        else:
+            avg_rel_conf = 1.0
+        overall_confidence = round(avg_rel_conf, 2)
+
+        # 7. Summary
+        if component_filter:
+            summary = f"Deterministic current-system model for component '{component_filter}' with {len(target_symbols)} symbols and {len(context_relationships)} relationships."
+        else:
+            summary = f"Deterministic current-system model for repository '{target_name}' across {len(target_files)} files, {len(target_symbols)} symbols, and {len(context_relationships)} relationship edges."
+
+        return ProjectContext(
+            target_type=target_type,
+            target_id=target_id,
+            target_name=target_name,
+            summary=summary,
+            entities=entities,
+            relationships=context_relationships,
+            evidence=evidence,
+            unknowns=unknowns,
+            confidence=overall_confidence,
+            provenance="tree_sitter_ast",
+        )
+
+    def build_component_brief(
+        self,
+        component_path: str,
+        files: List[dict],
+        symbols: List[dict],
+        dependencies: List[dict],
+        relationships: List[dict],
+    ) -> ComponentBrief:
+        """Convenience wrapper for component-level briefing."""
+        ctx = self.build_project_context(
+            target_id=component_path,
+            target_name=component_path,
+            target_type="component",
+            files=files,
+            symbols=symbols,
+            dependencies=dependencies,
+            relationships=relationships,
+            component_filter=component_path,
+        )
+
+        sym_entities = [e for e in ctx.entities if e.kind == "symbol"]
+        callers = [
+            {"caller": r.source_name, "path": r.source_path, "type": r.type}
+            for r in ctx.relationships
+            if r.type in ["imports", "calls"]
+        ]
+        tests = [r.target_path for r in ctx.relationships if r.type == "tested_by"]
+
+        return ComponentBrief(
+            name=component_path,
+            path=component_path,
+            language="typescript",
+            symbol_count=len(sym_entities),
+            symbols=[{"name": s.name, "kind": s.kind, "signature": s.signature or ""} for s in sym_entities],
+            dependencies=[
+                {"target": r.target_path, "symbol": r.target_name, "kind": "internal", "confidence": str(r.confidence)}
+                for r in ctx.relationships
+                if r.type == "imports"
+            ],
+            callers=callers,
+            tests=tests,
+            human_summary=ctx.to_human_markdown(),
+            llm_context=ctx.to_llm_prompt(),
+        )
+
+    @staticmethod
+    def _is_test_path(path: str) -> bool:
+        p = path.lower()
+        return (
+            ".test." in p
+            or ".spec." in p
+            or "/tests/" in p
+            or "/__tests__/" in p
+            or p.startswith("test_")
+            or "/test_" in p
+        )
 
 
 @dataclass
@@ -18,193 +286,3 @@ class ComponentBrief:
     human_summary: str
     llm_context: str
 
-
-@dataclass
-class RepositoryBrief:
-    repository_id: str
-    full_name: str
-    file_count: int
-    symbol_count: int
-    dependency_count: int
-    languages: Dict[str, int]
-    components: List[ComponentBrief]
-    human_summary: str
-    llm_context: str
-
-
-class CurrentSystemContextBuilder:
-    """
-    Constructs compact, trustworthy current-system briefings for humans
-    and token-efficient context blocks for LLM reasoning.
-    """
-
-    def build_component_brief(
-        self,
-        component_path: str,
-        files: List[dict],
-        symbols: List[dict],
-        dependencies: List[dict],
-        relationships: List[dict],
-    ) -> ComponentBrief:
-        # Filter files belonging to this component or exact path
-        matching_files = [
-            f for f in files
-            if f.get("path", "").startswith(component_path) or Path(f.get("path", "")).stem.lower() == component_path.lower()
-        ]
-        if not matching_files and files:
-            matching_files = files[:5]
-
-        file_ids = {f.get("id") for f in matching_files if f.get("id")}
-        comp_symbols = [s for s in symbols if s.get("file_id") in file_ids]
-
-        # Determine primary language
-        langs = [f.get("language", "typescript") for f in matching_files if f.get("language")]
-        primary_lang = langs[0] if langs else "typescript"
-
-        # Outbound dependencies
-        outbound_deps: List[Dict[str, str]] = []
-        for dep in dependencies:
-            if dep.get("source_file_id") in file_ids:
-                outbound_deps.append({
-                    "target": dep.get("target_path", ""),
-                    "symbol": dep.get("imported_symbol") or "",
-                    "kind": str(dep.get("kind", "internal")),
-                    "confidence": "1.0",
-                })
-
-        # Inbound callers (other components importing these files)
-        file_paths = {f.get("path") for f in matching_files}
-        callers: List[Dict[str, str]] = []
-        for rel in relationships:
-            if rel.get("target_path") in file_paths and rel.get("type") in ["imports", "calls"]:
-                callers.append({
-                    "caller": rel.get("source_name", ""),
-                    "path": rel.get("source_path", ""),
-                    "type": rel.get("type", "imports"),
-                })
-
-        # Tests
-        tests: List[str] = []
-        for rel in relationships:
-            if rel.get("source_path") in file_paths and rel.get("type") == "tested_by":
-                tests.append(rel.get("target_path", ""))
-
-        # 1. Generate Human Markdown Summary
-        sym_list_md = "\n".join(
-            f"- `{s.get('kind', 'symbol')}` **{s.get('name', '')}** (lines {s.get('line_start', 1)}-{s.get('line_end', 1)})"
-            for s in comp_symbols[:10]
-        ) or "- *No symbols indexed*"
-
-        dep_list_md = "\n".join(
-            f"- `{d['target']}`" + (f" (imports `{d['symbol']}`)" if d['symbol'] else "") + f" [{d['kind']}]"
-            for d in outbound_deps[:10]
-        ) or "- *None (Standalone module)*"
-
-        caller_list_md = "\n".join(
-            f"- **{c['caller']}** (`{c['path']}`)" for c in callers[:10]
-        ) or "- *No internal callers discovered*"
-
-        test_list_md = "\n".join(
-            f"- `{t}`" for t in tests
-        ) or "- *No associated test file match*"
-
-        human_summary = f"""### Component: {component_path}
-**Primary Language:** {primary_lang.capitalize()} | **Source Files:** {len(matching_files)} | **Symbols:** {len(comp_symbols)}
-
-#### 📦 Key Symbols
-{sym_list_md}
-
-#### 🔗 Dependencies (Imports)
-{dep_list_md}
-
-#### 📥 Used By (Inbound Callers)
-{caller_list_md}
-
-#### 🧪 Linked Test Suites
-{test_list_md}
-"""
-
-        # 2. Generate LLM Context Block
-        sym_names = [f"{s.get('name')}({s.get('kind')})" for s in comp_symbols[:12]]
-        dep_names = [f"{d['target']}:{d['symbol']}" if d['symbol'] else d['target'] for d in outbound_deps[:10]]
-        caller_names = [f"{c['caller']}({c['path']})" for c in callers[:8]]
-
-        llm_context = f"""--- CURRENT SYSTEM CONTEXT BRIEFING ---
-TARGET COMPONENT: {component_path}
-LANGUAGE: {primary_lang}
-SYMBOLS ({len(comp_symbols)}): [{', '.join(sym_names)}]
-OUTBOUND DEPENDENCIES: [{', '.join(dep_names)}]
-INBOUND CALLERS: [{', '.join(caller_names)}]
-LINKED TESTS: [{', '.join(tests) if tests else 'none'}]
-EXTRACTION PROVENANCE: Tree-sitter AST (Confidence: 1.0)
-----------------------------------------"""
-
-        return ComponentBrief(
-            name=component_path,
-            path=component_path,
-            language=primary_lang,
-            symbol_count=len(comp_symbols),
-            symbols=[{"name": s.get("name", ""), "kind": s.get("kind", ""), "signature": s.get("signature", "")} for s in comp_symbols],
-            dependencies=outbound_deps,
-            callers=callers,
-            tests=tests,
-            human_summary=human_summary,
-            llm_context=llm_context,
-        )
-
-    def build_repository_brief(
-        self,
-        repository_id: str,
-        full_name: str,
-        files: List[dict],
-        symbols: List[dict],
-        dependencies: List[dict],
-        relationships: List[dict],
-        languages: Dict[str, int],
-    ) -> RepositoryBrief:
-        components: List[ComponentBrief] = []
-
-        # Find distinct top-level components
-        comp_paths = set()
-        for f in files:
-            p = Path(f.get("path", ""))
-            parts = p.parts
-            if len(parts) > 1:
-                comp_paths.add("/".join(parts[: min(2, len(parts) - 1)]))
-            else:
-                comp_paths.add("root")
-
-        for cp in sorted(comp_paths):
-            components.append(
-                self.build_component_brief(cp, files, symbols, dependencies, relationships)
-            )
-
-        human_summary = f"""# System Architecture: {full_name}
-
-**Repository Overview:**
-- **Files:** {len(files)} source files
-- **Symbols:** {len(symbols)} AST symbols extracted
-- **Dependencies:** {len(dependencies)} dependency edges
-- **Languages:** {', '.join(f'{k}: {v}' for k, v in languages.items())}
-
-## Major Architecture Components ({len(components)})
-""" + "\n---\n".join(c.human_summary for c in components)
-
-        llm_context = f"""=== REPOSITORY CURRENT-SYSTEM MODEL ===
-REPO: {full_name}
-FILES: {len(files)} | SYMBOLS: {len(symbols)} | DEPENDENCIES: {len(dependencies)}
-LANGUAGES: {languages}
-COMPONENTS ({len(components)}):
-""" + "\n".join(f"- {c.name}: {c.symbol_count} symbols, {len(c.dependencies)} deps, {len(c.callers)} callers" for c in components) + "\n======================================="
-
-        return RepositoryBrief(
-            repository_id=repository_id,
-            full_name=full_name,
-            file_count=len(files),
-            symbol_count=len(symbols),
-            dependency_count=len(dependencies),
-            languages=languages,
-            components=components,
-            human_summary=human_summary,
-            llm_context=llm_context,
-        )

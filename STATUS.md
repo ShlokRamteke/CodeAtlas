@@ -34,13 +34,15 @@ engineering context, and AI reasoning.
 - **Phase 2 — Repository Understanding**:
   - Tree-sitter AST parser (`ASTCodeParser`) supporting TypeScript, TSX, JavaScript, and Python (`backend/app/parser/ast_parser.py`)
   - Deterministic symbol extraction (functions, classes, interfaces, types, methods, docstrings, line numbers)
-  - Dependency and import extraction (internal, external, relative imports)
+  - Dependency and import extraction (internal, external, relative imports) with confidence and extraction provenance
   - Relationship and test linker (`RelationshipAnalyzer`) mapping tests to source modules and constructing component architecture graphs
-  - Ingestion Engine (`IngestionEngine`) with SHA-256 content hashing and automated credential secret redaction
-  - `CodeDependency` database model and Alembic migration `0002_add_dependencies.py`
-  - REST endpoints for repository ingestion (`/ingest`), symbol query/filtering (`/symbols`), dependency querying (`/dependencies`), and architecture overview (`/architecture`)
-  - Frontend interactive `ArchitectureExplorer` component with component cards, live symbol search, and relationship graph
-  - Complete automated test suite with 100% pass rate (10/10 tests)
+  - Canonical Unified `ProjectContext` model (`project_context.py`) unifying Human UI and AI/Agent prompt pipelines into a single source of truth
+  - Deterministic detection and tracking of architectural unknowns & uncertainties (untested modules, external uninspected packages, empty files)
+  - `CurrentSystemContextBuilder` with dual projection rendering (`to_human_markdown()` and token-efficient `to_llm_prompt()`)
+  - REST endpoints for repository ingestion (`/ingest`, `/connect-github`), canonical context (`/context`), symbol query (`/symbols`), dependencies (`/dependencies`), and architecture overview (`/architecture`)
+  - Frontend interactive `ArchitectureExplorer` component with component cards, live symbol search, relationship graph, and dedicated Unified ProjectContext viewer with unknowns panel
+  - Complete automated test suite with 100% pass rate (16/16 pytest tests, zero type errors in contracts and frontend)
+
 
 ## Remaining
 

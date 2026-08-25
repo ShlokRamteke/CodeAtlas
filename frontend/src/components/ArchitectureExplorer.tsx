@@ -6,13 +6,13 @@ import type {
   ArchitectureOverview,
   SymbolItem,
   CodeDependencyItem,
-  ContextBriefResponse,
+  ProjectContext,
 } from "@archaeologist/contracts";
 import {
   fetchRepositoryArchitecture,
   fetchRepositorySymbols,
   fetchRepositoryDependencies,
-  fetchRepositoryContextBrief,
+  fetchProjectContext,
   ingestRepositoryFiles,
 } from "@/lib/api";
 import {
@@ -33,6 +33,10 @@ import {
   FileText,
   Copy,
   Sparkles,
+  AlertTriangle,
+  ShieldCheck,
+  HelpCircle,
+  FileCheck,
 } from "lucide-react";
 
 interface ArchitectureExplorerProps {
@@ -164,15 +168,15 @@ def test_aggregates():
 
 export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) {
   const [activeTab, setActiveTab] = useState<
-    "components" | "symbols" | "relationships" | "briefing" | "ingest"
+    "components" | "symbols" | "relationships" | "project_context" | "ingest"
   >("components");
   const [architecture, setArchitecture] = useState<ArchitectureOverview | null>(null);
   const [symbols, setSymbols] = useState<SymbolItem[]>([]);
   const [symbolQuery, setSymbolQuery] = useState("");
   const [kindFilter, setKindFilter] = useState<string>("");
   const [dependencies, setDependencies] = useState<CodeDependencyItem[]>([]);
-  const [contextBrief, setContextBrief] = useState<ContextBriefResponse | null>(null);
-  const [selectedBriefComp, setSelectedBriefComp] = useState<string>("");
+  const [projectContext, setProjectContext] = useState<ProjectContext | null>(null);
+  const [selectedContextComp, setSelectedContextComp] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [ingesting, setIngesting] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -200,23 +204,23 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
   }, [activeTab, symbolQuery, kindFilter, repository.id]);
 
   useEffect(() => {
-    if (activeTab === "briefing") {
-      fetchRepositoryContextBrief(repository.id, selectedBriefComp || undefined).then(
-        setContextBrief
+    if (activeTab === "project_context") {
+      fetchProjectContext(repository.id, selectedContextComp || undefined).then(
+        setProjectContext
       );
     }
-  }, [activeTab, selectedBriefComp, repository.id]);
+  }, [activeTab, selectedContextComp, repository.id]);
 
   async function loadData() {
     setLoading(true);
-    const [arch, deps, brief] = await Promise.all([
+    const [arch, deps, pCtx] = await Promise.all([
       fetchRepositoryArchitecture(repository.id),
       fetchRepositoryDependencies(repository.id),
-      fetchRepositoryContextBrief(repository.id),
+      fetchProjectContext(repository.id),
     ]);
     setArchitecture(arch);
     setDependencies(deps);
-    setContextBrief(brief);
+    setProjectContext(pCtx);
     setLoading(false);
   }
 
@@ -280,11 +284,11 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
             <h3 className="text-base font-semibold text-white flex items-center gap-2">
               Current System Architecture
               <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
-                Tree-sitter AST &bull; 100% Deterministic
+                Unified ProjectContext &bull; 100% Deterministic
               </span>
             </h3>
             <p className="text-xs text-slate-400">
-              Symbol graphs, test relationships, and Context Builder briefings
+              Single canonical context layer powering both Human UI and AI/Agent prompt pipelines
             </p>
           </div>
         </div>
@@ -292,11 +296,11 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
         {/* Action Buttons */}
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setActiveTab("briefing")}
+            onClick={() => setActiveTab("project_context")}
             className="flex items-center gap-2 px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 rounded-lg text-xs font-medium transition"
           >
             <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-            Context Brief
+            Project Context
           </button>
           <button
             onClick={() => setActiveTab("ingest")}
@@ -388,15 +392,15 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
           Relationships ({architecture?.relationships.length || 0})
         </button>
         <button
-          onClick={() => setActiveTab("briefing")}
+          onClick={() => setActiveTab("project_context")}
           className={`py-3 px-4 border-b-2 flex items-center gap-2 transition whitespace-nowrap ${
-            activeTab === "briefing"
+            activeTab === "project_context"
               ? "border-purple-500 text-purple-400 font-semibold"
               : "border-transparent hover:text-slate-200"
           }`}
         >
           <FileText className="w-4 h-4" />
-          Context Briefing
+          Unified ProjectContext
         </button>
         <button
           onClick={() => setActiveTab("ingest")}
@@ -606,33 +610,37 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
               </div>
             )}
           </div>
-        ) : activeTab === "briefing" ? (
-          /* Context Builder Briefing Tab */
+        ) : activeTab === "project_context" ? (
+          /* Canonical Unified ProjectContext Tab */
           <div className="space-y-6">
+            {/* Target Header Bar */}
             <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-800">
               <div>
                 <h4 className="text-sm font-semibold text-white flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-purple-400" />
-                  Current-System Context Builder
+                  Canonical ProjectContext
+                  <span className="text-xs font-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                    Single Knowledge Source
+                  </span>
                 </h4>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Compact human briefing and token-efficient LLM prompt context block.
+                  One structured context model shared between Human UI and AI/Agent reasoning.
                 </p>
               </div>
 
-              {/* Component filter selector */}
-              {contextBrief && contextBrief.components.length > 0 && (
+              {/* Component Scope Filter */}
+              {architecture && architecture.majorComponents.length > 0 && (
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400">Target Component:</span>
+                  <span className="text-xs text-slate-400">Context Scope:</span>
                   <select
-                    value={selectedBriefComp}
-                    onChange={(e) => setSelectedBriefComp(e.target.value)}
+                    value={selectedContextComp}
+                    onChange={(e) => setSelectedContextComp(e.target.value)}
                     className="bg-slate-950 border border-slate-700 text-white text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-purple-500 font-mono"
                   >
-                    <option value="">All Components Overview</option>
-                    {contextBrief.components.map((c) => (
-                      <option key={c.name} value={c.name}>
-                        {c.name} ({c.symbolCount} symbols)
+                    <option value="">Full Repository Context</option>
+                    {architecture.majorComponents.map((c) => (
+                      <option key={c.path} value={c.path}>
+                        Component: {c.name}
                       </option>
                     ))}
                   </select>
@@ -640,58 +648,140 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
               )}
             </div>
 
-            {/* Content Display: Split Human View & LLM Context Block */}
-            {contextBrief ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* 1. Human Markdown Summary */}
-                <div className="bg-slate-950/80 p-5 rounded-xl border border-slate-800 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-indigo-400 uppercase tracking-wider">
-                      Human Briefing
-                    </span>
-                    <span className="text-[11px] px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-                      Deterministic Facts
-                    </span>
+            {projectContext ? (
+              <div className="space-y-6">
+                {/* Meta & Provenance Pill Bar */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    <div>
+                      <div className="text-[10px] text-slate-500 uppercase font-semibold">Confidence</div>
+                      <div className="text-xs font-bold text-emerald-400">
+                        {Math.round(projectContext.confidence * 100)}% Verified
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed font-sans">
-                    {contextBrief.humanSummary}
+                  <div className="flex items-center gap-2">
+                    <FileCheck className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                    <div>
+                      <div className="text-[10px] text-slate-500 uppercase font-semibold">Entities &amp; Edges</div>
+                      <div className="text-xs font-bold text-white">
+                        {projectContext.entities.length} entities &bull; {projectContext.relationships.length} rels
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <HelpCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                    <div>
+                      <div className="text-[10px] text-slate-500 uppercase font-semibold">Identified Unknowns</div>
+                      <div className="text-xs font-bold text-amber-400">
+                        {projectContext.unknowns.length} gaps flagged
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <FileCode className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+                    <div>
+                      <div className="text-[10px] text-slate-500 uppercase font-semibold">Provenance</div>
+                      <div className="text-xs font-mono font-medium text-cyan-300 truncate">
+                        {projectContext.provenance}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* 2. Token-Efficient LLM Context Block */}
-                <div className="bg-slate-950/80 p-5 rounded-xl border border-slate-800 space-y-4 flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold text-purple-400 uppercase tracking-wider">
-                        LLM Context Block (Compact)
+                {/* Dual Views: Human Markdown vs AI/Agent Prompt */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* 1. Human UI View */}
+                  <div className="bg-slate-950/80 p-5 rounded-xl border border-slate-800 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5" />
+                        Human UI View (Markdown Projection)
                       </span>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(contextBrief.llmContext);
-                          setCopiedLlm(true);
-                          setTimeout(() => setCopiedLlm(false), 1500);
-                        }}
-                        className="flex items-center gap-1 px-2.5 py-1 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 rounded text-[11px] text-purple-300 transition"
-                      >
-                        {copiedLlm ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                        {copiedLlm ? "Copied!" : "Copy Context Block"}
-                      </button>
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                        Rendered for Developer
+                      </span>
                     </div>
 
-                    <pre className="p-3 bg-slate-900 rounded-lg text-[11px] font-mono text-purple-300/90 whitespace-pre-wrap leading-relaxed overflow-x-auto border border-purple-500/10">
-                      {contextBrief.llmContext}
-                    </pre>
+                    <div className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed font-sans max-h-[420px] overflow-y-auto pr-2">
+                      {projectContext.humanMarkdown}
+                    </div>
                   </div>
 
-                  <div className="text-[11px] text-slate-500 border-t border-slate-800/80 pt-3">
-                    💡 This compact block is injected into reasoning prompts (Phases 4–5) without polluting LLM token context with raw repo source.
+                  {/* 2. AI / Agent Context Block */}
+                  <div className="bg-slate-950/80 p-5 rounded-xl border border-slate-800 space-y-4 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5" />
+                          AI / Agent Projection (Token-Efficient)
+                        </span>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(projectContext.llmPromptContext);
+                            setCopiedLlm(true);
+                            setTimeout(() => setCopiedLlm(false), 1500);
+                          }}
+                          className="flex items-center gap-1 px-2.5 py-1 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 rounded text-[11px] text-purple-300 transition"
+                        >
+                          {copiedLlm ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          {copiedLlm ? "Copied!" : "Copy Agent Prompt"}
+                        </button>
+                      </div>
+
+                      <pre className="p-3 bg-slate-900 rounded-lg text-[11px] font-mono text-purple-300/90 whitespace-pre-wrap leading-relaxed overflow-x-auto max-h-[380px] border border-purple-500/10">
+                        {projectContext.llmPromptContext}
+                      </pre>
+                    </div>
+
+                    <div className="text-[11px] text-slate-500 border-t border-slate-800/80 pt-3">
+                      💡 <strong>Unified Pipeline:</strong> Both Human UI and LLM reasoning consume this exact same <code>ProjectContext</code> structure.
+                    </div>
                   </div>
                 </div>
+
+                {/* Unknowns & Architectural Gaps Panel */}
+                {projectContext.unknowns.length > 0 && (
+                  <div className="bg-slate-950/80 p-5 rounded-xl border border-amber-500/20">
+                    <h5 className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      Identified Uncertainties &amp; Gaps ({projectContext.unknowns.length})
+                    </h5>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {projectContext.unknowns.map((u, i) => (
+                        <div
+                          key={i}
+                          className="p-3 rounded-lg bg-slate-900 border border-slate-800 flex items-start gap-2 text-xs"
+                        >
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[10px] uppercase font-bold flex-shrink-0 ${
+                              u.severity === "high"
+                                ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                                : u.severity === "medium"
+                                ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                : "bg-slate-800 text-slate-400"
+                            }`}
+                          >
+                            {u.kind}
+                          </span>
+                          <div>
+                            <div className="font-mono text-white font-medium">{u.target}</div>
+                            <div className="text-slate-400 text-[11px] mt-0.5">{u.description}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="py-12 text-center text-slate-500 text-sm">
-                No context brief available yet. Index some code first!
+                No ProjectContext generated yet. Index repository code to inspect context!
               </div>
             )}
           </div>

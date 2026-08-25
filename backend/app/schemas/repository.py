@@ -104,6 +104,59 @@ class ConnectGitHubResponse(BaseModel):
     architecture: ArchitectureOverviewResponse
 
 
+class ContextEntitySchema(BaseModel):
+    id: str
+    name: str
+    kind: str
+    path: str
+    language: Optional[str] = None
+    signature: Optional[str] = None
+    line_start: Optional[int] = None
+    line_end: Optional[int] = None
+
+
+class ContextRelationshipSchema(BaseModel):
+    source_name: str
+    source_path: str
+    target_name: str
+    target_path: str
+    type: str
+    confidence: float = 1.0
+    resolution_method: str = "tree_sitter_ast"
+
+
+class ContextEvidenceSchema(BaseModel):
+    id: str
+    source_path: str
+    kind: str
+    content: str
+    confidence: float = 1.0
+    provenance: str = "tree_sitter_ast"
+
+
+class ContextUnknownSchema(BaseModel):
+    kind: str
+    target: str
+    description: str
+    severity: str = "medium"
+
+
+class ProjectContextRead(BaseModel):
+    target_type: str
+    target_id: str
+    target_name: str
+    summary: str
+    confidence: float = 1.0
+    provenance: str = "tree_sitter_ast"
+    entities: List[ContextEntitySchema]
+    relationships: List[ContextRelationshipSchema]
+    evidence: List[ContextEvidenceSchema]
+    unknowns: List[ContextUnknownSchema]
+    human_markdown: str
+    llm_prompt_context: str
+
+
+# Backwards compatibility alias for Phase 2 ContextBrief
 class ComponentBriefSchema(BaseModel):
     name: str
     path: str
@@ -127,5 +180,7 @@ class ContextBriefResponse(BaseModel):
     components: List[ComponentBriefSchema]
     human_summary: str
     llm_context: str
+    project_context: Optional[ProjectContextRead] = None
+
 
 
