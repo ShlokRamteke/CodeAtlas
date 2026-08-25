@@ -6,7 +6,9 @@ import type {
   ArchitectureOverview,
   SymbolItem,
   CodeDependencyItem,
+  ContextBriefResponse,
 } from "@archaeologist/contracts";
+
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -129,9 +131,47 @@ export async function ingestRepositoryFiles(
   }
 }
 
+export async function fetchRepositoryContextBrief(
+  repositoryId: string,
+  component?: string
+): Promise<ContextBriefResponse | null> {
+  try {
+    const url = new URL(`${API_BASE}/api/v1/repositories/${repositoryId}/context-brief`);
+    if (component) url.searchParams.set("component", component);
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      repositoryId: data.repository_id,
+      fullName: data.full_name,
+      fileCount: data.file_count,
+      symbolCount: data.symbol_count,
+      dependencyCount: data.dependency_count,
+      languages: data.languages,
+      components: data.components.map((c: any) => ({
+        name: c.name,
+        path: c.path,
+        language: c.language,
+        symbolCount: c.symbol_count,
+        symbols: c.symbols,
+        dependencies: c.dependencies,
+        callers: c.callers,
+        tests: c.tests,
+        humanSummary: c.human_summary,
+        llmContext: c.llm_context,
+      })),
+      humanSummary: data.human_summary,
+      llmContext: data.llm_context,
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
 export async function fetchRepositoryArchitecture(
   repositoryId: string
 ): Promise<ArchitectureOverview | null> {
+
   try {
     const res = await fetch(`${API_BASE}/api/v1/repositories/${repositoryId}/architecture`, {
       cache: "no-store",

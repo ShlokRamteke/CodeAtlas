@@ -25,6 +25,9 @@ class ExtractedDependency:
     target_path: str
     imported_symbol: Optional[str] = None
     kind: str = "internal"  # internal, external, relative
+    confidence: float = 1.0
+    resolution_method: str = "tree_sitter_ast"
+
 
 
 @dataclass

@@ -24,6 +24,9 @@ class RelationshipEdge:
     target_name: str
     target_path: str
     type: str  # imports, calls, extends, implements, tested_by
+    confidence: float = 1.0
+    resolution_method: str = "tree_sitter_ast"
+
 
 
 @dataclass
@@ -153,8 +156,11 @@ class RelationshipAnalyzer:
                     target_name=Path(test_file).stem,
                     target_path=test_file,
                     type="tested_by",
+                    confidence=0.90,
+                    resolution_method="filename_heuristic",
                 )
             )
+
 
         return ArchitectureGraph(
             file_count=len(parsed_files),

@@ -6,11 +6,13 @@ import type {
   ArchitectureOverview,
   SymbolItem,
   CodeDependencyItem,
+  ContextBriefResponse,
 } from "@archaeologist/contracts";
 import {
   fetchRepositoryArchitecture,
   fetchRepositorySymbols,
   fetchRepositoryDependencies,
+  fetchRepositoryContextBrief,
   ingestRepositoryFiles,
 } from "@/lib/api";
 import {
@@ -28,6 +30,9 @@ import {
   FilePlus,
   Play,
   Check,
+  FileText,
+  Copy,
+  Sparkles,
 } from "lucide-react";
 
 interface ArchitectureExplorerProps {
@@ -159,16 +164,19 @@ def test_aggregates():
 
 export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) {
   const [activeTab, setActiveTab] = useState<
-    "components" | "symbols" | "relationships" | "ingest"
+    "components" | "symbols" | "relationships" | "briefing" | "ingest"
   >("components");
   const [architecture, setArchitecture] = useState<ArchitectureOverview | null>(null);
   const [symbols, setSymbols] = useState<SymbolItem[]>([]);
   const [symbolQuery, setSymbolQuery] = useState("");
   const [kindFilter, setKindFilter] = useState<string>("");
   const [dependencies, setDependencies] = useState<CodeDependencyItem[]>([]);
+  const [contextBrief, setContextBrief] = useState<ContextBriefResponse | null>(null);
+  const [selectedBriefComp, setSelectedBriefComp] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [ingesting, setIngesting] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [copiedLlm, setCopiedLlm] = useState(false);
 
   // Custom File Editor state for Ingest tab
   const [customPath, setCustomPath] = useState("src/utils/calculator.ts");
@@ -191,14 +199,24 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
     }
   }, [activeTab, symbolQuery, kindFilter, repository.id]);
 
+  useEffect(() => {
+    if (activeTab === "briefing") {
+      fetchRepositoryContextBrief(repository.id, selectedBriefComp || undefined).then(
+        setContextBrief
+      );
+    }
+  }, [activeTab, selectedBriefComp, repository.id]);
+
   async function loadData() {
     setLoading(true);
-    const [arch, deps] = await Promise.all([
+    const [arch, deps, brief] = await Promise.all([
       fetchRepositoryArchitecture(repository.id),
       fetchRepositoryDependencies(repository.id),
+      fetchRepositoryContextBrief(repository.id),
     ]);
     setArchitecture(arch);
     setDependencies(deps);
+    setContextBrief(brief);
     setLoading(false);
   }
 
@@ -211,6 +229,7 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
     const arch = await ingestRepositoryFiles(repository.id, tpl.files);
     if (arch) {
       setArchitecture(arch);
+      await loadData();
       setSuccessMsg(`Successfully indexed ${tpl.label} (${arch.symbolCount} symbols extracted)`);
       setTimeout(() => {
         setActiveTab("components");
@@ -239,6 +258,7 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
     if (arch) {
       setArchitecture(arch);
       setStagedFiles({});
+      await loadData();
       setSuccessMsg(`Indexed ${arch.fileCount} custom files (${arch.symbolCount} symbols)!`);
       setTimeout(() => {
         setActiveTab("components");
@@ -260,11 +280,11 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
             <h3 className="text-base font-semibold text-white flex items-center gap-2">
               Current System Architecture
               <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
-                Tree-sitter AST
+                Tree-sitter AST &bull; 100% Deterministic
               </span>
             </h3>
             <p className="text-xs text-slate-400">
-              Deterministic symbol graphs, test relationships, and dependency maps
+              Symbol graphs, test relationships, and Context Builder briefings
             </p>
           </div>
         </div>
@@ -272,8 +292,15 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
         {/* Action Buttons */}
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setActiveTab("briefing")}
+            className="flex items-center gap-2 px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 rounded-lg text-xs font-medium transition"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+            Context Brief
+          </button>
+          <button
             onClick={() => setActiveTab("ingest")}
-            className="flex items-center gap-2 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition shadow-sm"
+            className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition shadow-sm"
           >
             <UploadCloud className="w-3.5 h-3.5" />
             Add / Index Code
@@ -359,6 +386,17 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
         >
           <Network className="w-4 h-4" />
           Relationships ({architecture?.relationships.length || 0})
+        </button>
+        <button
+          onClick={() => setActiveTab("briefing")}
+          className={`py-3 px-4 border-b-2 flex items-center gap-2 transition whitespace-nowrap ${
+            activeTab === "briefing"
+              ? "border-purple-500 text-purple-400 font-semibold"
+              : "border-transparent hover:text-slate-200"
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          Context Briefing
         </button>
         <button
           onClick={() => setActiveTab("ingest")}
@@ -553,6 +591,9 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
                       >
                         {rel.type}
                       </span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">
+                        {rel.confidence ? `${Math.round(rel.confidence * 100)}%` : "100%"} conf
+                      </span>
                       <GitFork className="w-3.5 h-3.5 text-slate-500" />
                     </div>
 
@@ -562,6 +603,95 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        ) : activeTab === "briefing" ? (
+          /* Context Builder Briefing Tab */
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-800">
+              <div>
+                <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-purple-400" />
+                  Current-System Context Builder
+                </h4>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Compact human briefing and token-efficient LLM prompt context block.
+                </p>
+              </div>
+
+              {/* Component filter selector */}
+              {contextBrief && contextBrief.components.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400">Target Component:</span>
+                  <select
+                    value={selectedBriefComp}
+                    onChange={(e) => setSelectedBriefComp(e.target.value)}
+                    className="bg-slate-950 border border-slate-700 text-white text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-purple-500 font-mono"
+                  >
+                    <option value="">All Components Overview</option>
+                    {contextBrief.components.map((c) => (
+                      <option key={c.name} value={c.name}>
+                        {c.name} ({c.symbolCount} symbols)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Content Display: Split Human View & LLM Context Block */}
+            {contextBrief ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* 1. Human Markdown Summary */}
+                <div className="bg-slate-950/80 p-5 rounded-xl border border-slate-800 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-indigo-400 uppercase tracking-wider">
+                      Human Briefing
+                    </span>
+                    <span className="text-[11px] px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                      Deterministic Facts
+                    </span>
+                  </div>
+
+                  <div className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed font-sans">
+                    {contextBrief.humanSummary}
+                  </div>
+                </div>
+
+                {/* 2. Token-Efficient LLM Context Block */}
+                <div className="bg-slate-950/80 p-5 rounded-xl border border-slate-800 space-y-4 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-purple-400 uppercase tracking-wider">
+                        LLM Context Block (Compact)
+                      </span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(contextBrief.llmContext);
+                          setCopiedLlm(true);
+                          setTimeout(() => setCopiedLlm(false), 1500);
+                        }}
+                        className="flex items-center gap-1 px-2.5 py-1 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 rounded text-[11px] text-purple-300 transition"
+                      >
+                        {copiedLlm ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        {copiedLlm ? "Copied!" : "Copy Context Block"}
+                      </button>
+                    </div>
+
+                    <pre className="p-3 bg-slate-900 rounded-lg text-[11px] font-mono text-purple-300/90 whitespace-pre-wrap leading-relaxed overflow-x-auto border border-purple-500/10">
+                      {contextBrief.llmContext}
+                    </pre>
+                  </div>
+
+                  <div className="text-[11px] text-slate-500 border-t border-slate-800/80 pt-3">
+                    💡 This compact block is injected into reasoning prompts (Phases 4–5) without polluting LLM token context with raw repo source.
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="py-12 text-center text-slate-500 text-sm">
+                No context brief available yet. Index some code first!
               </div>
             )}
           </div>
@@ -655,6 +785,7 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
                         if (arch) {
                           setArchitecture(arch);
                           setStagedFiles({});
+                          await loadData();
                           setSuccessMsg(`Successfully indexed files!`);
                           setTimeout(() => {
                             setActiveTab("components");

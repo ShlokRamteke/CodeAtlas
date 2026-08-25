@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.context_builder.builder import CurrentSystemContextBuilder
 from app.core.db import get_db
 from app.ingestion.engine import IngestionEngine
 from app.ingestion.github_fetcher import GitHubRepoFetcher
@@ -19,10 +20,12 @@ from app.parser.relationship_analyzer import RelationshipAnalyzer
 from app.schemas.repository import (
     ArchitectureOverviewResponse,
     CodeDependencyRead,
+    ComponentBriefSchema,
     ComponentOverview,
     ComponentRelationshipSchema,
     ConnectGitHubRequest,
     ConnectGitHubResponse,
+    ContextBriefResponse,
     IngestFilesRequest,
     RepositoryCreate,
     RepositoryRead,
@@ -30,6 +33,7 @@ from app.schemas.repository import (
 )
 
 router = APIRouter()
+
 
 
 @router.post("/connect-github", response_model=ConnectGitHubResponse)
@@ -338,7 +342,146 @@ async def get_repository_architecture(
                 target_name=r.target_name,
                 target_path=r.target_path,
                 type=r.type,
+                confidence=r.confidence,
+                resolution_method=r.resolution_method,
             )
             for r in arch.relationships
         ],
     )
+
+
+@router.get("/{repository_id}/context-brief", response_model=ContextBriefResponse)
+async def get_repository_context_brief(
+    repository_id: uuid.UUID,
+    component: Optional[str] = Query(None, description="Optional component or file path filter"),
+    db: AsyncSession = Depends(get_db),
+) -> ContextBriefResponse:
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Repository not found",
+        )
+
+    files_stmt = select(SourceFile).where(SourceFile.repository_id == repository_id)
+    files = list((await db.execute(files_stmt)).scalars().all())
+
+    symbols_stmt = select(Symbol).where(Symbol.repository_id == repository_id)
+    symbols = list((await db.execute(symbols_stmt)).scalars().all())
+
+    deps_stmt = select(CodeDependency).where(CodeDependency.repository_id == repository_id)
+    deps = list((await db.execute(deps_stmt)).scalars().all())
+
+    # Build relationship graph
+    file_symbols: dict[uuid.UUID, list[Symbol]] = {f.id: [] for f in files}
+    for s in symbols:
+        if s.file_id in file_symbols:
+            file_symbols[s.file_id].append(s)
+
+    file_deps: dict[uuid.UUID, list[CodeDependency]] = {f.id: [] for f in files}
+    for d in deps:
+        if d.source_file_id in file_deps:
+            file_deps[d.source_file_id].append(d)
+
+    parsed_files = [
+        ParsedFileResult(
+            path=f.path,
+            language=f.language,
+            symbols=[
+                ExtractedSymbol(
+                    name=s.name,
+                    kind=s.kind.value,
+                    line_start=s.line_start,
+                    line_end=s.line_end,
+                    signature=s.signature,
+                    docstring=s.docstring,
+                )
+                for s in file_symbols.get(f.id, [])
+            ],
+            dependencies=[
+                ExtractedDependency(
+                    target_path=d.target_path,
+                    imported_symbol=d.imported_symbol,
+                    kind=d.kind.value,
+                )
+                for d in file_deps.get(f.id, [])
+            ],
+        )
+        for f in files
+    ]
+
+    analyzer = RelationshipAnalyzer()
+    arch = analyzer.analyze_repository(parsed_files)
+
+    builder = CurrentSystemContextBuilder()
+    files_dict = [{"id": f.id, "path": f.path, "language": f.language} for f in files]
+    symbols_dict = [
+        {"id": s.id, "file_id": s.file_id, "name": s.name, "kind": s.kind.value, "line_start": s.line_start, "line_end": s.line_end, "signature": s.signature}
+        for s in symbols
+    ]
+    deps_dict = [
+        {"source_file_id": d.source_file_id, "target_path": d.target_path, "imported_symbol": d.imported_symbol, "kind": d.kind.value}
+        for d in deps
+    ]
+    rels_dict = [
+        {"source_name": r.source_name, "source_path": r.source_path, "target_name": r.target_name, "target_path": r.target_path, "type": r.type}
+        for r in arch.relationships
+    ]
+
+    if component:
+        brief = builder.build_component_brief(component, files_dict, symbols_dict, deps_dict, rels_dict)
+        return ContextBriefResponse(
+            repository_id=repo.id,
+            full_name=repo.full_name,
+            file_count=len(files),
+            symbol_count=len(symbols),
+            dependency_count=len(deps),
+            languages=arch.languages,
+            components=[
+                ComponentBriefSchema(
+                    name=brief.name,
+                    path=brief.path,
+                    language=brief.language,
+                    symbol_count=brief.symbol_count,
+                    symbols=brief.symbols,
+                    dependencies=brief.dependencies,
+                    callers=brief.callers,
+                    tests=brief.tests,
+                    human_summary=brief.human_summary,
+                    llm_context=brief.llm_context,
+                )
+            ],
+            human_summary=brief.human_summary,
+            llm_context=brief.llm_context,
+        )
+
+    repo_brief = builder.build_repository_brief(
+        str(repo.id), repo.full_name, files_dict, symbols_dict, deps_dict, rels_dict, arch.languages
+    )
+
+    return ContextBriefResponse(
+        repository_id=repo.id,
+        full_name=repo.full_name,
+        file_count=repo_brief.file_count,
+        symbol_count=repo_brief.symbol_count,
+        dependency_count=repo_brief.dependency_count,
+        languages=repo_brief.languages,
+        components=[
+            ComponentBriefSchema(
+                name=c.name,
+                path=c.path,
+                language=c.language,
+                symbol_count=c.symbol_count,
+                symbols=c.symbols,
+                dependencies=c.dependencies,
+                callers=c.callers,
+                tests=c.tests,
+                human_summary=c.human_summary,
+                llm_context=c.llm_context,
+            )
+            for c in repo_brief.components
+        ],
+        human_summary=repo_brief.human_summary,
+        llm_context=repo_brief.llm_context,
+    )
+

@@ -76,6 +76,8 @@ class ComponentRelationshipSchema(BaseModel):
     target_name: str
     target_path: str
     type: str
+    confidence: float = 1.0
+    resolution_method: str = "tree_sitter_ast"
 
 
 class ArchitectureOverviewResponse(BaseModel):
@@ -100,4 +102,30 @@ class ConnectGitHubRequest(BaseModel):
 class ConnectGitHubResponse(BaseModel):
     repository: RepositoryRead
     architecture: ArchitectureOverviewResponse
+
+
+class ComponentBriefSchema(BaseModel):
+    name: str
+    path: str
+    language: str
+    symbol_count: int
+    symbols: List[Dict[str, str]]
+    dependencies: List[Dict[str, str]]
+    callers: List[Dict[str, str]]
+    tests: List[str]
+    human_summary: str
+    llm_context: str
+
+
+class ContextBriefResponse(BaseModel):
+    repository_id: uuid.UUID
+    full_name: str
+    file_count: int
+    symbol_count: int
+    dependency_count: int
+    languages: Dict[str, int]
+    components: List[ComponentBriefSchema]
+    human_summary: str
+    llm_context: str
+
 

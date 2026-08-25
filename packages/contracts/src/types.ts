@@ -64,6 +64,33 @@ export interface ComponentRelationship {
   targetName: string;
   targetPath: string;
   type: 'imports' | 'calls' | 'extends' | 'implements' | 'tested_by';
+  confidence?: number;
+  resolutionMethod?: string;
+}
+
+export interface ComponentBriefItem {
+  name: string;
+  path: string;
+  language: string;
+  symbolCount: number;
+  symbols: Array<{ name: string; kind: string; signature?: string }>;
+  dependencies: Array<{ target: string; symbol?: string; kind: string; confidence?: string }>;
+  callers: Array<{ caller: string; path: string; type: string }>;
+  tests: string[];
+  humanSummary: string;
+  llmContext: string;
+}
+
+export interface ContextBriefResponse {
+  repositoryId: string;
+  fullName: string;
+  fileCount: number;
+  symbolCount: number;
+  dependencyCount: number;
+  languages: Record<string, number>;
+  components: ComponentBriefItem[];
+  humanSummary: string;
+  llmContext: string;
 }
 
 export interface ArchitectureOverview {
@@ -81,6 +108,7 @@ export interface ArchitectureOverview {
   }>;
   relationships: ComponentRelationship[];
 }
+
 
 export interface RepositoryTreeItem {
   path: string;
