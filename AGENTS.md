@@ -29,6 +29,7 @@ Do not load all documents or all phase files for every task.
 - Always create a new branch from `main` for each new task, feature, or bugfix (e.g. `feat/phase-02-tree-sitter`, `fix/...`).
 - Keep branch commits focused and atomic.
 - When the task satisfies the Definition of Done and tests pass, push the branch to GitHub (`git push -u origin <branch-name>`).
+- Save the structured Pull Request title and description in the `prs/` directory (`prs/<TASK_ID>-<task-slug>.md` and `prs/PR.md`).
 - Use the pushed branch to create a Pull Request targeting `main`.
 
 ## Implementation Rules
