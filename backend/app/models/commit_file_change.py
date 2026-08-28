@@ -31,10 +31,16 @@ class CommitFileChange(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     file_path: Mapped[str] = mapped_column(String(1024), index=True, nullable=False)
     change_type: Mapped[ChangeType] = mapped_column(
-        Enum(ChangeType, name="change_type_enum"),
+        Enum(
+            ChangeType,
+            name="change_type_enum",
+            native_enum=False,
+            values_callable=lambda x: [e.value for e in x],
+        ),
         nullable=False,
         default=ChangeType.MODIFIED,
     )
+
     insertions: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     deletions: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     old_path: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
