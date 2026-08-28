@@ -2,11 +2,11 @@
 
 ## Current Phase
 
-Phase 1 — Foundation
+Phase 2 — Repository Understanding
 
 ## Current Task
 
-Phase 1 Complete — Ready for Phase 2 (Repository Understanding)
+Phase 2 Complete — Ready for Phase 3 (Historical Intelligence)
 
 ## Status
 
@@ -22,19 +22,29 @@ engineering context, and AI reasoning.
 
 ## Completed
 
-- Git repository bootstrap and `.gitignore` setup
-- Podman Compose environment with `docker.io/pgvector/pgvector:pg16`
+- **Phase 1 — Foundation**:
+  - Git repository bootstrap and `.gitignore` setup
+  - Podman Compose environment with `docker.io/pgvector/pgvector:pg16`
+  - Shared TypeScript contracts and schema types (`packages/contracts`)
+  - FastAPI backend with async database engine, models, schemas, and endpoints (`backend/`)
+  - Alembic database migrations with PostgreSQL pgvector support
+  - Next.js 14 frontend application with dark theme and API client (`frontend/`)
+  - GitHub Actions CI workflow for backend and frontend (`.github/workflows/ci.yml`)
 
-- Shared TypeScript contracts and schema types (`packages/contracts`)
-- FastAPI backend with async database engine, models, schemas, and endpoints (`backend/`)
-- Alembic database migration with PostgreSQL pgvector support
-- Backend unit and integration test suite passing with 100% green status
-- Next.js 14 frontend application with dark theme and API client (`frontend/`)
-- GitHub Actions CI workflow for backend and frontend (`.github/workflows/ci.yml`)
+- **Phase 2 — Repository Understanding**:
+  - Tree-sitter AST parser (`ASTCodeParser`) supporting TypeScript, TSX, JavaScript, and Python (`backend/app/parser/ast_parser.py`)
+  - Deterministic symbol extraction (functions, classes, interfaces, types, methods, docstrings, line numbers)
+  - Dependency and import extraction (internal, external, relative imports)
+  - Relationship and test linker (`RelationshipAnalyzer`) mapping tests to source modules and constructing component architecture graphs
+  - Ingestion Engine (`IngestionEngine`) with SHA-256 content hashing and automated credential secret redaction
+  - `CodeDependency` database model and Alembic migration `0002_add_dependencies.py`
+  - REST endpoints for repository ingestion (`/ingest`), symbol query/filtering (`/symbols`), dependency querying (`/dependencies`), and architecture overview (`/architecture`)
+  - Frontend interactive `ArchitectureExplorer` component with component cards, live symbol search, and relationship graph
+  - Complete automated test suite with 100% pass rate (10/10 tests)
 
 ## Remaining
 
-- Begin Phase 2 — Repository Understanding (GitHub connection, AST/tree-sitter code analysis, symbol indexing).
+- Begin Phase 3 — Historical Intelligence (Git commit ingestion, PR discussions, issue links, evolution timeline).
 
 ## Blockers
 
@@ -42,7 +52,7 @@ None
 
 ## Next Action
 
-Start Phase 2: Ingest repository and implement Tree-sitter code parser for TypeScript/JavaScript.
+Start Phase 3: Implement Git commit history analyzer and PR/issue timeline ingestion.
 
 ## Session Rule
 

@@ -33,7 +33,6 @@ Do not load all documents or all phase files for every task.
 
 ## Implementation Rules
 
-
 - Make the smallest change that satisfies the current task.
 - Prefer existing patterns over new abstractions.
 - Do not introduce infrastructure without a concrete need.

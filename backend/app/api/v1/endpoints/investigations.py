@@ -30,8 +30,10 @@ async def list_repository_investigations(
     return list(result.scalars().all())
 
 
-@router.post("/", response_model=InvestigationRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=InvestigationRead, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=InvestigationRead, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 async def create_investigation(
+
     inv_in: InvestigationCreate,
     db: AsyncSession = Depends(get_db),
 ) -> Investigation:

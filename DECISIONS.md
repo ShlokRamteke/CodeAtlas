@@ -110,7 +110,30 @@ state authoritative.
 
 ---
 
-## ADR-006 — History Is a Core Intelligence Layer, Not the Entire Product
+## ADR-006 — Living Project Documentation
+
+**Status:** Accepted
+
+**Decision**
+
+Allow the coding agent to update `ARCHITECTURE.md`, `ROADMAP.md`, `STATUS.md`,
+and `DECISIONS.md` when implementation genuinely changes them.
+
+`PROJECT.md` may only be changed for explicit or clearly authorized product
+scope changes.
+
+**Reason**
+
+Static documentation drifts as implementation evolves.
+
+**Trade-off**
+
+Automatic updates must be limited to substantive changes to avoid documentation
+noise.
+
+---
+
+## ADR-007 — History Is a Core Intelligence Layer, Not the Entire Product
 
 **Status:** Accepted
 
@@ -140,17 +163,27 @@ as first-class inputs to the same investigation engine.
 
 ---
 
-## ADR-007 — Podman Container Runtime
+## ADR-008 — Current-System Context Before AI Reasoning
 
 **Status:** Accepted
 
-**Date:** 2026-08-22
-
 **Decision**
 
-Use Podman as the local container runtime and compose engine (`podman-compose.yml` / `compose.yaml`).
+Build a deterministic/language-aware Current System Context layer before introducing historical AI investigation.
 
 **Reason**
 
-Rootless, daemonless container execution aligning with security best practices and developer environment standards.
+Humans and LLMs do not need the entire codebase. They need a compact, trustworthy representation of the relevant part of the current system.
 
+This reduces token usage, improves grounding, and avoids turning the project into a full compiler or autonomous code-understanding system.
+
+**Implication**
+
+Phase 2 focuses on:
+- structural parsing,
+- semantic resolution where useful,
+- relationships,
+- tests,
+- current-system Context Builder.
+
+Historical reasoning is added on top in later phases.

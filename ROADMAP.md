@@ -1,9 +1,8 @@
-# Project Archaeologist — Roadmap
+# Roadmap
 
 ## Overall Goal
 
-Build a SaaS that helps developers **understand unfamiliar software before they
-change it**.
+Build a SaaS that helps developers **understand unfamiliar software before they change it**.
 
 The product combines:
 
@@ -14,13 +13,10 @@ Historical Context
       +
 Engineering Context
       ↓
-AI Archaeological Investigation
-      ↓
 Evidence-backed Understanding
 ```
 
-The history layer is a major differentiator and marketing hook, but the product
-is broader than Git-history analysis.
+History is a major differentiator and marketing hook, but the product is broader than Git-history analysis.
 
 ## End-to-End MVP
 
@@ -28,25 +24,23 @@ is broader than Git-history analysis.
 GitHub
 → deterministic analysis
 → current + historical + engineering context
-→ hybrid retrieval
+→ retrieval
+→ context building
 → agentic investigation
-→ evidence-backed explanation
-→ SaaS UI
-→ MCP
-→ evaluation
+→ answer + cited evidence
+→ web UI / MCP
 ```
 
-## Development Principles
+## Guiding Principles
 
-- Development is phase-based, not deadline-based.
-- Day estimates are guidance only.
-- Incomplete work carries forward.
-- Do not advance a dependent phase until its definition of done is satisfied.
-- Build vertical slices.
-- Prove one useful workflow before broadening the product.
-- Keep infrastructure minimal.
-- Keep model calls bounded.
-- Do not build future-phase functionality early.
+1. Build only what is needed for the current phase.
+2. Index deterministically where possible; use AI for synthesis and reasoning.
+3. Keep the agent workflow bounded.
+4. Keep the context minimal.
+5. Ground every non-trivial claim in evidence.
+6. Support both human understanding and agent reasoning.
+
+---
 
 ## Phase 1 — Foundation
 
@@ -62,6 +56,8 @@ A stable foundation for all later product work.
 - database migrations work
 - shared contracts exist
 - CI works
+
+---
 
 ## Phase 2 — Repository Understanding
 
@@ -81,9 +77,12 @@ This phase answers:
 - tests
 - APIs
 - architecture relationships
+- current-system Context Builder
 
 ### Done when
-A repository can be indexed and its current structure can be queried.
+A repository can be indexed and its current structure can be queried and summarized for humans and LLMs.
+
+---
 
 ## Phase 3 — Historical + Engineering Context
 
@@ -102,89 +101,91 @@ This phase answers:
 - documentation
 - decision/context relationships
 - embeddings
-- hybrid retrieval
+- retrieval layer
 
 ### Done when
-The system can retrieve relevant current and historical evidence for
-representative developer questions.
+A developer or agent can trace how a component, symbol, or behavior evolved over time.
 
-## Phase 4 — Archaeological Investigation
+---
+
+## Phase 4 — Archaeology & Investigation
 
 ### Goal
-Connect current-system understanding with historical/contextual evidence to
-explain **why**.
+Build the AI investigation engine.
 
-This is the key differentiating AI layer.
+This phase answers:
+
+> **Why is the software like this, and what should I know before changing it?**
 
 ### Includes
-- Why Does This Exist?
-- Investigation planner
+- bounded LangGraph workflow
 - read-only investigation tools
-- evidence correlation
-- reasoning
-- evidence verification
-- confidence/uncertainty
+- Context Builder
+- evidence extraction
+- claim classification
+- confidence scoring
+- Pre-Change Briefs
+- "Why does this exist?"
 
 ### Done when
-A developer can ask why a component or behavior exists and receive a grounded
-explanation with evidence.
+The system can reliably investigate an unfamiliar component or question and return a grounded answer with evidence citations.
 
-## Phase 5 — SaaS Experience
+---
+
+## Phase 5 — SaaS Core
 
 ### Goal
-Turn Project Intelligence into an easy-to-use developer product.
+Make the product a usable, secure multi-tenant application.
 
 ### Includes
-- repository overview
-- architecture explorer
-- historical timeline
-- investigation UI
-- feature archaeology
-- pre-change brief
-- evidence navigation
+- GitHub App onboarding
+- auth / orgs / teams
+- repository permissions
+- async indexing pipeline
+- caching
+- rate limiting / token tracking
+- audit logging
+- settings
 
 ### Done when
-A developer can understand an unfamiliar repository through the SaaS without
-manually traversing multiple GitHub surfaces.
+A user can log in, install the GitHub App, select repositories, and use the product securely.
 
-## Phase 6 — MCP
+---
+
+## Phase 6 — MCP Integration
 
 ### Goal
-Make Project Archaeologist useful to coding agents.
+Allow external AI coding assistants to query Project Archaeologist.
 
 ### Includes
 - MCP server
-- read-only archaeology tools
-- compact responses
-- authorization
+- read-only tools
+- authentication / tenant checks
+- structured investigation summaries
 
 ### Done when
-A coding agent can ask for architecture/history/context before modifying code.
+Cursor/Claude Desktop/Windsurf can invoke Project Archaeologist to understand a component or design reason.
 
-## Phase 7 — Evaluation + Hardening
+---
+
+## Phase 7 — Evaluation & Production Hardening
 
 ### Goal
-Make the system measurable, reliable, secure, and portfolio-ready.
+Validate quality, speed, safety, and reliability.
 
 ### Includes
-- golden repository
-- evaluation dataset
-- retrieval metrics
-- history/why accuracy
-- groundedness/citations
-- cost/token tracking
-- observability
-- security review
+- evaluation benchmark
+- groundedness testing
+- historical accuracy
+- latency/cost tracking
+- security audit
+- performance tuning
 
 ### Done when
-The end-to-end product is stable and its AI behavior is measurable.
+The product meets quality, security, and cost targets.
 
-## Phase Documents
+---
 
-- `phases/phase-01-foundation.md`
-- `phases/phase-02-repository-understanding.md`
-- `phases/phase-03-historical-context.md`
-- `phases/phase-04-archaeology.md`
-- `phases/phase-05-saas.md`
-- `phases/phase-06-mcp.md`
-- `phases/phase-07-evaluation.md`
+## Current Status
+
+See [`STATUS.md`](file:///Users/shlok/Projects/Archelogiest/STATUS.md).

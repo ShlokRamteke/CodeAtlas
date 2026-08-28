@@ -10,6 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
+    from app.models.dependency import CodeDependency
     from app.models.repository import Repository
     from app.models.symbol import Symbol
 
@@ -33,4 +34,7 @@ class SourceFile(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     repository: Mapped["Repository"] = relationship("Repository", back_populates="files")
     symbols: Mapped[List["Symbol"]] = relationship(
         "Symbol", back_populates="file", cascade="all, delete-orphan"
+    )
+    dependencies: Mapped[List["CodeDependency"]] = relationship(
+        "CodeDependency", back_populates="source_file", cascade="all, delete-orphan"
     )

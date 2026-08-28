@@ -1,19 +1,27 @@
 # Phase 1 — Foundation
 
 ## Goal
-Create the application, database, contracts, and development workflow.
+
+Create the application skeleton, database baseline, contracts, and developer workflow.
 
 ## Prerequisites
+
 None.
 
 ## Tasks
-- Repository bootstrap
-- Database foundation
-- Shared contracts
 
-## Definition of Done
-- frontend runs
-- backend runs
-- database migrations work
-- shared contracts exist
-- CI works
+- Next.js frontend
+- FastAPI backend
+- PostgreSQL + pgvector
+- shared contracts
+- migration system
+- linting/formatting
+- local workflow
+
+## Acceptance Criteria
+
+- [x] frontend runs
+- [x] backend runs
+- [x] migrations run
+- [x] CI passes
+- [x] health endpoint returns OK

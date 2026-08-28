@@ -29,6 +29,7 @@ export interface SourceFile {
   language: string;
   contentHash: string;
   sizeBytes: number;
+  summary?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -46,6 +47,75 @@ export interface SymbolItem {
   signature?: string | null;
   docstring?: string | null;
   createdAt: string;
+}
+
+export interface CodeDependencyItem {
+  id: string;
+  sourceFileId: string;
+  sourcePath: string;
+  targetPath: string;
+  importedSymbol?: string | null;
+  kind: 'internal' | 'external' | 'relative';
+}
+
+export interface ComponentRelationship {
+  sourceName: string;
+  sourcePath: string;
+  targetName: string;
+  targetPath: string;
+  type: 'imports' | 'calls' | 'extends' | 'implements' | 'tested_by';
+  confidence?: number;
+  resolutionMethod?: string;
+}
+
+export interface ComponentBriefItem {
+  name: string;
+  path: string;
+  language: string;
+  symbolCount: number;
+  symbols: Array<{ name: string; kind: string; signature?: string }>;
+  dependencies: Array<{ target: string; symbol?: string; kind: string; confidence?: string }>;
+  callers: Array<{ caller: string; path: string; type: string }>;
+  tests: string[];
+  humanSummary: string;
+  llmContext: string;
+}
+
+export interface ContextBriefResponse {
+  repositoryId: string;
+  fullName: string;
+  fileCount: number;
+  symbolCount: number;
+  dependencyCount: number;
+  languages: Record<string, number>;
+  components: ComponentBriefItem[];
+  humanSummary: string;
+  llmContext: string;
+}
+
+export interface ArchitectureOverview {
+  repositoryId: string;
+  fileCount: number;
+  symbolCount: number;
+  dependencyCount: number;
+  languages: Record<string, number>;
+  majorComponents: Array<{
+    name: string;
+    path: string;
+    symbolCount: number;
+    dependencies: string[];
+    testedBy?: string | null;
+  }>;
+  relationships: ComponentRelationship[];
+}
+
+
+export interface RepositoryTreeItem {
+  path: string;
+  type: 'file' | 'directory';
+  language?: string;
+  symbolCount?: number;
+  children?: RepositoryTreeItem[];
 }
 
 export interface CommitItem {
