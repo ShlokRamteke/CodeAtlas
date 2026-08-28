@@ -197,9 +197,10 @@ export default function Home() {
               >
                 {repositories.map((repo) => (
                   <option key={repo.id} value={repo.id}>
-                    {repo.fullName} ({repo.fileCount} files, {repo.symbolCount} symbols)
+                    {repo.fullName || `${repo.owner}/${repo.name}`} ({repo.fileCount ?? 0} files, {repo.symbolCount ?? 0} symbols)
                   </option>
                 ))}
+
               </select>
             ) : (
               <span className="text-xs text-slate-500">No repositories yet &mdash; connect one above!</span>

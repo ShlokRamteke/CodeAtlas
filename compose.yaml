@@ -16,6 +16,67 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - archaeologist-network
+
+  adminer:
+    image: docker.io/library/adminer:latest
+    container_name: archaeologist-adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - archaeologist-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: archaeologist-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-archaeologist}"
+      PROJECT_NAME: "Project Archaeologist API"
+      VERSION: "0.1.0"
+      API_V1_STR: "/api/v1"
+      BACKEND_CORS_ORIGINS: '["http://localhost:3000", "http://127.0.0.1:3000"]'
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/app/app:Z
+      - ./backend/alembic:/app/alembic:Z
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - archaeologist-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: archaeologist-frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: "http://localhost:8000"
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend/src:/app/frontend/src:Z
+      - ./frontend/public:/app/frontend/public:Z
+    depends_on:
+      - backend
+    networks:
+      - archaeologist-network
 
 volumes:
   postgres_data:
+
+networks:
+  archaeologist-network:
+    driver: bridge

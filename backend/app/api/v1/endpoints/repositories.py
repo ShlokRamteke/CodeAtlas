@@ -75,8 +75,23 @@ async def connect_and_ingest_github_repo(
         engine = IngestionEngine(db)
         arch = await engine.ingest_files(repo.id, files)
 
+        # 3b. Ingest Git Commits
+        try:
+            from app.history.git_indexer import GitHistoryIndexer
+            commits = await fetcher.fetch_public_repo_commits(
+                owner=owner,
+                repo=name,
+                github_token=payload.github_token,
+            )
+            if commits:
+                indexer = GitHistoryIndexer()
+                await indexer.index_commits(repo.id, commits, db)
+        except Exception:
+            pass
+
         # 4. Refresh repo
         await db.refresh(repo)
+
 
         return ConnectGitHubResponse(
             repository=RepositoryRead.model_validate(repo),

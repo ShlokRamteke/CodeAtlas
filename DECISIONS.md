@@ -221,3 +221,49 @@ A single canonical `ProjectContext` model guarantees that:
 2. Serialization methods (`to_human_markdown()` and `to_llm_prompt()`) are deterministic projections of the same underlying data structure.
 3. Unknowns (e.g. untested code, unresolved external dependencies, ambiguous types) are explicitly preserved and visible to both humans and LLMs.
 
+---
+
+## ADR-010 — Full-Stack Containerization Architecture
+
+**Status:** Accepted
+
+**Date:** 2026-08-28
+
+**Decision**
+
+Containerize the entire stack (FastAPI backend, Next.js 14 frontend, PostgreSQL with pgvector, and Adminer DB UI) into an orchestrated Podman / Docker Compose deployment (`compose.yaml` / `podman-compose.yml`) with automated migration execution and persistent storage volumes.
+
+**Reason**
+
+Managing disparate manual runtime processes (`uvicorn` local daemons, `next dev` background processes, standalone db containers) introduces port collision risks, environment drift across host OS configurations, and manual onboarding friction.
+
+**Implication**
+
+- The entire stack starts with a single command (`make up` or `podman compose up -d`).
+- The backend entrypoint automatically checks database readiness and executes `alembic upgrade head` before serving traffic.
+- Named volume `postgres_data` guarantees complete data persistence across container stop/start lifecycles.
+- Host bind mounts preserve live hot-reloading for code development in `backend/` and `frontend/`.
+
+---
+
+## ADR-011 — Manifest-Aware Dependency Resolution
+
+**Status:** Accepted
+
+**Date:** 2026-08-28
+
+**Decision**
+
+Inspect project manifest files (`package.json`, `pyproject.toml`, `requirements.txt`) and standard library registries to differentiate declared 3rd-party dependencies from actual codebase gaps.
+
+**Reason**
+
+Treating all non-relative imports as "unresolved external package" gaps created false-positive noise in the Identified Unknowns panel (e.g., standard libraries or declared packages like `recharts`, `react`, `fastapi` being flagged as errors).
+
+**Implication**
+
+- Declared dependencies in `package.json` / `pyproject.toml` and runtime stdlibs are marked as resolved external boundaries without raising an uncertainty.
+- Path aliases (`@/`, `~/`, `$lib/`, `src/`) resolve to local source files.
+- The `undeclared_dependency` uncertainty is reserved specifically for undeclared ghost imports and broken relative paths.
+
+

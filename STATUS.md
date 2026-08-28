@@ -2,15 +2,15 @@
 
 ## Current Phase
 
-Phase 2 — Repository Understanding
+Phase 3 — Historical + Engineering Context
 
 ## Current Task
 
-Phase 2 Complete — Ready for Phase 3 (Historical Intelligence)
+PH3-01 Complete &mdash; Next: PH3-02 (Commit &rarr; PR &rarr; Issue Linking)
 
 ## Status
 
-COMPLETED
+IN PROGRESS
 
 ## Product Focus
 
@@ -22,31 +22,23 @@ engineering context, and AI reasoning.
 
 ## Completed
 
-- **Phase 1 — Foundation**:
-  - Git repository bootstrap and `.gitignore` setup
-  - Podman Compose environment with `docker.io/pgvector/pgvector:pg16`
-  - Shared TypeScript contracts and schema types (`packages/contracts`)
-  - FastAPI backend with async database engine, models, schemas, and endpoints (`backend/`)
-  - Alembic database migrations with PostgreSQL pgvector support
-  - Next.js 14 frontend application with dark theme and API client (`frontend/`)
-  - GitHub Actions CI workflow for backend and frontend (`.github/workflows/ci.yml`)
-
-- **Phase 2 — Repository Understanding**:
-  - Tree-sitter AST parser (`ASTCodeParser`) supporting TypeScript, TSX, JavaScript, and Python (`backend/app/parser/ast_parser.py`)
-  - Deterministic symbol extraction (functions, classes, interfaces, types, methods, docstrings, line numbers)
-  - Dependency and import extraction (internal, external, relative imports) with confidence and extraction provenance
-  - Relationship and test linker (`RelationshipAnalyzer`) mapping tests to source modules and constructing component architecture graphs
-  - Canonical Unified `ProjectContext` model (`project_context.py`) unifying Human UI and AI/Agent prompt pipelines into a single source of truth
-  - Deterministic detection and tracking of architectural unknowns & uncertainties (untested modules, external uninspected packages, empty files)
-  - `CurrentSystemContextBuilder` with dual projection rendering (`to_human_markdown()` and token-efficient `to_llm_prompt()`)
-  - REST endpoints for repository ingestion (`/ingest`, `/connect-github`), canonical context (`/context`), symbol query (`/symbols`), dependencies (`/dependencies`), and architecture overview (`/architecture`)
-  - Frontend interactive `ArchitectureExplorer` component with component cards, live symbol search, relationship graph, and dedicated Unified ProjectContext viewer with unknowns panel
-  - Complete automated test suite with 100% pass rate (16/16 pytest tests, zero type errors in contracts and frontend)
-
+- **Phase 1 — Foundation**: Complete foundation (Postgres, Alembic, FastAPI, Contracts, Next.js).
+- **Phase 2 — Repository Understanding**: Complete current-system layer (Tree-sitter AST, relationships, Context Builder, unified `ProjectContext`).
+- **Phase 3 — Task PH3-01 (Git History Indexing)**:
+  - Database model `CommitFileChange` (`ChangeType`: added, modified, deleted, renamed) and `0003_add_commit_file_changes` migration.
+  - `GitHistoryIndexer` service calculating file history and identifying the **introducing commit** (origin commit) for any file or component.
+  - `GitHubRepoFetcher.fetch_public_repo_commits()` extracting real commit history and file diffs.
+  - REST endpoints: `GET /api/v1/repositories/{id}/commits`, `GET /api/v1/repositories/{id}/files/{path}/history`, `GET /api/v1/repositories/{id}/components/{path}/history`, and `POST /commits/ingest`.
+  - Frontend interactive **Git History** tab and **File Evolution Inspector** in Next.js UI.
+  - 100% automated test pass rate (19/19 pytest tests).
 
 ## Remaining
 
-- Begin Phase 3 — Historical Intelligence (Git commit ingestion, PR discussions, issue links, evolution timeline).
+- **PH3-02**: Commit &rarr; PR &rarr; Issue Linking
+- **PH3-03**: Historical Retrieval
+- **PH3-04**: Engineering Context
+- **PH3-05**: Enrich ProjectContext
+- **PH3-06**: Historical Timeline / Developer View
 
 ## Blockers
 
@@ -54,7 +46,8 @@ None
 
 ## Next Action
 
-Start Phase 3: Implement Git commit history analyzer and PR/issue timeline ingestion.
+Start Task PH3-02: Implement Commit &rarr; PR &rarr; Issue linking and reference extraction.
+
 
 ## Session Rule
 

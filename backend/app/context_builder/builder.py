@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
+import re
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 from app.context_builder.project_context import (
     ContextEntity,
@@ -12,6 +14,23 @@ from app.context_builder.project_context import (
     ContextUnknown,
     ProjectContext,
 )
+
+NODE_STDLIB = {
+    "fs", "fs/promises", "path", "os", "events", "crypto", "stream", "http", "https",
+    "util", "url", "buffer", "process", "child_process", "cluster", "net", "tls",
+    "dgram", "dns", "readline", "zlib", "perf_hooks", "worker_threads", "assert",
+    "v8", "vm", "module", "string_decoder", "timers", "querystring"
+}
+
+PYTHON_STDLIB = {
+    "os", "sys", "re", "json", "math", "datetime", "typing", "collections", "itertools",
+    "functools", "pathlib", "uuid", "hashlib", "asyncio", "logging", "time", "random",
+    "copy", "enum", "dataclasses", "abc", "io", "urllib", "http", "unittest", "tempfile",
+    "shutil", "glob", "contextlib", "threading", "subprocess", "socket", "struct", "traceback"
+}
+
+KNOWN_STDLIB = NODE_STDLIB | PYTHON_STDLIB
+
 
 
 class CurrentSystemContextBuilder:
@@ -151,18 +170,51 @@ class CurrentSystemContextBuilder:
                     )
                 )
 
-        # Check for unresolved external dependencies
+        has_manifest, declared_pkgs = self._extract_declared_manifest_packages(files)
+
+        # Check for unresolved external dependencies (de-duplicated, excluding aliases and declared manifest packages)
+        seen_external_pkgs = set()
         for d in dependencies:
             if not target_file_ids or d.get("source_file_id") in target_file_ids:
-                if d.get("kind") == "external":
-                    unknowns.append(
-                        ContextUnknown(
-                            kind="unresolved_dependency",
-                            target=d.get("target_path", "external_package"),
-                            description=f"External package '{d.get('target_path')}' imported without local source inspection.",
-                            severity="low",
-                        )
-                    )
+                tgt = d.get("target_path", "")
+                is_alias = (
+                    tgt.startswith("@/")
+                    or tgt.startswith("~/")
+                    or tgt.startswith("#/")
+                    or tgt.startswith("$lib/")
+                    or tgt.startswith("src/")
+                    or tgt.startswith("app/")
+                )
+                if d.get("kind") == "external" and not is_alias:
+                    pkg_base = "/".join(tgt.split("/")[:2]) if tgt.startswith("@") else tgt.split("/")[0]
+                    pkg_base_lower = pkg_base.lower()
+
+                    # If declared in package.json or is standard library -> resolved
+                    if pkg_base in declared_pkgs or pkg_base_lower in declared_pkgs or pkg_base in KNOWN_STDLIB:
+                        continue
+
+                    if tgt not in seen_external_pkgs:
+                        seen_external_pkgs.add(tgt)
+                        if has_manifest:
+                            unknowns.append(
+                                ContextUnknown(
+                                    kind="undeclared_dependency",
+                                    target=tgt,
+                                    description=f"Package '{tgt}' is imported in code but not declared in project manifest (package.json / pyproject.toml).",
+                                    severity="medium",
+                                )
+                            )
+                        else:
+                            unknowns.append(
+                                ContextUnknown(
+                                    kind="unresolved_dependency",
+                                    target=tgt,
+                                    description=f"External package '{tgt}' imported without local source inspection.",
+                                    severity="low",
+                                )
+                            )
+
+
 
         # Check for empty files (no AST symbols extracted)
         symbol_file_ids = {s.get("file_id") for s in symbols if s.get("file_id")}
@@ -271,6 +323,48 @@ class CurrentSystemContextBuilder:
             or p.startswith("test_")
             or "/test_" in p
         )
+
+    @staticmethod
+    def _extract_declared_manifest_packages(files: List[dict]) -> tuple[bool, Set[str]]:
+        """
+        Inspect repository files for package.json, requirements.txt, or pyproject.toml
+        and return (has_manifest, set_of_declared_package_names).
+        """
+        declared: Set[str] = set()
+        has_manifest = False
+        for f in files:
+            p = f.get("path", "")
+            content = f.get("content") or ""
+            name = Path(p).name
+            if name == "package.json":
+                has_manifest = True
+                if content:
+                    try:
+                        data = json.loads(content)
+                        for sec in ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]:
+                            if isinstance(data.get(sec), dict):
+                                declared.update(data[sec].keys())
+                    except Exception:
+                        pass
+            elif name == "requirements.txt":
+                has_manifest = True
+                if content:
+                    for line in content.splitlines():
+                        line = line.strip()
+                        if line and not line.startswith("#"):
+                            m = re.match(r"^([a-zA-Z0-9_\-\.]+)", line)
+                            if m:
+                                declared.add(m.group(1).lower())
+            elif name == "pyproject.toml":
+                has_manifest = True
+                if content:
+                    for line in content.splitlines():
+                        line = line.strip()
+                        m = re.search(r'["\']([a-zA-Z0-9_\-\.]+)[\s><=~^]', line)
+                        if m:
+                            declared.add(m.group(1).lower())
+        return has_manifest, declared
+
 
 
 @dataclass

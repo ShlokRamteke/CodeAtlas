@@ -74,3 +74,8 @@ postgres_data/
 .agents
 zip
 docs
+
+# Pull Request draft descriptions
+PR.md
+*.PR.md
+

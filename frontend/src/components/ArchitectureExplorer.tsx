@@ -7,12 +7,17 @@ import type {
   SymbolItem,
   CodeDependencyItem,
   ProjectContext,
+  CommitItem,
+  FileHistoryResponse,
 } from "@archaeologist/contracts";
 import {
   fetchRepositoryArchitecture,
   fetchRepositorySymbols,
   fetchRepositoryDependencies,
   fetchProjectContext,
+  fetchRepositoryCommits,
+  fetchFileHistory,
+  ingestRepositoryCommits,
   ingestRepositoryFiles,
 } from "@/lib/api";
 import {
@@ -37,6 +42,12 @@ import {
   ShieldCheck,
   HelpCircle,
   FileCheck,
+  GitCommit,
+  History,
+  Calendar,
+  User,
+  PlusCircle,
+  Tag,
 } from "lucide-react";
 
 interface ArchitectureExplorerProps {
@@ -45,7 +56,7 @@ interface ArchitectureExplorerProps {
 
 const TEMPLATES: Record<
   string,
-  { label: string; desc: string; files: Record<string, string> }
+  { label: string; desc: string; files: Record<string, string>; commits?: any[] }
 > = {
   ecommerce: {
     label: "E-Commerce Checkout & Payment",
@@ -109,6 +120,40 @@ export class CheckoutService {
   }
 }`,
     },
+    commits: [
+      {
+        commit_hash: "a1b2c3d4",
+        author_name: "Alice Developer",
+        author_email: "alice@payments.io",
+        committed_at: "2025-01-15T10:00:00Z",
+        message: "feat(models): introduce initial Order and Payment models (#1)",
+        file_changes: [
+          { file_path: "src/models/Order.ts", change_type: "added", insertions: 15, deletions: 0 },
+        ],
+      },
+      {
+        commit_hash: "e5f6a7b8",
+        author_name: "Bob Engineer",
+        author_email: "bob@payments.io",
+        committed_at: "2025-02-10T14:30:00Z",
+        message: "feat(services): implement PaymentService and Stripe connector (#12)",
+        file_changes: [
+          { file_path: "src/services/PaymentService.ts", change_type: "added", insertions: 22, deletions: 0 },
+          { file_path: "src/services/PaymentService.test.ts", change_type: "added", insertions: 18, deletions: 0 },
+        ],
+      },
+      {
+        commit_hash: "9c0d1e2f",
+        author_name: "Alice Developer",
+        author_email: "alice@payments.io",
+        committed_at: "2025-03-01T09:15:00Z",
+        message: "feat(checkout): add CheckoutService integration (#45)",
+        file_changes: [
+          { file_path: "src/services/CheckoutService.ts", change_type: "added", insertions: 19, deletions: 0 },
+          { file_path: "src/services/PaymentService.ts", change_type: "modified", insertions: 4, deletions: 1 },
+        ],
+      },
+    ],
   },
   auth: {
     label: "Authentication & Token Engine",
@@ -138,6 +183,20 @@ export const testLogin = async () => {
   return await auth.login('user@domain.com', 'secret');
 };`,
     },
+    commits: [
+      {
+        commit_hash: "11aa22bb",
+        author_name: "Security Lead",
+        author_email: "security@company.com",
+        committed_at: "2024-11-20T08:00:00Z",
+        message: "feat(auth): initial JWT token issuance and user verification (#101)",
+        file_changes: [
+          { file_path: "src/models/User.ts", change_type: "added", insertions: 8, deletions: 0 },
+          { file_path: "src/auth/AuthService.ts", change_type: "added", insertions: 25, deletions: 0 },
+          { file_path: "src/auth/AuthService.test.ts", change_type: "added", insertions: 14, deletions: 0 },
+        ],
+      },
+    ],
   },
   python_backend: {
     label: "Python FastAPI Backend",
@@ -163,12 +222,25 @@ def test_aggregates():
     assert engine.sample_rate == 1.0
 `,
     },
+    commits: [
+      {
+        commit_hash: "py_init_01",
+        author_name: "Data Engineer",
+        author_email: "data@python.org",
+        committed_at: "2025-01-01T12:00:00Z",
+        message: "feat(analytics): bootstrap analytics aggregation engine",
+        file_changes: [
+          { file_path: "app/services/analytics.py", change_type: "added", insertions: 15, deletions: 0 },
+          { file_path: "app/services/test_analytics.py", change_type: "added", insertions: 10, deletions: 0 },
+        ],
+      },
+    ],
   },
 };
 
 export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) {
   const [activeTab, setActiveTab] = useState<
-    "components" | "symbols" | "relationships" | "project_context" | "ingest"
+    "components" | "symbols" | "relationships" | "project_context" | "git_history" | "ingest"
   >("components");
   const [architecture, setArchitecture] = useState<ArchitectureOverview | null>(null);
   const [symbols, setSymbols] = useState<SymbolItem[]>([]);
@@ -177,6 +249,10 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
   const [dependencies, setDependencies] = useState<CodeDependencyItem[]>([]);
   const [projectContext, setProjectContext] = useState<ProjectContext | null>(null);
   const [selectedContextComp, setSelectedContextComp] = useState<string>("");
+  const [commits, setCommits] = useState<CommitItem[]>([]);
+  const [selectedHistoryFile, setSelectedHistoryFile] = useState<string>("");
+  const [fileHistory, setFileHistory] = useState<FileHistoryResponse | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [ingesting, setIngesting] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -211,17 +287,40 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
     }
   }, [activeTab, selectedContextComp, repository.id]);
 
+  useEffect(() => {
+    if (activeTab === "git_history") {
+      loadHistory();
+    }
+  }, [activeTab, repository.id]);
+
+  useEffect(() => {
+    if (selectedHistoryFile) {
+      setHistoryLoading(true);
+      fetchFileHistory(repository.id, selectedHistoryFile).then((res) => {
+        setFileHistory(res);
+        setHistoryLoading(false);
+      });
+    }
+  }, [selectedHistoryFile, repository.id]);
+
   async function loadData() {
     setLoading(true);
-    const [arch, deps, pCtx] = await Promise.all([
+    const [arch, deps, pCtx, cList] = await Promise.all([
       fetchRepositoryArchitecture(repository.id),
       fetchRepositoryDependencies(repository.id),
       fetchProjectContext(repository.id),
+      fetchRepositoryCommits(repository.id),
     ]);
     setArchitecture(arch);
     setDependencies(deps);
     setProjectContext(pCtx);
+    setCommits(cList);
     setLoading(false);
+  }
+
+  async function loadHistory() {
+    const cList = await fetchRepositoryCommits(repository.id);
+    setCommits(cList);
   }
 
   async function handleIngestTemplate(templateKey: string) {
@@ -231,10 +330,14 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
     if (!tpl) return;
 
     const arch = await ingestRepositoryFiles(repository.id, tpl.files);
+    if (tpl.commits && tpl.commits.length > 0) {
+      await ingestRepositoryCommits(repository.id, tpl.commits);
+    }
+
     if (arch) {
       setArchitecture(arch);
       await loadData();
-      setSuccessMsg(`Successfully indexed ${tpl.label} (${arch.symbolCount} symbols extracted)`);
+      setSuccessMsg(`Successfully indexed ${tpl.label} (${arch.symbolCount} symbols, ${tpl.commits?.length || 0} commits)`);
       setTimeout(() => {
         setActiveTab("components");
         setSuccessMsg(null);
@@ -296,6 +399,13 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
         {/* Action Buttons */}
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setActiveTab("git_history")}
+            className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-medium transition"
+          >
+            <GitCommit className="w-3.5 h-3.5 text-amber-400" />
+            Git History ({commits.length})
+          </button>
+          <button
             onClick={() => setActiveTab("project_context")}
             className="flex items-center gap-2 px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 rounded-lg text-xs font-medium transition"
           >
@@ -335,9 +445,9 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
           </div>
         </div>
         <div className="bg-slate-950/40 p-3 rounded-lg border border-slate-800/80">
-          <div className="text-xs text-slate-400 font-medium">Dependencies</div>
-          <div className="text-xl font-bold text-cyan-400 mt-1">
-            {architecture?.dependencyCount ?? dependencies.length}
+          <div className="text-xs text-slate-400 font-medium">Git Commits</div>
+          <div className="text-xl font-bold text-amber-400 mt-1">
+            {commits.length}
           </div>
         </div>
         <div className="bg-slate-950/40 p-3 rounded-lg border border-slate-800/80">
@@ -390,6 +500,17 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
         >
           <Network className="w-4 h-4" />
           Relationships ({architecture?.relationships.length || 0})
+        </button>
+        <button
+          onClick={() => setActiveTab("git_history")}
+          className={`py-3 px-4 border-b-2 flex items-center gap-2 transition whitespace-nowrap ${
+            activeTab === "git_history"
+              ? "border-amber-500 text-amber-400 font-semibold"
+              : "border-transparent hover:text-slate-200"
+          }`}
+        >
+          <GitCommit className="w-4 h-4" />
+          Git History ({commits.length})
         </button>
         <button
           onClick={() => setActiveTab("project_context")}
@@ -610,6 +731,147 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
               </div>
             )}
           </div>
+        ) : activeTab === "git_history" ? (
+          /* Git History & File Evolution Tab */
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-800">
+              <div>
+                <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+                  <GitCommit className="w-4 h-4 text-amber-400" />
+                  Deterministic Git History Index
+                  <span className="text-xs font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                    PH3-01 Dataset
+                  </span>
+                </h4>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Trace commit origins, changed files, author timelines, and introducing commits.
+                </p>
+              </div>
+
+              {/* File / Component filter for introducing commit discovery */}
+              {architecture && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400">File Evolution:</span>
+                  <select
+                    value={selectedHistoryFile}
+                    onChange={(e) => setSelectedHistoryFile(e.target.value)}
+                    className="bg-slate-950 border border-slate-700 text-white text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-amber-500 font-mono"
+                  >
+                    <option value="">Select File to Trace Origins</option>
+                    {architecture.majorComponents.map((c) => (
+                      <option key={c.path} value={c.path}>
+                        {c.path} ({c.name})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* If a file is selected for history analysis */}
+            {selectedHistoryFile && (
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-amber-500/30 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileCode className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-semibold text-white font-mono">{selectedHistoryFile}</span>
+                  </div>
+                  <span className="text-[11px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                    {fileHistory ? `${fileHistory.totalCommits} changes tracked` : "Loading..."}
+                  </span>
+                </div>
+
+                {fileHistory?.introducingCommit ? (
+                  <div className="p-3 bg-emerald-950/30 border border-emerald-500/30 rounded-lg flex items-start gap-3">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-xs font-bold text-emerald-400 flex items-center gap-2">
+                        Introducing Commit (Origin)
+                        <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-emerald-900/50 text-emerald-300">
+                          {fileHistory.introducingCommit.commit_hash.slice(0, 7)}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-200 mt-1 font-medium">
+                        {fileHistory.introducingCommit.message}
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-3">
+                        <span>Author: <strong>{fileHistory.introducingCommit.author_name}</strong></span>
+                        <span>Date: {fileHistory.introducingCommit.committed_at.slice(0, 10)}</span>
+                        <span className="text-emerald-300 font-mono">+{fileHistory.introducingCommit.insertions} lines</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-500 italic">No introducing commit record indexed.</div>
+                )}
+              </div>
+            )}
+
+            {/* Commits Feed */}
+            {commits.length === 0 ? (
+              <div className="py-12 text-center">
+                <History className="w-8 h-8 text-slate-600 mx-auto mb-3" />
+                <p className="text-slate-400 text-sm font-medium">No Git commits indexed yet.</p>
+                <p className="text-slate-500 text-xs mt-1">
+                  Connect a public GitHub repository or load an architecture template.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {commits.map((c) => (
+                  <div
+                    key={c.id || c.commitHash}
+                    className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 transition space-y-2"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-1">
+                        <div className="text-xs font-semibold text-white leading-snug">
+                          {c.message}
+                        </div>
+                        <div className="flex items-center gap-3 text-[11px] text-slate-400 flex-wrap">
+                          <span className="flex items-center gap-1">
+                            <User className="w-3 h-3 text-slate-500" />
+                            {c.authorName}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3 text-slate-500" />
+                            {c.committedAt.slice(0, 10)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">
+                          {c.commitHash.slice(0, 7)}
+                        </span>
+                        {c.insertions !== undefined && (
+                          <span className="text-[10px] font-mono text-emerald-400">+{c.insertions}</span>
+                        )}
+                        {c.deletions !== undefined && (
+                          <span className="text-[10px] font-mono text-red-400">-{c.deletions}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {c.fileChanges && c.fileChanges.length > 0 && (
+                      <div className="pt-2 border-t border-slate-800/80 flex items-center gap-2 flex-wrap">
+                        <span className="text-[11px] text-slate-500">Changed Files:</span>
+                        {c.fileChanges.map((fc, idx) => (
+                          <span
+                            key={idx}
+                            onClick={() => setSelectedHistoryFile(fc.filePath)}
+                            className="cursor-pointer px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 font-mono text-[10px] border border-slate-800 hover:border-slate-600 transition"
+                          >
+                            {fc.filePath} ({fc.changeType})
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         ) : activeTab === "project_context" ? (
           /* Canonical Unified ProjectContext Tab */
           <div className="space-y-6">
@@ -808,7 +1070,7 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
                       <h5 className="text-sm font-semibold text-white">{tpl.label}</h5>
                       <p className="text-xs text-slate-400 mt-1">{tpl.desc}</p>
                       <div className="text-[11px] font-mono text-slate-500 mt-2">
-                        {Object.keys(tpl.files).length} files included
+                        {Object.keys(tpl.files).length} files &bull; {tpl.commits?.length || 0} commits
                       </div>
                     </div>
 

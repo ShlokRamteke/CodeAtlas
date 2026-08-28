@@ -195,6 +195,17 @@ The canonical `ProjectContext` model preserves:
 The Context Builder is the deterministic bridge between repository analysis and downstream AI reasoning.
 
 
+### Manifest-Aware Dependency Resolution
+
+To prevent false-positive architectural uncertainties, the Context Builder implements manifest-aware dependency checking:
+- **Manifest Inspection**: Scans `package.json`, `pyproject.toml`, and `requirements.txt` for declared dependencies (`dependencies`, `devDependencies`, `peerDependencies`).
+- **Runtime Stdlib Recognition**: Recognizes Node.js and Python built-in standard libraries (`fs`, `path`, `os`, `sys`, `json`, `math`, `asyncio`, etc.).
+- **Accurate Gap Demarcation**:
+  - *Declared External Package* &rarr; Resolved external boundary (no uncertainty raised).
+  - *Internal Path Alias* (`@/`, `~/`, `$lib/`, `src/`) &rarr; Resolved to local source files.
+  - *Undeclared Import* &rarr; Flagged as `undeclared_dependency` (a genuine codebase configuration gap).
+  - *Broken Relative Import* &rarr; Flagged as `broken_import`.
+
 ### Phase 2 Questions
 
 Phase 2 should support current-state questions such as:
@@ -231,22 +242,33 @@ flowchart LR
 
 Never execute repository code during indexing.
 
-## 6. Historical Analysis
+## 6. Historical Analysis (Phase 3)
 
-Git history is a first-class source for the later archaeology layer.
+Git history is a first-class source for the archaeology layer.
 
 ```mermaid
 flowchart LR
     CODE[Current Component] --> BLAME[File History / Blame]
-    BLAME --> COMMIT[Introducing Change]
+    BLAME --> COMMIT[Introducing Commit]
     COMMIT --> PR[Pull Request]
     PR --> ISSUE[Issue / Requirement]
-    ISSUE --> CONTEXT[Historical Context]
+    ISSUE --> CONTEXT[Enriched Context]
     PR --> CONTEXT
     COMMIT --> CONTEXT
 ```
 
-The goal is not simply to display Git history; it is to connect changes to current system context.
+The goal is not simply to display Git history; it is to connect changes directly to current system context and answer: *"How did this component get here?"*
+
+### Git History Indexing Engine (`GitHistoryIndexer`)
+
+1. **Commit & Diff Persistence**:
+   - `Commit`: Stores hash, author, email, timestamp, message, parent hashes, and aggregate diff metrics (`insertions`, `deletions`, `files_changed_count`).
+   - `CommitFileChange`: Tracks per-file modifications with `ChangeType` (`added`, `modified`, `deleted`, `renamed`), old path tracking, and line delta counts.
+
+2. **Introducing Commit (Origin) Detection**:
+   - Deterministically calculates the origin commit for any file or logical component directory (earliest commit with `change_type == 'added'`).
+   - Powers the developer file evolution timeline without requiring an LLM call.
+
 
 ## 7. Project Intelligence Storage
 
@@ -457,3 +479,28 @@ Metrics:
 - agent success rate
 - token usage
 - latency
+
+## 19. Containerization & Deployment Stack
+
+Project Archaeologist runs as an orchestrated multi-container architecture via Podman / Docker Compose (`compose.yaml` / `podman-compose.yml`):
+
+```text
+podman compose up -d (or make up)
+       │
+       ├── archaeologist-postgres  (Port 5432: PostgreSQL 16 + pgvector, persistent volume)
+       │      ▲
+       │      │ Internal Bridge Network (archaeologist-network)
+       │      ▼
+       ├── archaeologist-backend   (Port 8000: FastAPI + Tree-sitter, auto-Alembic migration entrypoint)
+       │      ▲
+       │      │ CORS HTTP
+       │      ▼
+       ├── archaeologist-frontend  (Port 3000: Next.js 14 App Router + Bun)
+       │
+       └── archaeologist-adminer   (Port 8080: Database Admin Web UI)
+```
+
+### Storage Persistence & Live Development
+- **Database Volumes**: The PostgreSQL service uses a dedicated named volume (`postgres_data`) ensuring data is never lost across container restarts (`make up` / `make down`).
+- **Live Code Reloading**: The backend (`./backend/app:/app/app:Z`) and frontend (`./frontend/src:/app/frontend/src:Z`) bind mounts allow instant hot-reloading in development without container restarts.
+
