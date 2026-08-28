@@ -32,11 +32,15 @@ Historical Timeline / Developer View
 
 ## Tasks Breakdown
 
-### PH3-01 — Git History Indexing
+### PH3-01 — Git History Indexing (Completed)
 Build the historical dataset:
-- Ingest commits, changed files, diff stats, author identities, timestamps.
-- Build file-level history and identify introducing commit for each file/entity.
-- Output: Current entities can be linked to Git history.
+- [x] Ingest commits, changed files, diff stats, author identities, timestamps.
+- [x] Build file-level history and identify introducing commit for each file/entity.
+- [x] `GitHistoryIndexer` service with deterministic file/component evolution timeline.
+- [x] REST endpoints (`/commits`, `/files/{path}/history`, `/components/{path}/history`).
+- [x] Interactive Git History tab & File Evolution Inspector in Next.js UI.
+- [x] Output: Current entities can be linked to Git history.
+
 
 ### PH3-02 — Commit → PR → Issue Linking
 Connect historical artifacts:
