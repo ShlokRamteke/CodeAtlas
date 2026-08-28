@@ -17,12 +17,13 @@ Repository
     ↓
 Deterministic + language-aware analysis
     ↓
-Current System Model
-    ↓
 Context Builder
-    ├── Human View
-    └── LLM Context
+    ↓
+Unified ProjectContext
+    ├── Human UI (Markdown / Visual graph)
+    └── AI / Agent (Token-efficient prompt serialization)
 ```
+
 
 ## Prerequisites
 

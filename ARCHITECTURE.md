@@ -161,52 +161,39 @@ Repository
 └── External Dependencies
 ```
 
-### Context Builder
+### Canonical Unified ProjectContext
 
-Phase 2 introduces a lightweight Context Builder.
+Phase 2 introduces the canonical `ProjectContext` model.
 
-It converts machine-readable facts into compact human/LLM context.
-
-Example:
+It serves as the single authoritative context layer shared by both the human UI and AI/Agent prompt pipelines without maintaining separate knowledge extraction pipelines.
 
 ```text
-COMPONENT: PaymentService
-
-CALLERS:
-CheckoutService
-RefundWorker
-
-DEPENDENCIES:
-StripeClient
-OrderRepository
-Redis
-
-TESTS:
-PaymentService.test.ts
-Refund.test.ts
+Project Knowledge
+      ↓
+Context Builder
+      ↓
+Project Context
+   ├── Human UI (Markdown / Visual graph)
+   └── AI / Agent (Token-efficient prompt serialization)
 ```
 
-Human view:
+The canonical `ProjectContext` model preserves:
+- **Entities**: Files, AST symbols (classes, functions, interfaces, methods, types)
+- **Relationships**: Outbound dependencies, inbound callers, inheritance, test links
+- **Evidence**: Concrete AST nodes and import lines with provenance
+- **Confidence**: Deterministic extraction confidence scores (e.g. `1.0` for AST, `0.90` for filename heuristics)
+- **Unknowns & Gaps**: Untested components, unresolved external packages, empty files, low-confidence relationships
 
-```text
-PaymentService
+#### Structured Projections from One Context
 
-Handles payment processing and refunds.
+1. **Human UI Projection (`to_human_markdown()` / `human_markdown`)**:
+   Formatted markdown with component structure, symbol line spans, caller trees, and verified test suites.
 
-Used by:
-CheckoutService
-RefundWorker
+2. **AI / Agent Projection (`to_llm_prompt()` / `llm_prompt_context`)**:
+   Token-efficient, compressed prompt context briefing ready for agent injection in Phase 4/5 without leaking raw codebase contents.
 
-Dependencies:
-Stripe
-Redis
-OrderRepository
+The Context Builder is the deterministic bridge between repository analysis and downstream AI reasoning.
 
-Tests:
-4 related tests
-```
-
-The Context Builder is the bridge between repository analysis and later AI reasoning.
 
 ### Phase 2 Questions
 

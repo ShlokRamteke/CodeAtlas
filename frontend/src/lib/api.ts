@@ -7,7 +7,9 @@ import type {
   SymbolItem,
   CodeDependencyItem,
   ContextBriefResponse,
+  ProjectContext,
 } from "@archaeologist/contracts";
+
 
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -131,6 +133,64 @@ export async function ingestRepositoryFiles(
   }
 }
 
+export async function fetchProjectContext(
+  repositoryId: string,
+  component?: string
+): Promise<ProjectContext | null> {
+  try {
+    const url = new URL(`${API_BASE}/api/v1/repositories/${repositoryId}/context`);
+    if (component) url.searchParams.set("component", component);
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      targetType: data.target_type,
+      targetId: data.target_id,
+      targetName: data.target_name,
+      summary: data.summary,
+      confidence: data.confidence,
+      provenance: data.provenance,
+      entities: (data.entities || []).map((e: any) => ({
+        id: e.id,
+        name: e.name,
+        kind: e.kind,
+        path: e.path,
+        language: e.language,
+        signature: e.signature,
+        lineStart: e.line_start,
+        lineEnd: e.line_end,
+      })),
+      relationships: (data.relationships || []).map((r: any) => ({
+        sourceName: r.source_name,
+        sourcePath: r.source_path,
+        targetName: r.target_name,
+        targetPath: r.target_path,
+        type: r.type,
+        confidence: r.confidence,
+        resolutionMethod: r.resolution_method,
+      })),
+      evidence: (data.evidence || []).map((ev: any) => ({
+        id: ev.id,
+        sourcePath: ev.source_path,
+        kind: ev.kind,
+        content: ev.content,
+        confidence: ev.confidence,
+        provenance: ev.provenance,
+      })),
+      unknowns: (data.unknowns || []).map((u: any) => ({
+        kind: u.kind,
+        target: u.target,
+        description: u.description,
+        severity: u.severity,
+      })),
+      humanMarkdown: data.human_markdown,
+      llmPromptContext: data.llm_prompt_context,
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
 export async function fetchRepositoryContextBrief(
   repositoryId: string,
   component?: string
@@ -167,6 +227,7 @@ export async function fetchRepositoryContextBrief(
     return null;
   }
 }
+
 
 export async function fetchRepositoryArchitecture(
   repositoryId: string

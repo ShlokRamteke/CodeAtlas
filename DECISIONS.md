@@ -187,3 +187,37 @@ Phase 2 focuses on:
 - current-system Context Builder.
 
 Historical reasoning is added on top in later phases.
+
+---
+
+## ADR-009 — Unified Project Context
+
+**Status:** Accepted
+
+**Date:** 2026-08-25
+
+**Decision**
+
+Use a single canonical `ProjectContext` model as the authoritative shared context layer for both the human UI and AI/Agent prompt pipelines.
+
+Do not maintain separate Human Context and LLM Context knowledge extraction pipelines.
+
+```text
+Project Knowledge
+      ↓
+Context Builder
+      ↓
+Project Context
+   ├── Human UI (Markdown / Visual graph)
+   └── AI / Agent (Token-efficient prompt serialization)
+```
+
+**Reason**
+
+Maintaining divergent data structures or extraction logic for human exploration versus AI prompts introduces drift, inconsistent grounding, and duplicated indexing pipelines.
+
+A single canonical `ProjectContext` model guarantees that:
+1. Both human users and AI agents reason over the identical set of entities, relationship edges, evidence, confidence scores, and identified unknowns/gaps.
+2. Serialization methods (`to_human_markdown()` and `to_llm_prompt()`) are deterministic projections of the same underlying data structure.
+3. Unknowns (e.g. untested code, unresolved external dependencies, ambiguous types) are explicitly preserved and visible to both humans and LLMs.
+

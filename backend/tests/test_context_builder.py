@@ -31,4 +31,5 @@ def test_build_component_brief() -> None:
     assert len(brief.tests) == 1
     assert "src/services/PaymentService.test.ts" in brief.tests
     assert "PaymentService" in brief.human_summary
-    assert "CURRENT SYSTEM CONTEXT BRIEFING" in brief.llm_context
+    assert "PROJECT CONTEXT BRIEFING" in brief.llm_context
+

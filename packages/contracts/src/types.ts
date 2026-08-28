@@ -58,6 +58,58 @@ export interface CodeDependencyItem {
   kind: 'internal' | 'external' | 'relative';
 }
 
+export interface ContextEntity {
+  id: string;
+  name: string;
+  kind: string; // 'file' | 'symbol' | 'component'
+  path: string;
+  language?: string;
+  signature?: string;
+  lineStart?: number;
+  lineEnd?: number;
+}
+
+export interface ContextRelationship {
+  sourceName: string;
+  sourcePath: string;
+  targetName: string;
+  targetPath: string;
+  type: string; // 'imports' | 'calls' | 'extends' | 'implements' | 'tested_by'
+  confidence: number;
+  resolutionMethod: string;
+}
+
+export interface ContextEvidence {
+  id: string;
+  sourcePath: string;
+  kind: string; // 'ast_symbol' | 'import_statement' | 'test_binding' | 'file_header'
+  content: string;
+  confidence: number;
+  provenance: string;
+}
+
+export interface ContextUnknown {
+  kind: string; // 'untested' | 'unresolved_dependency' | 'missing_signature' | 'empty_file' | 'low_confidence'
+  target: string;
+  description: string;
+  severity: 'low' | 'medium' | 'high';
+}
+
+export interface ProjectContext {
+  targetType: 'repository' | 'component' | 'file' | 'symbol';
+  targetId: string;
+  targetName: string;
+  summary: string;
+  confidence: number;
+  provenance: string;
+  entities: ContextEntity[];
+  relationships: ContextRelationship[];
+  evidence: ContextEvidence[];
+  unknowns: ContextUnknown[];
+  humanMarkdown: string;
+  llmPromptContext: string;
+}
+
 export interface ComponentRelationship {
   sourceName: string;
   sourcePath: string;
@@ -91,7 +143,9 @@ export interface ContextBriefResponse {
   components: ComponentBriefItem[];
   humanSummary: string;
   llmContext: string;
+  projectContext?: ProjectContext;
 }
+
 
 export interface ArchitectureOverview {
   repositoryId: string;
