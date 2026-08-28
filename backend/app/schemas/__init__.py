@@ -4,8 +4,18 @@ from app.schemas.history import (
     CommitRead,
     ComponentHistoryResponse,
     FileHistoryResponse,
+    HistoricalTraceItem,
+    HistoricalTraceResponse,
     IngestCommitsRequest,
     IngestCommitsResponse,
+    IngestIssuesRequest,
+    IngestIssuesResponse,
+    IngestPullRequestsRequest,
+    IngestPullRequestsResponse,
+    IssueRead,
+    LinkedIssueRead,
+    LinkedPullRequestRead,
+    PullRequestRead,
 )
 from app.schemas.investigation import (
     EvidenceItemSchema,

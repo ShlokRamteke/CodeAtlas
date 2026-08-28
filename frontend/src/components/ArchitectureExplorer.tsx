@@ -9,6 +9,9 @@ import type {
   ProjectContext,
   CommitItem,
   FileHistoryResponse,
+  PullRequestItem,
+  IssueItem,
+  HistoricalTraceResponse,
 } from "@archaeologist/contracts";
 import {
   fetchRepositoryArchitecture,
@@ -17,7 +20,12 @@ import {
   fetchProjectContext,
   fetchRepositoryCommits,
   fetchFileHistory,
+  fetchRepositoryPullRequests,
+  fetchRepositoryIssues,
+  fetchHistoricalTrace,
   ingestRepositoryCommits,
+  ingestRepositoryPullRequests,
+  ingestRepositoryIssues,
   ingestRepositoryFiles,
 } from "@/lib/api";
 import {
@@ -43,6 +51,11 @@ import {
   HelpCircle,
   FileCheck,
   GitCommit,
+  GitPullRequest,
+  CircleDot,
+  GitMerge,
+  ArrowRight,
+  ExternalLink,
   History,
   Calendar,
   User,
@@ -56,7 +69,14 @@ interface ArchitectureExplorerProps {
 
 const TEMPLATES: Record<
   string,
-  { label: string; desc: string; files: Record<string, string>; commits?: any[] }
+  {
+    label: string;
+    desc: string;
+    files: Record<string, string>;
+    commits?: any[];
+    pull_requests?: any[];
+    issues?: any[];
+  }
 > = {
   ecommerce: {
     label: "E-Commerce Checkout & Payment",
@@ -154,6 +174,72 @@ export class CheckoutService {
         ],
       },
     ],
+    pull_requests: [
+      {
+        number: 1,
+        title: "feat(models): introduce initial Order and Payment models",
+        body: "Initial schema for order processing.\n\nCloses #80",
+        state: "merged",
+        author: "Alice Developer",
+        labels: ["models", "v1"],
+        merged_at: "2025-01-15T10:00:00Z",
+      },
+      {
+        number: 12,
+        title: "feat(services): implement PaymentService and Stripe connector",
+        body: "Connects Stripe transaction gateway.\n\nFixes #88\nRefs #89",
+        state: "merged",
+        author: "Bob Engineer",
+        labels: ["payment", "stripe"],
+        merged_at: "2025-02-10T14:30:00Z",
+      },
+      {
+        number: 45,
+        title: "feat(checkout): add CheckoutService integration",
+        body: "End-to-end checkout orchestration.\n\nFixes #90",
+        state: "merged",
+        author: "Alice Developer",
+        labels: ["checkout", "epic"],
+        merged_at: "2025-03-01T09:15:00Z",
+      },
+    ],
+    issues: [
+      {
+        number: 80,
+        title: "Define core domain models for orders and payments",
+        body: "Need typed contracts for order state machine.",
+        state: "closed",
+        author: "Architect",
+        labels: ["domain", "v1"],
+        closed_at: "2025-01-15T10:00:00Z",
+      },
+      {
+        number: 88,
+        title: "Support Stripe card transactions with idempotent receipts",
+        body: "Secure payment processing requirement.",
+        state: "closed",
+        author: "Product Lead",
+        labels: ["feature", "payment"],
+        closed_at: "2025-02-10T14:30:00Z",
+      },
+      {
+        number: 89,
+        title: "Configure Stripe webhook signature verification",
+        body: "Verify webhook signatures to prevent forgery.",
+        state: "open",
+        author: "Security Officer",
+        labels: ["security"],
+      },
+      {
+        number: 90,
+        title: "Orchestrate single-click checkout with payment verification",
+        body: "Checkout pipeline requirement.",
+        state: "closed",
+        author: "Product Lead",
+        labels: ["epic", "checkout"],
+        closed_at: "2025-03-01T09:15:00Z",
+      },
+    ],
   },
   auth: {
     label: "Authentication & Token Engine",
@@ -195,6 +281,28 @@ export const testLogin = async () => {
           { file_path: "src/auth/AuthService.ts", change_type: "added", insertions: 25, deletions: 0 },
           { file_path: "src/auth/AuthService.test.ts", change_type: "added", insertions: 14, deletions: 0 },
         ],
+      },
+    ],
+    pull_requests: [
+      {
+        number: 101,
+        title: "feat(auth): initial JWT token issuance and user verification",
+        body: "Implements HMAC-SHA256 signature verification.\n\nFixes #200",
+        state: "merged",
+        author: "Security Lead",
+        labels: ["security", "auth"],
+        merged_at: "2024-11-20T08:00:00Z",
+      },
+    ],
+    issues: [
+      {
+        number: 200,
+        title: "Design stateless JWT token issuance for API auth",
+        body: "Ensure tokens can be verified across distributed microservices.",
+        state: "closed",
+        author: "CISO",
+        labels: ["security"],
+        closed_at: "2024-11-20T08:00:00Z",
       },
     ],
   },
@@ -242,6 +350,7 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
   const [activeTab, setActiveTab] = useState<
     "components" | "symbols" | "relationships" | "project_context" | "git_history" | "ingest"
   >("components");
+  const [historySubTab, setHistorySubTab] = useState<"commits" | "trace" | "prs" | "issues">("commits");
   const [architecture, setArchitecture] = useState<ArchitectureOverview | null>(null);
   const [symbols, setSymbols] = useState<SymbolItem[]>([]);
   const [symbolQuery, setSymbolQuery] = useState("");
@@ -250,9 +359,13 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
   const [projectContext, setProjectContext] = useState<ProjectContext | null>(null);
   const [selectedContextComp, setSelectedContextComp] = useState<string>("");
   const [commits, setCommits] = useState<CommitItem[]>([]);
+  const [pullRequests, setPullRequests] = useState<PullRequestItem[]>([]);
+  const [issues, setIssues] = useState<IssueItem[]>([]);
   const [selectedHistoryFile, setSelectedHistoryFile] = useState<string>("");
   const [fileHistory, setFileHistory] = useState<FileHistoryResponse | null>(null);
+  const [historicalTrace, setHistoricalTrace] = useState<HistoricalTraceResponse | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [traceLoading, setTraceLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [ingesting, setIngesting] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -296,31 +409,46 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
   useEffect(() => {
     if (selectedHistoryFile) {
       setHistoryLoading(true);
+      setTraceLoading(true);
       fetchFileHistory(repository.id, selectedHistoryFile).then((res) => {
         setFileHistory(res);
         setHistoryLoading(false);
+      });
+      fetchHistoricalTrace(repository.id, selectedHistoryFile).then((res) => {
+        setHistoricalTrace(res);
+        setTraceLoading(false);
       });
     }
   }, [selectedHistoryFile, repository.id]);
 
   async function loadData() {
     setLoading(true);
-    const [arch, deps, pCtx, cList] = await Promise.all([
+    const [arch, deps, pCtx, cList, prList, issList] = await Promise.all([
       fetchRepositoryArchitecture(repository.id),
       fetchRepositoryDependencies(repository.id),
       fetchProjectContext(repository.id),
       fetchRepositoryCommits(repository.id),
+      fetchRepositoryPullRequests(repository.id),
+      fetchRepositoryIssues(repository.id),
     ]);
     setArchitecture(arch);
     setDependencies(deps);
     setProjectContext(pCtx);
     setCommits(cList);
+    setPullRequests(prList);
+    setIssues(issList);
     setLoading(false);
   }
 
   async function loadHistory() {
-    const cList = await fetchRepositoryCommits(repository.id);
+    const [cList, prList, issList] = await Promise.all([
+      fetchRepositoryCommits(repository.id),
+      fetchRepositoryPullRequests(repository.id),
+      fetchRepositoryIssues(repository.id),
+    ]);
     setCommits(cList);
+    setPullRequests(prList);
+    setIssues(issList);
   }
 
   async function handleIngestTemplate(templateKey: string) {
@@ -330,6 +458,12 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
     if (!tpl) return;
 
     const arch = await ingestRepositoryFiles(repository.id, tpl.files);
+    if (tpl.pull_requests && tpl.pull_requests.length > 0) {
+      await ingestRepositoryPullRequests(repository.id, tpl.pull_requests);
+    }
+    if (tpl.issues && tpl.issues.length > 0) {
+      await ingestRepositoryIssues(repository.id, tpl.issues);
+    }
     if (tpl.commits && tpl.commits.length > 0) {
       await ingestRepositoryCommits(repository.id, tpl.commits);
     }
@@ -337,7 +471,9 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
     if (arch) {
       setArchitecture(arch);
       await loadData();
-      setSuccessMsg(`Successfully indexed ${tpl.label} (${arch.symbolCount} symbols, ${tpl.commits?.length || 0} commits)`);
+      setSuccessMsg(
+        `Successfully indexed ${tpl.label} (${arch.symbolCount} symbols, ${tpl.commits?.length || 0} commits, ${tpl.pull_requests?.length || 0} PRs, ${tpl.issues?.length || 0} issues)`
+      );
       setTimeout(() => {
         setActiveTab("components");
         setSuccessMsg(null);
@@ -738,137 +874,487 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
               <div>
                 <h4 className="text-sm font-semibold text-white flex items-center gap-2">
                   <GitCommit className="w-4 h-4 text-amber-400" />
-                  Deterministic Git History Index
+                  Historical Traceability & Artifact Linking
                   <span className="text-xs font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
-                    PH3-01 Dataset
+                    PH3-02 Dataset
                   </span>
                 </h4>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Trace commit origins, changed files, author timelines, and introducing commits.
+                  Trace code changes from Files &rarr; Commits &rarr; Pull Requests &rarr; Originating Issues.
                 </p>
               </div>
 
-              {/* File / Component filter for introducing commit discovery */}
-              {architecture && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400">File Evolution:</span>
-                  <select
-                    value={selectedHistoryFile}
-                    onChange={(e) => setSelectedHistoryFile(e.target.value)}
-                    className="bg-slate-950 border border-slate-700 text-white text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-amber-500 font-mono"
-                  >
-                    <option value="">Select File to Trace Origins</option>
-                    {architecture.majorComponents.map((c) => (
-                      <option key={c.path} value={c.path}>
-                        {c.path} ({c.name})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              {/* Sub-tab Navigation */}
+              <div className="flex items-center gap-1.5 p-1 bg-slate-900 border border-slate-800 rounded-lg text-xs">
+                <button
+                  onClick={() => setHistorySubTab("commits")}
+                  className={`px-3 py-1 rounded-md font-medium transition flex items-center gap-1.5 ${
+                    historySubTab === "commits"
+                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <GitCommit className="w-3.5 h-3.5" />
+                  Commits ({commits.length})
+                </button>
+                <button
+                  onClick={() => setHistorySubTab("trace")}
+                  className={`px-3 py-1 rounded-md font-medium transition flex items-center gap-1.5 ${
+                    historySubTab === "trace"
+                      ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <ArrowRight className="w-3.5 h-3.5" />
+                  Provenance Trace
+                </button>
+                <button
+                  onClick={() => setHistorySubTab("prs")}
+                  className={`px-3 py-1 rounded-md font-medium transition flex items-center gap-1.5 ${
+                    historySubTab === "prs"
+                      ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <GitPullRequest className="w-3.5 h-3.5" />
+                  PRs ({pullRequests.length})
+                </button>
+                <button
+                  onClick={() => setHistorySubTab("issues")}
+                  className={`px-3 py-1 rounded-md font-medium transition flex items-center gap-1.5 ${
+                    historySubTab === "issues"
+                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <CircleDot className="w-3.5 h-3.5" />
+                  Issues ({issues.length})
+                </button>
+              </div>
             </div>
 
-            {/* If a file is selected for history analysis */}
-            {selectedHistoryFile && (
-              <div className="p-4 rounded-xl bg-slate-950/80 border border-amber-500/30 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileCode className="w-4 h-4 text-amber-400" />
-                    <span className="text-xs font-semibold text-white font-mono">{selectedHistoryFile}</span>
-                  </div>
-                  <span className="text-[11px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
-                    {fileHistory ? `${fileHistory.totalCommits} changes tracked` : "Loading..."}
-                  </span>
-                </div>
-
-                {fileHistory?.introducingCommit ? (
-                  <div className="p-3 bg-emerald-950/30 border border-emerald-500/30 rounded-lg flex items-start gap-3">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <div className="text-xs font-bold text-emerald-400 flex items-center gap-2">
-                        Introducing Commit (Origin)
-                        <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-emerald-900/50 text-emerald-300">
-                          {fileHistory.introducingCommit.commit_hash.slice(0, 7)}
-                        </span>
-                      </div>
-                      <div className="text-xs text-slate-200 mt-1 font-medium">
-                        {fileHistory.introducingCommit.message}
-                      </div>
-                      <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-3">
-                        <span>Author: <strong>{fileHistory.introducingCommit.author_name}</strong></span>
-                        <span>Date: {fileHistory.introducingCommit.committed_at.slice(0, 10)}</span>
-                        <span className="text-emerald-300 font-mono">+{fileHistory.introducingCommit.insertions} lines</span>
-                      </div>
-                    </div>
+            {/* Commits Sub-Tab */}
+            {historySubTab === "commits" && (
+              <div className="space-y-4">
+                {commits.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <History className="w-8 h-8 text-slate-600 mx-auto mb-3" />
+                    <p className="text-slate-400 text-sm font-medium">No Git commits indexed yet.</p>
+                    <p className="text-slate-500 text-xs mt-1">
+                      Connect a public GitHub repository or load an architecture template.
+                    </p>
                   </div>
                 ) : (
-                  <div className="text-xs text-slate-500 italic">No introducing commit record indexed.</div>
+                  <div className="space-y-3">
+                    {commits.map((c) => (
+                      <div
+                        key={c.id || c.commitHash}
+                        className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 transition space-y-2.5"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="space-y-1">
+                            <div className="text-xs font-semibold text-white leading-snug">
+                              {c.message}
+                            </div>
+                            <div className="flex items-center gap-3 text-[11px] text-slate-400 flex-wrap">
+                              <span className="flex items-center gap-1">
+                                <User className="w-3 h-3 text-slate-500" />
+                                {c.authorName}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-3 h-3 text-slate-500" />
+                                {c.committedAt.slice(0, 10)}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">
+                              {c.commitHash.slice(0, 7)}
+                            </span>
+                            {c.insertions !== undefined && (
+                              <span className="text-[10px] font-mono text-emerald-400">+{c.insertions}</span>
+                            )}
+                            {c.deletions !== undefined && (
+                              <span className="text-[10px] font-mono text-red-400">-{c.deletions}</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Linked PRs & Issues Badges */}
+                        {((c.linkedPullRequests && c.linkedPullRequests.length > 0) ||
+                          (c.linkedIssues && c.linkedIssues.length > 0)) && (
+                          <div className="pt-2 border-t border-slate-800/80 flex items-center gap-2 flex-wrap">
+                            <span className="text-[11px] text-slate-500 font-medium">Trace Links:</span>
+                            {c.linkedPullRequests?.map((pr, idx) => (
+                              <span
+                                key={idx}
+                                onClick={() => setHistorySubTab("prs")}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-950/50 hover:bg-purple-900/50 text-purple-300 border border-purple-500/30 text-[10px] font-mono cursor-pointer transition"
+                                title={pr.title || `PR #${pr.prNumber}`}
+                              >
+                                <GitPullRequest className="w-3 h-3 text-purple-400" />
+                                PR #{pr.prNumber} ({pr.linkType})
+                              </span>
+                            ))}
+                            {c.linkedIssues?.map((iss, idx) => (
+                              <span
+                                key={idx}
+                                onClick={() => setHistorySubTab("issues")}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-950/50 hover:bg-emerald-900/50 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono cursor-pointer transition"
+                                title={iss.title || `Issue #${iss.issueNumber}`}
+                              >
+                                <CircleDot className="w-3 h-3 text-emerald-400" />
+                                Issue #{iss.issueNumber} ({iss.linkType})
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {c.fileChanges && c.fileChanges.length > 0 && (
+                          <div className="pt-1 flex items-center gap-2 flex-wrap">
+                            <span className="text-[11px] text-slate-500">Changed Files:</span>
+                            {c.fileChanges.map((fc, idx) => (
+                              <span
+                                key={idx}
+                                onClick={() => {
+                                  setSelectedHistoryFile(fc.filePath);
+                                  setHistorySubTab("trace");
+                                }}
+                                className="cursor-pointer px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 font-mono text-[10px] border border-slate-800 hover:border-slate-600 transition"
+                              >
+                                {fc.filePath} ({fc.changeType})
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             )}
 
-            {/* Commits Feed */}
-            {commits.length === 0 ? (
-              <div className="py-12 text-center">
-                <History className="w-8 h-8 text-slate-600 mx-auto mb-3" />
-                <p className="text-slate-400 text-sm font-medium">No Git commits indexed yet.</p>
-                <p className="text-slate-500 text-xs mt-1">
-                  Connect a public GitHub repository or load an architecture template.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {commits.map((c) => (
-                  <div
-                    key={c.id || c.commitHash}
-                    className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 transition space-y-2"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="space-y-1">
-                        <div className="text-xs font-semibold text-white leading-snug">
-                          {c.message}
+            {/* Provenance Trace Sub-Tab */}
+            {historySubTab === "trace" && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-4 p-4 bg-slate-950/60 border border-slate-800 rounded-xl">
+                  <div className="space-y-0.5">
+                    <div className="text-xs font-semibold text-white">Select File to Trace Lineage</div>
+                    <div className="text-[11px] text-slate-400">
+                      Discovers the introducing commit, evolution diffs, linked PRs, and resolving issues.
+                    </div>
+                  </div>
+                  {architecture && (
+                    <select
+                      value={selectedHistoryFile}
+                      onChange={(e) => setSelectedHistoryFile(e.target.value)}
+                      className="bg-slate-950 border border-slate-700 text-white text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-500 font-mono"
+                    >
+                      <option value="">Select File to Inspect</option>
+                      {architecture.majorComponents.map((c) => (
+                        <option key={c.path} value={c.path}>
+                          {c.path} ({c.name})
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                {selectedHistoryFile ? (
+                  <div className="space-y-4">
+                    {/* File Header & Introducing Commit */}
+                    <div className="p-4 rounded-xl bg-slate-950/80 border border-indigo-500/30 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <FileCode className="w-4 h-4 text-indigo-400" />
+                          <span className="text-xs font-semibold text-white font-mono">{selectedHistoryFile}</span>
                         </div>
-                        <div className="flex items-center gap-3 text-[11px] text-slate-400 flex-wrap">
-                          <span className="flex items-center gap-1">
-                            <User className="w-3 h-3 text-slate-500" />
-                            {c.authorName}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3 text-slate-500" />
-                            {c.committedAt.slice(0, 10)}
-                          </span>
-                        </div>
+                        <span className="text-[11px] px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                          {historicalTrace
+                            ? `${historicalTrace.totalCommits} commits • ${historicalTrace.totalPullRequests} PRs • ${historicalTrace.totalIssues} issues`
+                            : "Loading trace..."}
+                        </span>
                       </div>
 
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">
-                          {c.commitHash.slice(0, 7)}
-                        </span>
-                        {c.insertions !== undefined && (
-                          <span className="text-[10px] font-mono text-emerald-400">+{c.insertions}</span>
-                        )}
-                        {c.deletions !== undefined && (
-                          <span className="text-[10px] font-mono text-red-400">-{c.deletions}</span>
-                        )}
-                      </div>
+                      {fileHistory?.introducingCommit && (
+                        <div className="p-3 bg-emerald-950/30 border border-emerald-500/30 rounded-lg flex items-start gap-3">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <div className="text-xs font-bold text-emerald-400 flex items-center gap-2">
+                              Introducing Commit (Origin)
+                              <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-emerald-900/50 text-emerald-300">
+                                {fileHistory.introducingCommit.commit_hash.slice(0, 7)}
+                              </span>
+                            </div>
+                            <div className="text-xs text-slate-200 mt-1 font-medium">
+                              {fileHistory.introducingCommit.message}
+                            </div>
+                            <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-3">
+                              <span>Author: <strong>{fileHistory.introducingCommit.author_name}</strong></span>
+                              <span>Date: {fileHistory.introducingCommit.committed_at.slice(0, 10)}</span>
+                              <span className="text-emerald-300 font-mono">+{fileHistory.introducingCommit.insertions} lines</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
-                    {c.fileChanges && c.fileChanges.length > 0 && (
-                      <div className="pt-2 border-t border-slate-800/80 flex items-center gap-2 flex-wrap">
-                        <span className="text-[11px] text-slate-500">Changed Files:</span>
-                        {c.fileChanges.map((fc, idx) => (
-                          <span
+                    {/* Step-by-Step Provenance Lineage */}
+                    {historicalTrace && (
+                      <div className="space-y-3">
+                        <h5 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                          Code &rarr; Commit &rarr; PR &rarr; Issue Trace Lineage
+                        </h5>
+
+                        {historicalTrace.traceChain.map((step, idx) => (
+                          <div
                             key={idx}
-                            onClick={() => setSelectedHistoryFile(fc.filePath)}
-                            className="cursor-pointer px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 font-mono text-[10px] border border-slate-800 hover:border-slate-600 transition"
+                            className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3"
                           >
-                            {fc.filePath} ({fc.changeType})
-                          </span>
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                    step.changeType === "added"
+                                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                      : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                                  }`}
+                                >
+                                  {step.changeType}
+                                </span>
+                                <span className="font-mono text-xs font-semibold text-white">
+                                  {step.commitHash.slice(0, 7)}
+                                </span>
+                                <span className="text-xs text-slate-300 font-medium">
+                                  {step.message}
+                                </span>
+                              </div>
+                              <span className="text-[11px] text-slate-500">
+                                {step.committedAt.slice(0, 10)} by {step.authorName}
+                              </span>
+                            </div>
+
+                            {/* Chain Nodes */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-800/80">
+                              {/* Linked PRs */}
+                              <div className="p-2.5 rounded-lg bg-purple-950/20 border border-purple-500/20 space-y-1.5">
+                                <div className="text-[10px] font-bold uppercase text-purple-400 flex items-center gap-1.5">
+                                  <GitPullRequest className="w-3 h-3" />
+                                  Linked Pull Request ({step.linkedPullRequests.length})
+                                </div>
+                                {step.linkedPullRequests.length === 0 ? (
+                                  <div className="text-[11px] text-slate-500 italic">Direct commit (no PR)</div>
+                                ) : (
+                                  step.linkedPullRequests.map((pr: any, pIdx: number) => (
+                                    <div key={pIdx} className="text-xs space-y-0.5">
+                                      <div className="text-purple-200 font-semibold flex items-center gap-1.5">
+                                        PR #{pr.number}: {pr.title}
+                                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-900/60 text-purple-300 uppercase">
+                                          {pr.state}
+                                        </span>
+                                      </div>
+                                      {pr.linked_issues && pr.linked_issues.length > 0 && (
+                                        <div className="text-[10px] text-emerald-400">
+                                          Resolves: {pr.linked_issues.map((i: any) => `#${i.number}`).join(", ")}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+
+                              {/* Linked Issues */}
+                              <div className="p-2.5 rounded-lg bg-emerald-950/20 border border-emerald-500/20 space-y-1.5">
+                                <div className="text-[10px] font-bold uppercase text-emerald-400 flex items-center gap-1.5">
+                                  <CircleDot className="w-3 h-3" />
+                                  Linked Issue / Requirement ({step.linkedIssues.length})
+                                </div>
+                                {step.linkedIssues.length === 0 ? (
+                                  <div className="text-[11px] text-slate-500 italic">No direct issue closure tagged</div>
+                                ) : (
+                                  step.linkedIssues.map((iss: any, iIdx: number) => (
+                                    <div key={iIdx} className="text-xs space-y-0.5">
+                                      <div className="text-emerald-200 font-semibold flex items-center gap-1.5">
+                                        Issue #{iss.number}: {iss.title}
+                                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-900/60 text-emerald-300 uppercase">
+                                          {iss.state}
+                                        </span>
+                                      </div>
+                                      <div className="text-[10px] text-slate-400">
+                                        Link Type: <strong>{iss.link_type}</strong>
+                                      </div>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         ))}
                       </div>
                     )}
                   </div>
-                ))}
+                ) : (
+                  <div className="py-12 text-center text-slate-500 text-sm">
+                    Select a component file above to inspect its full Code &rarr; Commit &rarr; PR &rarr; Issue lineage.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Pull Requests Sub-Tab */}
+            {historySubTab === "prs" && (
+              <div className="space-y-3">
+                {pullRequests.length === 0 ? (
+                  <div className="py-12 text-center text-slate-500 text-sm">
+                    No pull requests indexed yet. Connect a public GitHub repository or load a template.
+                  </div>
+                ) : (
+                  pullRequests.map((pr) => (
+                    <div
+                      key={pr.id || pr.number}
+                      className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2.5 hover:border-slate-700 transition"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <GitPullRequest className="w-4 h-4 text-purple-400" />
+                            <span className="text-xs font-bold text-white">
+                              PR #{pr.number}: {pr.title}
+                            </span>
+                            <span
+                              className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
+                                pr.state === "merged"
+                                  ? "bg-purple-500/10 text-purple-400 border border-purple-500/20"
+                                  : pr.state === "closed"
+                                  ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                                  : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                              }`}
+                            >
+                              {pr.state}
+                            </span>
+                          </div>
+                          {pr.body && (
+                            <p className="text-xs text-slate-400 line-clamp-2">{pr.body}</p>
+                          )}
+                          <div className="flex items-center gap-3 text-[11px] text-slate-500 pt-1">
+                            <span>Author: <strong>{pr.author}</strong></span>
+                            {pr.mergedAt && (
+                              <span>Merged: {pr.mergedAt.slice(0, 10)}</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {pr.labels && pr.labels.length > 0 && (
+                          <div className="flex items-center gap-1 flex-wrap justify-end">
+                            {pr.labels.map((lbl, idx) => (
+                              <span
+                                key={idx}
+                                className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 font-mono"
+                              >
+                                {lbl}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Linked Issues */}
+                      {pr.linkedIssues && pr.linkedIssues.length > 0 && (
+                        <div className="pt-2 border-t border-slate-800/80 flex items-center gap-2 flex-wrap">
+                          <span className="text-[11px] text-slate-500">Resolves Issues:</span>
+                          {pr.linkedIssues.map((iss, idx) => (
+                            <span
+                              key={idx}
+                              onClick={() => setHistorySubTab("issues")}
+                              className="cursor-pointer text-[10px] px-2 py-0.5 rounded bg-emerald-950/50 text-emerald-300 border border-emerald-500/30 font-mono flex items-center gap-1"
+                            >
+                              <CircleDot className="w-2.5 h-2.5" />
+                              Issue #{iss.issueNumber} ({iss.linkType})
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Issues Sub-Tab */}
+            {historySubTab === "issues" && (
+              <div className="space-y-3">
+                {issues.length === 0 ? (
+                  <div className="py-12 text-center text-slate-500 text-sm">
+                    No issues indexed yet. Connect a public GitHub repository or load a template.
+                  </div>
+                ) : (
+                  issues.map((issue) => (
+                    <div
+                      key={issue.id || issue.number}
+                      className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2.5 hover:border-slate-700 transition"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <CircleDot className="w-4 h-4 text-emerald-400" />
+                            <span className="text-xs font-bold text-white">
+                              Issue #{issue.number}: {issue.title}
+                            </span>
+                            <span
+                              className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
+                                issue.state === "closed"
+                                  ? "bg-purple-500/10 text-purple-400 border border-purple-500/20"
+                                  : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                              }`}
+                            >
+                              {issue.state}
+                            </span>
+                          </div>
+                          {issue.body && (
+                            <p className="text-xs text-slate-400 line-clamp-2">{issue.body}</p>
+                          )}
+                          <div className="flex items-center gap-3 text-[11px] text-slate-500 pt-1">
+                            <span>Author: <strong>{issue.author}</strong></span>
+                            {issue.closedAt && (
+                              <span>Closed: {issue.closedAt.slice(0, 10)}</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {issue.labels && issue.labels.length > 0 && (
+                          <div className="flex items-center gap-1 flex-wrap justify-end">
+                            {issue.labels.map((lbl, idx) => (
+                              <span
+                                key={idx}
+                                className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 font-mono"
+                              >
+                                {lbl}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Linked PRs */}
+                      {issue.linkedPullRequests && issue.linkedPullRequests.length > 0 && (
+                        <div className="pt-2 border-t border-slate-800/80 flex items-center gap-2 flex-wrap">
+                          <span className="text-[11px] text-slate-500">Addressed in PR:</span>
+                          {issue.linkedPullRequests.map((pr, idx) => (
+                            <span
+                              key={idx}
+                              onClick={() => setHistorySubTab("prs")}
+                              className="cursor-pointer text-[10px] px-2 py-0.5 rounded bg-purple-950/50 text-purple-300 border border-purple-500/30 font-mono flex items-center gap-1"
+                            >
+                              <GitPullRequest className="w-2.5 h-2.5" />
+                              PR #{pr.prNumber} ({pr.linkType})
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             )}
           </div>

@@ -266,4 +266,47 @@ Treating all non-relative imports as "unresolved external package" gaps created 
 - Path aliases (`@/`, `~/`, `$lib/`, `src/`) resolve to local source files.
 - The `undeclared_dependency` uncertainty is reserved specifically for undeclared ghost imports and broken relative paths.
 
+---
+
+## ADR-012 — Deterministic Cross-Artifact Traceability Engine
+
+**Status:** Accepted
+
+**Date:** 2026-08-28
+
+**Decision**
+
+Use deterministic regex pattern extraction and relational association models (`CommitPullRequestLink`, `CommitIssueLink`, `PullRequestIssueLink`) to establish bidirectional `Code -> Commit -> Pull Request -> Issue` traceability without requiring LLM calls during indexing.
+
+**Reason**
+
+Tracing code evolution beyond individual commit SHAs into Pull Requests, discussions, and originating Issues is a core requirement of historical archaeology. Relying on an LLM for reference extraction would be slow, non-deterministic, and costly. Regular expressions on standard GitHub merge formats and closing keywords (`Fixes #123`, `Merge pull request #45`, `(#45)`, `GH-101`) provide fast, 100% deterministic link discovery.
+
+**Implication**
+
+- Commits, PRs, and Issues can be ingested asynchronously in any order; unlinked references automatically reconcile when the corresponding artifact is indexed.
+- The `HistoricalLinker` provides single-pass provenance tracing (`GET /trace/{file_path}`) across the full artifact lifecycle.
+
+---
+
+## ADR-013 — Primary GitHub GraphQL API for Repository & Historical Extraction
+
+**Status:** Accepted
+
+**Date:** 2026-08-28
+
+**Decision**
+
+Adopt GitHub GraphQL API v4 (`https://api.github.com/graphql`) as the primary data retrieval protocol for repository metadata, commit histories, parent graphs, pull requests, closing issue references, and issue trackers across all archaeology tasks, with seamless fallback to the REST API v3 when unauthenticated or for raw file content.
+
+**Reason**
+
+The GitHub REST API requires multiple roundtrips per repository (e.g. separate calls for repo metadata, commit list, individual commit file diffs, pull requests, and issues), quickly exhausting rate limits and introducing latency. The GraphQL API v4 enables batching the repository overview, branch references, commit parent graphs, associated pull requests, closing issue references, and labels into a **single HTTP network request**.
+
+**Implication**
+
+- When `GITHUB_TOKEN` is present, `GitHubRepoFetcher` queries the GraphQL endpoint, drastically reducing ingestion time and API rate consumption.
+- If GraphQL returns 401 or no token is configured, the fetcher transparently falls back to public REST endpoints.
+- All future repository analysis tasks (code structure, blame, history, PRs, issues, discussions) should prioritize GraphQL queries over multi-endpoint REST polling.
+
 

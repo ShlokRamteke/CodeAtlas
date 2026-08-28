@@ -11,6 +11,9 @@ import type {
   CommitItem,
   FileHistoryResponse,
   ComponentHistoryResponse,
+  PullRequestItem,
+  IssueItem,
+  HistoricalTraceResponse,
 } from "@archaeologist/contracts";
 
 
@@ -400,9 +403,151 @@ export async function fetchRepositoryCommits(
         deletions: fc.deletions,
         oldPath: fc.old_path,
       })),
+      linkedPullRequests: (c.linked_pull_requests || []).map((pl: any) => ({
+        prNumber: pl.pr_number,
+        linkType: pl.link_type,
+        rawReference: pl.raw_reference,
+        confidence: pl.confidence,
+        title: pl.title,
+        state: pl.state,
+        author: pl.author,
+        mergedAt: pl.merged_at,
+        labels: pl.labels || [],
+        htmlUrl: pl.html_url,
+      })),
+      linkedIssues: (c.linked_issues || []).map((il: any) => ({
+        issueNumber: il.issue_number,
+        linkType: il.link_type,
+        rawReference: il.raw_reference,
+        confidence: il.confidence,
+        title: il.title,
+        state: il.state,
+        author: il.author,
+        closedAt: il.closed_at,
+        labels: il.labels || [],
+        htmlUrl: il.html_url,
+      })),
     }));
   } catch (error) {
     return [];
+  }
+}
+
+export async function fetchRepositoryPullRequests(
+  repositoryId: string,
+  state?: string
+): Promise<PullRequestItem[]> {
+  try {
+    const url = new URL(`${API_BASE}/api/v1/repositories/${repositoryId}/pull-requests`);
+    if (state) url.searchParams.set("state", state);
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.map((p: any) => ({
+      id: p.id,
+      repositoryId: p.repository_id,
+      number: p.number,
+      title: p.title,
+      body: p.body,
+      state: p.state,
+      author: p.author,
+      mergedAt: p.merged_at,
+      closedAt: p.closed_at,
+      labels: p.labels || [],
+      htmlUrl: p.html_url,
+      createdAt: p.created_at,
+      linkedIssues: (p.linked_issues || []).map((il: any) => ({
+        issueNumber: il.issue_number,
+        linkType: il.link_type,
+        rawReference: il.raw_reference,
+        confidence: il.confidence,
+        title: il.title,
+        state: il.state,
+        author: il.author,
+        closedAt: il.closed_at,
+        labels: il.labels || [],
+        htmlUrl: il.html_url,
+      })),
+      linkedCommits: p.linked_commits || [],
+    }));
+  } catch (error) {
+    return [];
+  }
+}
+
+export async function fetchRepositoryIssues(
+  repositoryId: string,
+  state?: string
+): Promise<IssueItem[]> {
+  try {
+    const url = new URL(`${API_BASE}/api/v1/repositories/${repositoryId}/issues`);
+    if (state) url.searchParams.set("state", state);
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.map((i: any) => ({
+      id: i.id,
+      repositoryId: i.repository_id,
+      number: i.number,
+      title: i.title,
+      body: i.body,
+      state: i.state,
+      author: i.author,
+      closedAt: i.closed_at,
+      labels: i.labels || [],
+      htmlUrl: i.html_url,
+      createdAt: i.created_at,
+      linkedPullRequests: (i.linked_pull_requests || []).map((pl: any) => ({
+        prNumber: pl.pr_number,
+        linkType: pl.link_type,
+        rawReference: pl.raw_reference,
+        confidence: pl.confidence,
+        title: pl.title,
+        state: pl.state,
+        author: pl.author,
+        mergedAt: pl.merged_at,
+        labels: pl.labels || [],
+        htmlUrl: pl.html_url,
+      })),
+      linkedCommits: i.linked_commits || [],
+    }));
+  } catch (error) {
+    return [];
+  }
+}
+
+export async function fetchHistoricalTrace(
+  repositoryId: string,
+  filePath: string
+): Promise<HistoricalTraceResponse | null> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/v1/repositories/${repositoryId}/trace/${encodeURIComponent(filePath)}`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      filePath: data.file_path,
+      totalCommits: data.total_commits,
+      totalPullRequests: data.total_pull_requests,
+      totalIssues: data.total_issues,
+      traceChain: (data.trace_chain || []).map((tc: any) => ({
+        commitHash: tc.commit_hash,
+        authorName: tc.author_name,
+        committedAt: tc.committed_at,
+        message: tc.message,
+        changeType: tc.change_type,
+        insertions: tc.insertions,
+        deletions: tc.deletions,
+        linkedPullRequests: tc.linked_pull_requests || [],
+        linkedIssues: tc.linked_issues || [],
+      })),
+      allPullRequests: data.all_pull_requests || [],
+      allIssues: data.all_issues || [],
+    };
+  } catch (error) {
+    return null;
   }
 }
 
@@ -447,6 +592,38 @@ export async function ingestRepositoryCommits(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ commits }),
+    });
+    return res.ok;
+  } catch (error) {
+    return false;
+  }
+}
+
+export async function ingestRepositoryPullRequests(
+  repositoryId: string,
+  pullRequests: any[]
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/repositories/${repositoryId}/pull-requests/ingest`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pull_requests: pullRequests }),
+    });
+    return res.ok;
+  } catch (error) {
+    return false;
+  }
+}
+
+export async function ingestRepositoryIssues(
+  repositoryId: string,
+  issues: any[]
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/repositories/${repositoryId}/issues/ingest`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ issues }),
     });
     return res.ok;
   } catch (error) {

@@ -269,6 +269,23 @@ The goal is not simply to display Git history; it is to connect changes directly
    - Deterministically calculates the origin commit for any file or logical component directory (earliest commit with `change_type == 'added'`).
    - Powers the developer file evolution timeline without requiring an LLM call.
 
+### Artifact Traceability Engine (`HistoricalLinker` & `ReferenceExtractor`)
+
+1. **Deterministic Pattern Extraction (`ReferenceExtractor`)**:
+   - Regex extraction of PR merge/squash/explicit patterns (`Merge pull request #123`, `(#123)`, `PR #123`).
+   - Regex extraction of Issue resolution keywords (`Fixes #101`, `Closes #102`, `Resolves GH-103`, `Refs #104`).
+   - Cross-references extracted from both commit messages and Pull Request bodies.
+
+2. **Bidirectional Artifact Linking**:
+   - `CommitPullRequestLink`, `CommitIssueLink`, `PullRequestIssueLink` models and association graph.
+   - Self-reconciling link resolution as PRs, Issues, and Commits are indexed asynchronously.
+   - End-to-end provenance tracing (`GET /trace/{file_path}`) connecting Code &rarr; Commit &rarr; PR &rarr; Issue.
+
+### GitHub GraphQL Ingestion Protocol (`GitHubRepoFetcher`)
+
+- **Primary GraphQL v4 Queries**: When an authenticated GitHub token is present, repository metadata, commit histories, parent graphs, associated PRs, and linked issues are retrieved in a single batched GraphQL query (`RepoArchaeology`).
+- **REST v3 Fallback**: In unauthenticated local mode or when fetching raw file contents, the fetcher transparently falls back to GitHub REST v3 endpoints.
+
 
 ## 7. Project Intelligence Storage
 

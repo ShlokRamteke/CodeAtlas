@@ -78,4 +78,7 @@ docs
 # Pull Request draft descriptions
 PR.md
 *.PR.md
+prs/
+.prs/
+
 

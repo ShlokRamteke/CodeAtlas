@@ -93,6 +93,12 @@ class GitHistoryIndexer:
                 )
                 db.add(change_obj)
 
+            # Extract and persist PR & Issue links for this commit
+            from app.history.historical_linker import HistoricalLinker
+
+            linker = HistoricalLinker()
+            await linker.link_commit(repository_id, commit_obj, db)
+
             indexed_count += 1
 
         await db.commit()
@@ -122,6 +128,23 @@ class GitHistoryIndexer:
         introducing_commit: Optional[Dict[str, Any]] = None
 
         for commit, change in rows:
+            linked_prs = [
+                {
+                    "pr_number": pl.pr_number,
+                    "link_type": pl.link_type,
+                    "raw_reference": pl.raw_reference,
+                }
+                for pl in getattr(commit, "pull_request_links", [])
+            ]
+            linked_issues = [
+                {
+                    "issue_number": il.issue_number,
+                    "link_type": il.link_type,
+                    "raw_reference": il.raw_reference,
+                }
+                for il in getattr(commit, "issue_links", [])
+            ]
+
             c_dict = {
                 "commit_hash": commit.commit_hash,
                 "author_name": commit.author_name,
@@ -131,6 +154,8 @@ class GitHistoryIndexer:
                 "change_type": change.change_type.value,
                 "insertions": change.insertions,
                 "deletions": change.deletions,
+                "linked_pull_requests": linked_prs,
+                "linked_issues": linked_issues,
             }
             commits_data.append(c_dict)
 
@@ -189,6 +214,22 @@ class GitHistoryIndexer:
         for commit, change in rows:
             if commit.id not in seen_commits:
                 seen_commits.add(commit.id)
+                linked_prs = [
+                    {
+                        "pr_number": pl.pr_number,
+                        "link_type": pl.link_type,
+                        "raw_reference": pl.raw_reference,
+                    }
+                    for pl in getattr(commit, "pull_request_links", [])
+                ]
+                linked_issues = [
+                    {
+                        "issue_number": il.issue_number,
+                        "link_type": il.link_type,
+                        "raw_reference": il.raw_reference,
+                    }
+                    for il in getattr(commit, "issue_links", [])
+                ]
                 unique_commits.append({
                     "commit_hash": commit.commit_hash,
                     "author_name": commit.author_name,
@@ -198,6 +239,8 @@ class GitHistoryIndexer:
                     "files_changed_count": commit.files_changed_count,
                     "insertions": commit.insertions,
                     "deletions": commit.deletions,
+                    "linked_pull_requests": linked_prs,
+                    "linked_issues": linked_issues,
                 })
                 authors_map[commit.author_name] = authors_map.get(commit.author_name, 0) + 1
 

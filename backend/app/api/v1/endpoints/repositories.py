@@ -75,17 +75,54 @@ async def connect_and_ingest_github_repo(
         engine = IngestionEngine(db)
         arch = await engine.ingest_files(repo.id, files)
 
-        # 3b. Ingest Git Commits
+        # 3b. Ingest Git History, PRs, and Issues (GraphQL / REST)
         try:
             from app.history.git_indexer import GitHistoryIndexer
-            commits = await fetcher.fetch_public_repo_commits(
+            from app.history.historical_linker import HistoricalLinker
+
+            linker = HistoricalLinker()
+            indexer = GitHistoryIndexer()
+
+            # Attempt single-pass batched GraphQL query first
+            bundle = await fetcher.fetch_repo_bundle_graphql(
                 owner=owner,
                 repo=name,
                 github_token=payload.github_token,
             )
-            if commits:
-                indexer = GitHistoryIndexer()
-                await indexer.index_commits(repo.id, commits, db)
+
+            if bundle:
+                commits, prs, issues = bundle
+                if prs:
+                    await linker.index_pull_requests(repo.id, prs, db)
+                if issues:
+                    await linker.index_issues(repo.id, issues, db)
+                if commits:
+                    await indexer.index_commits(repo.id, commits, db)
+            else:
+                # Fallback to individual endpoints
+                prs = await fetcher.fetch_public_repo_pull_requests(
+                    owner=owner,
+                    repo=name,
+                    github_token=payload.github_token,
+                )
+                if prs:
+                    await linker.index_pull_requests(repo.id, prs, db)
+
+                issues = await fetcher.fetch_public_repo_issues(
+                    owner=owner,
+                    repo=name,
+                    github_token=payload.github_token,
+                )
+                if issues:
+                    await linker.index_issues(repo.id, issues, db)
+
+                commits = await fetcher.fetch_public_repo_commits(
+                    owner=owner,
+                    repo=name,
+                    github_token=payload.github_token,
+                )
+                if commits:
+                    await indexer.index_commits(repo.id, commits, db)
         except Exception:
             pass
 
