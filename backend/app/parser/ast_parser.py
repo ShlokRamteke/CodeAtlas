@@ -101,7 +101,22 @@ class ASTCodeParser:
                 source_node = node.child_by_field_name("source")
                 if source_node:
                     target = get_text(source_node).strip("'\"`")
-                    kind = "relative" if target.startswith(".") else "external"
+                    if target.startswith("."):
+                        kind = "relative"
+                    elif (
+                        target.startswith("@/")
+                        or target.startswith("~/")
+                        or target.startswith("#/")
+                        or target.startswith("$lib/")
+                        or target.startswith("src/")
+                        or target.startswith("app/")
+                        or target.startswith("components/")
+                        or target.startswith("lib/")
+                    ):
+                        kind = "internal"
+                    else:
+                        kind = "external"
+
 
                     clause_node = node.child_by_field_name("clause") or node.child_by_field_name("import")
                     if not clause_node:

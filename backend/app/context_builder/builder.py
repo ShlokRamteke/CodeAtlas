@@ -151,18 +151,30 @@ class CurrentSystemContextBuilder:
                     )
                 )
 
-        # Check for unresolved external dependencies
+        # Check for unresolved external dependencies (de-duplicated and excluding internal aliases)
+        seen_external_pkgs = set()
         for d in dependencies:
             if not target_file_ids or d.get("source_file_id") in target_file_ids:
-                if d.get("kind") == "external":
+                tgt = d.get("target_path", "")
+                is_alias = (
+                    tgt.startswith("@/")
+                    or tgt.startswith("~/")
+                    or tgt.startswith("#/")
+                    or tgt.startswith("$lib/")
+                    or tgt.startswith("src/")
+                    or tgt.startswith("app/")
+                )
+                if d.get("kind") == "external" and not is_alias and tgt not in seen_external_pkgs:
+                    seen_external_pkgs.add(tgt)
                     unknowns.append(
                         ContextUnknown(
                             kind="unresolved_dependency",
-                            target=d.get("target_path", "external_package"),
-                            description=f"External package '{d.get('target_path')}' imported without local source inspection.",
+                            target=tgt,
+                            description=f"External package '{tgt}' imported without local source inspection.",
                             severity="low",
                         )
                     )
+
 
         # Check for empty files (no AST symbols extracted)
         symbol_file_ids = {s.get("file_id") for s in symbols if s.get("file_id")}
