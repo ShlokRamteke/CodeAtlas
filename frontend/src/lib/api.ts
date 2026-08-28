@@ -40,11 +40,29 @@ export async function fetchHealth(): Promise<HealthResponse> {
   }
 }
 
+function mapRepository(data: any): Repository {
+  return {
+    id: data.id,
+    owner: data.owner,
+    name: data.name,
+    fullName: data.full_name || data.fullName || `${data.owner}/${data.name}`,
+    defaultBranch: data.default_branch || data.defaultBranch || "main",
+    status: data.status || "ready",
+    indexedAt: data.indexed_at || data.indexedAt,
+    fileCount: data.file_count ?? data.fileCount ?? 0,
+    symbolCount: data.symbol_count ?? data.symbolCount ?? 0,
+    commitCount: data.commit_count ?? data.commitCount ?? 0,
+    createdAt: data.created_at || data.createdAt || new Date().toISOString(),
+    updatedAt: data.updated_at || data.updatedAt || new Date().toISOString(),
+  };
+}
+
 export async function fetchRepositories(): Promise<Repository[]> {
   try {
     const res = await fetch(`${API_BASE}/api/v1/repositories/`, { cache: "no-store" });
     if (!res.ok) return [];
-    return await res.json();
+    const data = await res.json();
+    return Array.isArray(data) ? data.map(mapRepository) : [];
   } catch (error) {
     return [];
   }
@@ -69,7 +87,8 @@ export async function connectGitHubRepository(
     }
     const data = await res.json();
     return {
-      repository: data.repository,
+      repository: mapRepository(data.repository),
+
       architecture: {
         repositoryId: data.architecture.repository_id,
         fileCount: data.architecture.file_count,
