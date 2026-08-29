@@ -27,6 +27,7 @@ import {
   ingestRepositoryPullRequests,
   ingestRepositoryIssues,
   ingestRepositoryFiles,
+  reindexRepository,
 } from "@/lib/api";
 import {
   Boxes,
@@ -38,6 +39,8 @@ import {
   FileCode,
   Network,
   RefreshCw,
+  RotateCw,
+
   FolderTree,
   UploadCloud,
   FilePlus,
@@ -367,7 +370,9 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
   const [historyLoading, setHistoryLoading] = useState(false);
   const [traceLoading, setTraceLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [reindexing, setReindexing] = useState(false);
   const [ingesting, setIngesting] = useState(false);
+
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [copiedLlm, setCopiedLlm] = useState(false);
 
@@ -450,6 +455,24 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
     setPullRequests(prList);
     setIssues(issList);
   }
+
+  async function handleReindex() {
+    setReindexing(true);
+    try {
+      const res = await reindexRepository(repository.id);
+      if (res) {
+        setArchitecture(res.architecture);
+        await loadData();
+        setSuccessMsg(`Successfully re-indexed ${res.repository.fullName}!`);
+        setTimeout(() => setSuccessMsg(null), 3000);
+      }
+    } catch (e: any) {
+      console.error("Reindex error:", e);
+    } finally {
+      setReindexing(false);
+    }
+  }
+
 
   async function handleIngestTemplate(templateKey: string) {
     setIngesting(true);
@@ -556,15 +579,25 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
             Add / Index Code
           </button>
           <button
+            onClick={handleReindex}
+            disabled={reindexing}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 border border-slate-700 rounded-lg text-xs font-medium transition"
+            title="Re-fetch all files, commits, PRs, and issues from GitHub"
+          >
+            <RotateCw className={`w-3.5 h-3.5 text-indigo-400 ${reindexing ? "animate-spin" : ""}`} />
+            <span>{reindexing ? "Reindexing..." : "Re-index"}</span>
+          </button>
+          <button
             onClick={loadData}
             disabled={loading}
             className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs transition"
-            title="Refresh"
+            title="Refresh local data"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
           </button>
         </div>
       </div>
+
 
       {/* Metrics Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 bg-slate-900/60 border-b border-slate-800">

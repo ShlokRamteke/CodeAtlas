@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.history.reference_extractor import ReferenceExtractor
@@ -320,13 +320,18 @@ class HistoricalLinker:
         Trace the full historical chain for a given file:
         Code / File -> Commit -> Pull Request -> Issue.
         """
-        # Fetch commits touching file_path
+        # Fetch commits touching file_path or directory prefix
+        norm_path = file_path.strip("/")
         stmt = (
             select(Commit, CommitFileChange)
             .join(CommitFileChange, Commit.id == CommitFileChange.commit_id)
             .where(
                 Commit.repository_id == repository_id,
-                CommitFileChange.file_path == file_path,
+                or_(
+                    CommitFileChange.file_path == file_path,
+                    CommitFileChange.file_path == norm_path,
+                    CommitFileChange.file_path.startswith(f"{norm_path}/"),
+                ),
             )
             .order_by(Commit.committed_at.desc())
         )

@@ -85,8 +85,15 @@ export async function connectGitHubRepository(
       }),
     });
     if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.detail || "Failed to connect repository");
+      let errDetail = "Failed to connect repository";
+      try {
+        const err = await res.json();
+        errDetail = err.detail || err.message || errDetail;
+      } catch {
+        const text = await res.text();
+        if (text) errDetail = text;
+      }
+      throw new Error(errDetail);
     }
     const data = await res.json();
     return {
@@ -119,6 +126,60 @@ export async function connectGitHubRepository(
     throw error;
   }
 }
+
+export async function reindexRepository(
+  repositoryId: string,
+  githubToken?: string
+): Promise<{ repository: Repository; architecture: ArchitectureOverview } | null> {
+  try {
+    const query = githubToken ? `?github_token=${encodeURIComponent(githubToken)}` : "";
+    const res = await fetch(`${API_BASE}/api/v1/repositories/${repositoryId}/reindex${query}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!res.ok) {
+      let errDetail = "Failed to reindex repository";
+      try {
+        const err = await res.json();
+        errDetail = err.detail || err.message || errDetail;
+      } catch {
+        const text = await res.text();
+        if (text) errDetail = text;
+      }
+      throw new Error(errDetail);
+    }
+    const data = await res.json();
+
+    return {
+      repository: mapRepository(data.repository),
+      architecture: {
+        repositoryId: data.architecture.repository_id,
+        fileCount: data.architecture.file_count,
+        symbolCount: data.architecture.symbol_count,
+        dependencyCount: data.architecture.dependency_count,
+        languages: data.architecture.languages,
+        majorComponents: data.architecture.major_components.map((c: any) => ({
+          name: c.name,
+          path: c.path,
+          symbolCount: c.symbol_count,
+          dependencies: c.dependencies,
+          testedBy: c.tested_by,
+        })),
+        relationships: data.architecture.relationships.map((r: any) => ({
+          sourceName: r.source_name,
+          sourcePath: r.source_path,
+          targetName: r.target_name,
+          targetPath: r.target_path,
+          type: r.type,
+        })),
+      },
+    };
+  } catch (error: any) {
+    console.error("reindexRepository error:", error);
+    throw error;
+  }
+}
+
 
 
 export async function ingestRepositoryFiles(

@@ -30,6 +30,8 @@ class ParsedCommit:
     message: str
     parent_hashes: List[str] = field(default_factory=list)
     file_changes: List[ParsedFileChange] = field(default_factory=list)
+    insertions: int = 0
+    deletions: int = 0
 
 
 @dataclass
@@ -60,7 +62,27 @@ class GitHistoryIndexer:
             )
             existing = (await db.execute(existing_stmt)).scalar_one_or_none()
             if existing:
+                # Backfill file changes & diff metrics if missing
+                if (existing.files_changed_count == 0 or existing.insertions == 0) and pc.file_changes:
+                    insertions = sum(fc.insertions for fc in pc.file_changes) or pc.insertions
+                    deletions = sum(fc.deletions for fc in pc.file_changes) or pc.deletions
+                    existing.files_changed_count = len(pc.file_changes)
+                    existing.insertions = insertions
+                    existing.deletions = deletions
+                    for fc in pc.file_changes:
+                        change_obj = CommitFileChange(
+                            id=uuid.uuid4(),
+                            commit_id=existing.id,
+                            file_path=fc.file_path,
+                            change_type=fc.change_type,
+                            insertions=fc.insertions,
+                            deletions=fc.deletions,
+                            old_path=fc.old_path,
+                        )
+                        db.add(change_obj)
+                    indexed_count += 1
                 continue
+
 
             insertions = sum(fc.insertions for fc in pc.file_changes)
             deletions = sum(fc.deletions for fc in pc.file_changes)

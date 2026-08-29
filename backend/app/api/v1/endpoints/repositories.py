@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import os
 import uuid
 from typing import List, Optional
+
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
@@ -166,6 +168,130 @@ async def connect_and_ingest_github_repo(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         ) from e
+
+
+@router.post("/{repository_id}/reindex", response_model=ConnectGitHubResponse)
+async def reindex_repository(
+    repository_id: uuid.UUID,
+    github_token: Optional[str] = Query(None, description="Optional GitHub Personal Access Token"),
+    db: AsyncSession = Depends(get_db),
+) -> ConnectGitHubResponse:
+    """
+    Re-indexes an existing repository:
+    Fetches fresh files, AST symbols, commit history, pull requests, and issues via GitHub GraphQL/REST.
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository {repository_id} not found.",
+        )
+
+    fetcher = GitHubRepoFetcher()
+    owner = repo.owner
+    name = repo.name
+    token = github_token or os.getenv("GITHUB_TOKEN")
+
+    try:
+        # 1. Fetch & ingest source files
+        files, default_branch = await fetcher.fetch_public_repo_files(
+            owner=owner,
+            repo=name,
+            github_token=token,
+        )
+
+
+        engine = IngestionEngine(db)
+        arch = await engine.ingest_files(repo.id, files)
+
+        # 2. Ingest Commits, PRs, and Issues (GraphQL / REST)
+        try:
+            from app.history.git_indexer import GitHistoryIndexer
+            from app.history.historical_linker import HistoricalLinker
+
+            linker = HistoricalLinker()
+            indexer = GitHistoryIndexer()
+
+            bundle = await fetcher.fetch_repo_bundle_graphql(
+                owner=owner,
+                repo=name,
+                github_token=token,
+            )
+
+            if bundle:
+                commits, prs, issues = bundle
+                if prs:
+                    await linker.index_pull_requests(repo.id, prs, db)
+                if issues:
+                    await linker.index_issues(repo.id, issues, db)
+                if commits:
+                    await indexer.index_commits(repo.id, commits, db)
+            else:
+                prs = await fetcher.fetch_public_repo_pull_requests(
+                    owner=owner,
+                    repo=name,
+                    github_token=token,
+                )
+                if prs:
+                    await linker.index_pull_requests(repo.id, prs, db)
+
+                issues = await fetcher.fetch_public_repo_issues(
+                    owner=owner,
+                    repo=name,
+                    github_token=token,
+                )
+                if issues:
+                    await linker.index_issues(repo.id, issues, db)
+
+                commits = await fetcher.fetch_public_repo_commits(
+                    owner=owner,
+                    repo=name,
+                    github_token=token,
+                )
+                if commits:
+                    await indexer.index_commits(repo.id, commits, db)
+        except Exception:
+            pass
+
+        await db.refresh(repo)
+
+        return ConnectGitHubResponse(
+            repository=RepositoryRead.model_validate(repo),
+            architecture=ArchitectureOverviewResponse(
+                repository_id=repo.id,
+                file_count=arch.file_count,
+                symbol_count=arch.symbol_count,
+                dependency_count=arch.dependency_count,
+                languages=arch.languages,
+                major_components=[
+                    ComponentOverview(
+                        name=c.name,
+                        path=c.path,
+                        symbol_count=c.symbol_count,
+                        file_count=c.file_count,
+                        dependencies=c.dependencies,
+                        tested_by=c.tested_by,
+                    )
+                    for c in arch.major_components
+                ],
+                relationships=[
+                    ComponentRelationshipSchema(
+                        source_name=r.source_name,
+                        source_path=r.source_path,
+                        target_name=r.target_name,
+                        target_path=r.target_path,
+                        type=r.type,
+                    )
+                    for r in arch.relationships
+                ],
+            ),
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Reindex failed: {str(exc)}",
+        ) from exc
+
 
 
 

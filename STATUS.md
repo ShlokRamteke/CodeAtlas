@@ -38,7 +38,7 @@ engineering context, and AI reasoning.
   - `GitHubRepoFetcher` enhanced to fetch PR and Issue metadata from the GitHub REST API.
   - REST endpoints: `GET /api/v1/repositories/{id}/pull-requests`, `GET /api/v1/repositories/{id}/issues`, `GET /api/v1/repositories/{id}/trace/{file_path:path}`, and ingestion endpoints.
   - Frontend interactive **Historical Traceability & Artifact Linking** sub-views in Next.js UI with live cross-referenced chips on commits, PRs, and issues.
-  - 100% automated test pass rate (29/29 pytest tests, clean frontend build).
+  - 100% automated test pass rate (31/31 pytest tests, clean frontend build & contracts typecheck).
 
 ## Remaining
 

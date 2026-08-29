@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+
 import os
 import re
 from datetime import datetime, timezone
@@ -36,6 +38,8 @@ query RepoArchaeology(
               oid
               message
               committedDate
+              additions
+              deletions
               author {
                 name
                 email
@@ -43,6 +47,7 @@ query RepoArchaeology(
                   login
                 }
               }
+
               parents(first: 10) {
                 nodes {
                   oid
@@ -230,6 +235,8 @@ class GitHubRepoFetcher:
             )
             author_email = author_obj.get("email") or "unknown@domain.com"
             parent_hashes = [p["oid"] for p in node.get("parents", {}).get("nodes", []) if "oid" in p]
+            additions = int(node.get("additions", 0) or 0)
+            deletions = int(node.get("deletions", 0) or 0)
 
             parsed_commits.append(
                 ParsedCommit(
@@ -240,11 +247,66 @@ class GitHubRepoFetcher:
                     message=node.get("message", ""),
                     parent_hashes=parent_hashes,
                     file_changes=[],
+                    insertions=additions,
+                    deletions=deletions,
                 )
             )
 
+        # Concurrently fetch commit file changes via GitHub REST
+        rest_headers = {
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "Project-Archaeologist-Agent",
+        }
+        active_token = github_token or os.getenv("GITHUB_TOKEN")
+        if active_token:
+            rest_headers["Authorization"] = f"Bearer {active_token}"
+
+        async def fetch_commit_file_changes(sha: str) -> List[ParsedFileChange]:
+            if not sha:
+                return []
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    detail_res = await client.get(
+                        f"https://api.github.com/repos/{owner}/{repo}/commits/{sha}",
+                        headers=rest_headers,
+                    )
+                    if detail_res.status_code == 200:
+                        detail_data = detail_res.json()
+                        changes: List[ParsedFileChange] = []
+                        for f in detail_data.get("files", []):
+                            status_str = f.get("status", "modified")
+                            ctype = (
+                                ChangeType.ADDED if status_str == "added"
+                                else ChangeType.DELETED if status_str == "removed"
+                                else ChangeType.RENAMED if status_str == "renamed"
+                                else ChangeType.MODIFIED
+                            )
+                            changes.append(
+                                ParsedFileChange(
+                                    file_path=f.get("filename", ""),
+                                    change_type=ctype,
+                                    insertions=int(f.get("additions", 0) or 0),
+                                    deletions=int(f.get("deletions", 0) or 0),
+                                    old_path=f.get("previous_filename"),
+                                )
+                            )
+                        return changes
+            except Exception:
+                pass
+            return []
+
+        if parsed_commits:
+            file_fetch_tasks = [fetch_commit_file_changes(c.commit_hash) for c in parsed_commits]
+            commit_file_results = await asyncio.gather(*file_fetch_tasks, return_exceptions=True)
+            for idx, f_res in enumerate(commit_file_results):
+                if isinstance(f_res, list) and f_res:
+                    parsed_commits[idx].file_changes = f_res
+                    parsed_commits[idx].insertions = sum(fc.insertions for fc in f_res)
+                    parsed_commits[idx].deletions = sum(fc.deletions for fc in f_res)
+
         # 2. Parse Pull Requests
         parsed_prs: List[ParsedPullRequest] = []
+
         pr_nodes = (repo_data.get("pullRequests") or {}).get("nodes") or []
         for node in pr_nodes:
             merged_at = None
