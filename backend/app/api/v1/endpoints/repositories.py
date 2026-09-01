@@ -4,7 +4,6 @@ import os
 import uuid
 from typing import List, Optional
 
-
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,7 +35,6 @@ from app.schemas.repository import (
 )
 
 router = APIRouter()
-
 
 
 @router.post("/connect-github", response_model=ConnectGitHubResponse)
@@ -130,10 +128,8 @@ async def connect_and_ingest_github_repo(
         except Exception:
             pass
 
-
         # 4. Refresh repo
         await db.refresh(repo)
-
 
         return ConnectGitHubResponse(
             repository=RepositoryRead.model_validate(repo),
@@ -194,7 +190,6 @@ async def reindex_repository(
     name = repo.name
     token = os.getenv("GITHUB_TOKEN")
 
-
     try:
         # 1. Fetch & ingest source files
         files, default_branch = await fetcher.fetch_public_repo_files(
@@ -202,7 +197,6 @@ async def reindex_repository(
             repo=name,
             github_token=token,
         )
-
 
         engine = IngestionEngine(db)
         arch = await engine.ingest_files(repo.id, files)
@@ -296,8 +290,6 @@ async def reindex_repository(
         ) from exc
 
 
-
-
 @router.get("", response_model=List[RepositoryRead])
 @router.get("/", response_model=List[RepositoryRead], include_in_schema=False)
 async def list_repositories(
@@ -311,7 +303,9 @@ async def list_repositories(
 
 
 @router.post("", response_model=RepositoryRead, status_code=status.HTTP_201_CREATED)
-@router.post("/", response_model=RepositoryRead, status_code=status.HTTP_201_CREATED, include_in_schema=False)
+@router.post(
+    "/", response_model=RepositoryRead, status_code=status.HTTP_201_CREATED, include_in_schema=False
+)
 async def create_repository(
     payload: RepositoryCreate,
     db: AsyncSession = Depends(get_db),
@@ -363,7 +357,6 @@ async def ingest_repository_files(
         arch = await engine.ingest_files(repository_id, payload.files)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-
 
     return ArchitectureOverviewResponse(
         repository_id=repository_id,
@@ -598,15 +591,34 @@ async def get_repository_context_brief(
     builder = CurrentSystemContextBuilder()
     files_dict = [{"id": f.id, "path": f.path, "language": f.language} for f in files]
     symbols_dict = [
-        {"id": s.id, "file_id": s.file_id, "name": s.name, "kind": s.kind.value, "line_start": s.line_start, "line_end": s.line_end, "signature": s.signature}
+        {
+            "id": s.id,
+            "file_id": s.file_id,
+            "name": s.name,
+            "kind": s.kind.value,
+            "line_start": s.line_start,
+            "line_end": s.line_end,
+            "signature": s.signature,
+        }
         for s in symbols
     ]
     deps_dict = [
-        {"source_file_id": d.source_file_id, "target_path": d.target_path, "imported_symbol": d.imported_symbol, "kind": d.kind.value}
+        {
+            "source_file_id": d.source_file_id,
+            "target_path": d.target_path,
+            "imported_symbol": d.imported_symbol,
+            "kind": d.kind.value,
+        }
         for d in deps
     ]
     rels_dict = [
-        {"source_name": r.source_name, "source_path": r.source_path, "target_name": r.target_name, "target_path": r.target_path, "type": r.type}
+        {
+            "source_name": r.source_name,
+            "source_path": r.source_path,
+            "target_name": r.target_name,
+            "target_path": r.target_path,
+            "type": r.type,
+        }
         for r in arch.relationships
     ]
 
@@ -629,13 +641,14 @@ async def get_repository_context_brief(
     # Build component list
     components_list = [
         ComponentBriefSchema(
-
             name=c.name,
             path=c.path,
             language="typescript",
             symbol_count=c.symbol_count,
             symbols=[],
-            dependencies=[{"target": d, "kind": "internal", "confidence": "1.0"} for d in c.dependencies],
+            dependencies=[
+                {"target": d, "kind": "internal", "confidence": "1.0"} for d in c.dependencies
+            ],
             callers=[],
             tests=[c.tested_by] if c.tested_by else [],
             human_summary=f"Component `{c.name}` with {c.symbol_count} symbols.",
@@ -728,15 +741,39 @@ async def get_repository_context(
     builder = CurrentSystemContextBuilder()
     files_dict = [{"id": f.id, "path": f.path, "language": f.language} for f in files]
     symbols_dict = [
-        {"id": s.id, "file_id": s.file_id, "name": s.name, "kind": s.kind.value, "path": next((f.path for f in files if f.id == s.file_id), ""), "line_start": s.line_start, "line_end": s.line_end, "signature": s.signature}
+        {
+            "id": s.id,
+            "file_id": s.file_id,
+            "name": s.name,
+            "kind": s.kind.value,
+            "path": next((f.path for f in files if f.id == s.file_id), ""),
+            "line_start": s.line_start,
+            "line_end": s.line_end,
+            "signature": s.signature,
+        }
         for s in symbols
     ]
     deps_dict = [
-        {"source_file_id": d.source_file_id, "source_path": d.source_path, "target_path": d.target_path, "imported_symbol": d.imported_symbol, "kind": d.kind.value, "confidence": 1.0}
+        {
+            "source_file_id": d.source_file_id,
+            "source_path": d.source_path,
+            "target_path": d.target_path,
+            "imported_symbol": d.imported_symbol,
+            "kind": d.kind.value,
+            "confidence": 1.0,
+        }
         for d in deps
     ]
     rels_dict = [
-        {"source_name": r.source_name, "source_path": r.source_path, "target_name": r.target_name, "target_path": r.target_path, "type": r.type, "confidence": r.confidence, "resolution_method": r.resolution_method}
+        {
+            "source_name": r.source_name,
+            "source_path": r.source_path,
+            "target_name": r.target_name,
+            "target_path": r.target_path,
+            "type": r.type,
+            "confidence": r.confidence,
+            "resolution_method": r.resolution_method,
+        }
         for r in arch.relationships
     ]
 
@@ -754,5 +791,3 @@ async def get_repository_context(
     )
 
     return ProjectContextRead.model_validate(proj_ctx.to_dict())
-
-

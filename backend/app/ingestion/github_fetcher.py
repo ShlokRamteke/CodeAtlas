@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-
 import os
 import re
 from datetime import datetime, timezone
@@ -228,13 +227,11 @@ class GitHubRepoFetcher:
 
             author_obj = node.get("author") or {}
             author_user = author_obj.get("user") or {}
-            author_name = (
-                author_obj.get("name")
-                or author_user.get("login")
-                or "Unknown"
-            )
+            author_name = author_obj.get("name") or author_user.get("login") or "Unknown"
             author_email = author_obj.get("email") or "unknown@domain.com"
-            parent_hashes = [p["oid"] for p in node.get("parents", {}).get("nodes", []) if "oid" in p]
+            parent_hashes = [
+                p["oid"] for p in node.get("parents", {}).get("nodes", []) if "oid" in p
+            ]
             additions = int(node.get("additions", 0) or 0)
             deletions = int(node.get("deletions", 0) or 0)
 
@@ -276,9 +273,12 @@ class GitHubRepoFetcher:
                         for f in detail_data.get("files", []):
                             status_str = f.get("status", "modified")
                             ctype = (
-                                ChangeType.ADDED if status_str == "added"
-                                else ChangeType.DELETED if status_str == "removed"
-                                else ChangeType.RENAMED if status_str == "renamed"
+                                ChangeType.ADDED
+                                if status_str == "added"
+                                else ChangeType.DELETED
+                                if status_str == "removed"
+                                else ChangeType.RENAMED
+                                if status_str == "renamed"
                                 else ChangeType.MODIFIED
                             )
                             changes.append(
@@ -335,7 +335,9 @@ class GitHubRepoFetcher:
             state = "merged" if is_merged else state_raw.lower()
 
             author = (node.get("author") or {}).get("login", "Unknown")
-            labels = [lbl["name"] for lbl in (node.get("labels") or {}).get("nodes", []) if "name" in lbl]
+            labels = [
+                lbl["name"] for lbl in (node.get("labels") or {}).get("nodes", []) if "name" in lbl
+            ]
 
             parsed_prs.append(
                 ParsedPullRequest(
@@ -371,7 +373,9 @@ class GitHubRepoFetcher:
                     created_at = None
 
             author = (node.get("author") or {}).get("login", "Unknown")
-            labels = [lbl["name"] for lbl in (node.get("labels") or {}).get("nodes", []) if "name" in lbl]
+            labels = [
+                lbl["name"] for lbl in (node.get("labels") or {}).get("nodes", []) if "name" in lbl
+            ]
 
             parsed_issues.append(
                 ParsedIssue(
@@ -456,7 +460,9 @@ class GitHubRepoFetcher:
             # 4. Fetch raw content for candidate files via raw.githubusercontent.com
             files_content: Dict[str, str] = {}
             for path in candidate_files:
-                raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{default_branch}/{path}"
+                raw_url = (
+                    f"https://raw.githubusercontent.com/{owner}/{repo}/{default_branch}/{path}"
+                )
                 try:
                     res = await client.get(raw_url, headers=headers)
                     if res.status_code == 200:
@@ -647,7 +653,9 @@ class GitHubRepoFetcher:
                         title=pr.get("title", ""),
                         body=pr.get("body"),
                         state=pr.get("state", "open"),
-                        author=pr.get("user", {}).get("login", "Unknown") if isinstance(pr.get("user"), dict) else "Unknown",
+                        author=pr.get("user", {}).get("login", "Unknown")
+                        if isinstance(pr.get("user"), dict)
+                        else "Unknown",
                         merged_at=merged_at,
                         closed_at=closed_at,
                         labels=labels,
@@ -714,7 +722,9 @@ class GitHubRepoFetcher:
                 created_at = None
                 if item.get("created_at"):
                     try:
-                        created_at = datetime.fromisoformat(item["created_at"].replace("Z", "+00:00"))
+                        created_at = datetime.fromisoformat(
+                            item["created_at"].replace("Z", "+00:00")
+                        )
                     except Exception:
                         created_at = None
 
@@ -729,7 +739,9 @@ class GitHubRepoFetcher:
                         title=item.get("title", ""),
                         body=item.get("body"),
                         state=item.get("state", "open"),
-                        author=item.get("user", {}).get("login", "Unknown") if isinstance(item.get("user"), dict) else "Unknown",
+                        author=item.get("user", {}).get("login", "Unknown")
+                        if isinstance(item.get("user"), dict)
+                        else "Unknown",
                         closed_at=closed_at,
                         labels=labels,
                         html_url=item.get("html_url"),

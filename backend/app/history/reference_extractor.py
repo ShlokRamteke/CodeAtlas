@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Set
+from typing import List, Optional, Set
 
 
 @dataclass
@@ -129,9 +129,7 @@ class ReferenceExtractor:
             if issue_num not in seen_issues and issue_num not in seen_prs:
                 seen_issues.add(issue_num)
                 link_type = (
-                    "fixes" if "fix" in action
-                    else "closes" if "close" in action
-                    else "resolves"
+                    "fixes" if "fix" in action else "closes" if "close" in action else "resolves"
                 )
                 issues.append(
                     ExtractedIssueRef(
@@ -191,9 +189,7 @@ class ReferenceExtractor:
             if issue_num not in seen_issues:
                 seen_issues.add(issue_num)
                 link_type = (
-                    "fixes" if "fix" in action
-                    else "closes" if "close" in action
-                    else "resolves"
+                    "fixes" if "fix" in action else "closes" if "close" in action else "resolves"
                 )
                 issues.append(
                     ExtractedIssueRef(

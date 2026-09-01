@@ -98,7 +98,6 @@ class ConnectGitHubRequest(BaseModel):
     url_or_slug: str
 
 
-
 class ConnectGitHubResponse(BaseModel):
     repository: RepositoryRead
     architecture: ArchitectureOverviewResponse
@@ -181,6 +180,3 @@ class ContextBriefResponse(BaseModel):
     human_summary: str
     llm_context: str
     project_context: Optional[ProjectContextRead] = None
-
-
-

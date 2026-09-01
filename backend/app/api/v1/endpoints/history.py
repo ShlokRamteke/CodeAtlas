@@ -12,11 +12,6 @@ from app.history.git_indexer import GitHistoryIndexer
 from app.history.historical_linker import HistoricalLinker
 from app.models.commit import Commit
 from app.models.commit_file_change import CommitFileChange
-from app.models.historical_link import (
-    CommitIssueLink,
-    CommitPullRequestLink,
-    PullRequestIssueLink,
-)
 from app.models.issue import Issue
 from app.models.pull_request import PullRequest
 from app.models.repository import Repository
@@ -46,8 +41,7 @@ async def _format_commit_read(commit: Commit, db: AsyncSession) -> CommitRead:
     """Format Commit with populated linked PRs and Issues."""
     # CommitFileChanges
     changes_read = [
-        CommitFileChangeRead.model_validate(fc)
-        for fc in getattr(commit, "file_changes", [])
+        CommitFileChangeRead.model_validate(fc) for fc in getattr(commit, "file_changes", [])
     ]
 
     # Linked PRs
@@ -213,7 +207,10 @@ async def get_file_history(
     )
 
 
-@router.get("/{repository_id}/components/{component_path:path}/history", response_model=ComponentHistoryResponse)
+@router.get(
+    "/{repository_id}/components/{component_path:path}/history",
+    response_model=ComponentHistoryResponse,
+)
 async def get_component_history(
     repository_id: uuid.UUID,
     component_path: str,
@@ -315,13 +312,15 @@ async def list_repository_pull_requests(
         for cl in getattr(pr, "commit_links", []):
             c_obj = await db.get(Commit, cl.commit_id) if cl.commit_id else None
             if c_obj:
-                commit_links_data.append({
-                    "commit_hash": c_obj.commit_hash,
-                    "message": c_obj.message,
-                    "author_name": c_obj.author_name,
-                    "committed_at": c_obj.committed_at.isoformat(),
-                    "link_type": cl.link_type,
-                })
+                commit_links_data.append(
+                    {
+                        "commit_hash": c_obj.commit_hash,
+                        "message": c_obj.message,
+                        "author_name": c_obj.author_name,
+                        "committed_at": c_obj.committed_at.isoformat(),
+                        "link_type": cl.link_type,
+                    }
+                )
 
         results.append(
             PullRequestRead(
@@ -387,13 +386,15 @@ async def get_pull_request_detail(
     for cl in getattr(pr, "commit_links", []):
         c_obj = await db.get(Commit, cl.commit_id) if cl.commit_id else None
         if c_obj:
-            commit_links_data.append({
-                "commit_hash": c_obj.commit_hash,
-                "message": c_obj.message,
-                "author_name": c_obj.author_name,
-                "committed_at": c_obj.committed_at.isoformat(),
-                "link_type": cl.link_type,
-            })
+            commit_links_data.append(
+                {
+                    "commit_hash": c_obj.commit_hash,
+                    "message": c_obj.message,
+                    "author_name": c_obj.author_name,
+                    "committed_at": c_obj.committed_at.isoformat(),
+                    "link_type": cl.link_type,
+                }
+            )
 
     return PullRequestRead(
         id=pr.id,
@@ -490,13 +491,15 @@ async def list_repository_issues(
         for cl in getattr(issue, "commit_links", []):
             c_obj = await db.get(Commit, cl.commit_id) if cl.commit_id else None
             if c_obj:
-                commit_links_data.append({
-                    "commit_hash": c_obj.commit_hash,
-                    "message": c_obj.message,
-                    "author_name": c_obj.author_name,
-                    "committed_at": c_obj.committed_at.isoformat(),
-                    "link_type": cl.link_type,
-                })
+                commit_links_data.append(
+                    {
+                        "commit_hash": c_obj.commit_hash,
+                        "message": c_obj.message,
+                        "author_name": c_obj.author_name,
+                        "committed_at": c_obj.committed_at.isoformat(),
+                        "link_type": cl.link_type,
+                    }
+                )
 
         results.append(
             IssueRead(
@@ -560,13 +563,15 @@ async def get_issue_detail(
     for cl in getattr(issue, "commit_links", []):
         c_obj = await db.get(Commit, cl.commit_id) if cl.commit_id else None
         if c_obj:
-            commit_links_data.append({
-                "commit_hash": c_obj.commit_hash,
-                "message": c_obj.message,
-                "author_name": c_obj.author_name,
-                "committed_at": c_obj.committed_at.isoformat(),
-                "link_type": cl.link_type,
-            })
+            commit_links_data.append(
+                {
+                    "commit_hash": c_obj.commit_hash,
+                    "message": c_obj.message,
+                    "author_name": c_obj.author_name,
+                    "committed_at": c_obj.committed_at.isoformat(),
+                    "link_type": cl.link_type,
+                }
+            )
 
     return IssueRead(
         id=issue.id,

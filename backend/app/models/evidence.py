@@ -46,4 +46,6 @@ class Evidence(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         JSON().with_variant(JSONB, "postgresql"), default=dict, nullable=False
     )
 
-    investigation: Mapped["Investigation"] = relationship("Investigation", back_populates="evidence")
+    investigation: Mapped["Investigation"] = relationship(
+        "Investigation", back_populates="evidence"
+    )

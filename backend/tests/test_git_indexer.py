@@ -68,7 +68,9 @@ async def test_git_indexer_index_and_file_history(db_session: AsyncSession) -> N
     assert count == 2
 
     # 3. Query file history
-    file_history = await indexer.get_file_history(repo.id, "src/services/PaymentService.ts", db_session)
+    file_history = await indexer.get_file_history(
+        repo.id, "src/services/PaymentService.ts", db_session
+    )
     assert file_history.total_commits == 2
     assert len(file_history.commits) == 2
     assert file_history.introducing_commit is not None
@@ -98,8 +100,18 @@ async def test_git_indexer_component_history(db_session: AsyncSession) -> None:
             "committed_at": "2025-01-10T12:00:00Z",
             "message": "feat: order processing",
             "file_changes": [
-                {"file_path": "src/orders/service.ts", "change_type": "added", "insertions": 30, "deletions": 0},
-                {"file_path": "src/orders/model.ts", "change_type": "added", "insertions": 20, "deletions": 0},
+                {
+                    "file_path": "src/orders/service.ts",
+                    "change_type": "added",
+                    "insertions": 30,
+                    "deletions": 0,
+                },
+                {
+                    "file_path": "src/orders/model.ts",
+                    "change_type": "added",
+                    "insertions": 20,
+                    "deletions": 0,
+                },
             ],
         }
     ]

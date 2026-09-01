@@ -69,10 +69,13 @@ class ProjectContext:
         file_entities = [e for e in self.entities if e.kind == "file"]
 
         # Symbol breakdown
-        sym_md = "\n".join(
-            f"- `{s.signature or s.name}` ({s.path}:{s.line_start}-{s.line_end})"
-            for s in sym_entities[:15]
-        ) or "- *No symbols indexed*"
+        sym_md = (
+            "\n".join(
+                f"- `{s.signature or s.name}` ({s.path}:{s.line_start}-{s.line_end})"
+                for s in sym_entities[:15]
+            )
+            or "- *No symbols indexed*"
+        )
         if len(sym_entities) > 15:
             sym_md += f"\n- *... and {len(sym_entities) - 15} more symbols*"
 
@@ -81,32 +84,44 @@ class ProjectContext:
         tested_by = [r for r in self.relationships if r.type == "tested_by"]
         calls = [r for r in self.relationships if r.type in ["calls", "extends", "implements"]]
 
-        imports_md = "\n".join(
-            f"- `{r.source_name}` &rarr; `{r.target_name}` (`{r.target_path}`) [{r.resolution_method}, {int(r.confidence * 100)}% conf]"
-            for r in imports[:10]
-        ) or "- *None*"
+        imports_md = (
+            "\n".join(
+                f"- `{r.source_name}` &rarr; `{r.target_name}` (`{r.target_path}`) [{r.resolution_method}, {int(r.confidence * 100)}% conf]"
+                for r in imports[:10]
+            )
+            or "- *None*"
+        )
 
-        tests_md = "\n".join(
-            f"- `{r.source_name}` tested by `{r.target_name}` (`{r.target_path}`)"
-            for r in tested_by
-        ) or "- *No associated test suite match*"
+        tests_md = (
+            "\n".join(
+                f"- `{r.source_name}` tested by `{r.target_name}` (`{r.target_path}`)"
+                for r in tested_by
+            )
+            or "- *No associated test suite match*"
+        )
 
-        calls_md = "\n".join(
-            f"- `{r.source_name}` {r.type} `{r.target_name}`"
-            for r in calls[:10]
-        ) or "- *No caller/inheritance edges*"
+        calls_md = (
+            "\n".join(f"- `{r.source_name}` {r.type} `{r.target_name}`" for r in calls[:10])
+            or "- *No caller/inheritance edges*"
+        )
 
         # Unknowns & Gaps
-        unknowns_md = "\n".join(
-            f"- [{u.severity.upper()}] **{u.target}**: {u.description} (`{u.kind}`)"
-            for u in self.unknowns
-        ) or "- *No architectural gaps detected (High confidence)*"
+        unknowns_md = (
+            "\n".join(
+                f"- [{u.severity.upper()}] **{u.target}**: {u.description} (`{u.kind}`)"
+                for u in self.unknowns
+            )
+            or "- *No architectural gaps detected (High confidence)*"
+        )
 
         # Evidence
-        evidence_md = "\n".join(
-            f"- `[{e.id[:8]}]` {e.kind} in `{e.source_path}` ({int(e.confidence * 100)}% conf)"
-            for e in self.evidence[:8]
-        ) or "- *No raw evidence records*"
+        evidence_md = (
+            "\n".join(
+                f"- `[{e.id[:8]}]` {e.kind} in `{e.source_path}` ({int(e.confidence * 100)}% conf)"
+                for e in self.evidence[:8]
+            )
+            or "- *No raw evidence records*"
+        )
 
         return f"""# Project Context: {self.target_name}
 **Target Type:** {self.target_type.capitalize()} | **Confidence:** {int(self.confidence * 100)}% | **Provenance:** `{self.provenance}`
@@ -142,20 +157,24 @@ class ProjectContext:
         file_entities = [e for e in self.entities if e.kind == "file"]
 
         sym_strs = [f"{s.name}({s.signature or s.name})" for s in sym_entities[:15]]
-        dep_strs = [f"{r.source_name}->{r.target_name}" for r in self.relationships if r.type == "imports"][:12]
-        test_strs = [f"{r.source_name}:{r.target_path}" for r in self.relationships if r.type == "tested_by"]
+        dep_strs = [
+            f"{r.source_name}->{r.target_name}" for r in self.relationships if r.type == "imports"
+        ][:12]
+        test_strs = [
+            f"{r.source_name}:{r.target_path}" for r in self.relationships if r.type == "tested_by"
+        ]
         unknown_strs = [f"{u.target}({u.kind})" for u in self.unknowns[:8]]
         evidence_ids = [e.id[:8] for e in self.evidence[:10]]
 
         return f"""=== UNIFIED PROJECT CONTEXT BRIEFING ===
 TARGET: {self.target_name} (type: {self.target_type}, id: {self.target_id})
 CONFIDENCE: {self.confidence:.2f} | PROVENANCE: {self.provenance}
-FILES ({len(file_entities)}): [{', '.join(f.path for f in file_entities[:8])}]
-SYMBOLS ({len(sym_entities)}): [{', '.join(sym_strs)}]
-DEPENDENCIES ({len(dep_strs)}): [{', '.join(dep_strs)}]
-TEST_COVERAGE: [{', '.join(test_strs) if test_strs else 'NONE_DETECTED'}]
-UNKNOWNS_GAPS ({len(self.unknowns)}): [{', '.join(unknown_strs) if unknown_strs else 'NONE'}]
-EVIDENCE_RECORDS ({len(self.evidence)}): [{', '.join(evidence_ids)}]
+FILES ({len(file_entities)}): [{", ".join(f.path for f in file_entities[:8])}]
+SYMBOLS ({len(sym_entities)}): [{", ".join(sym_strs)}]
+DEPENDENCIES ({len(dep_strs)}): [{", ".join(dep_strs)}]
+TEST_COVERAGE: [{", ".join(test_strs) if test_strs else "NONE_DETECTED"}]
+UNKNOWNS_GAPS ({len(self.unknowns)}): [{", ".join(unknown_strs) if unknown_strs else "NONE"}]
+EVIDENCE_RECORDS ({len(self.evidence)}): [{", ".join(evidence_ids)}]
 ========================================"""
 
     def to_dict(self) -> Dict[str, Any]:

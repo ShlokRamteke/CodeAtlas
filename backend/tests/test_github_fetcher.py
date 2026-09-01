@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -115,7 +115,11 @@ async def test_fetch_repo_bundle_graphql_mocked():
                                 "parents": {"nodes": [{"oid": "root000"}]},
                                 "associatedPullRequests": {
                                     "nodes": [
-                                        {"number": 12, "title": "Tree-sitter parser", "state": "MERGED"}
+                                        {
+                                            "number": 12,
+                                            "title": "Tree-sitter parser",
+                                            "state": "MERGED",
+                                        }
                                     ]
                                 },
                             }
@@ -139,7 +143,11 @@ async def test_fetch_repo_bundle_graphql_mocked():
                         "labels": {"nodes": [{"name": "ast"}, {"name": "core"}]},
                         "closingIssuesReferences": {
                             "nodes": [
-                                {"number": 5, "title": "Parse multi-language ASTs", "state": "CLOSED"}
+                                {
+                                    "number": 5,
+                                    "title": "Parse multi-language ASTs",
+                                    "state": "CLOSED",
+                                }
                             ]
                         },
                     }

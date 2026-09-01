@@ -1,8 +1,9 @@
 from __future__ import annotations
+
 from typing import Any
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
 
 
 class Settings(BaseSettings):
@@ -36,14 +37,13 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
     ]
 
-
-
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Any) -> list[str]:
         if isinstance(v, str):
             if v.startswith("[") and v.endswith("]"):
                 import json
+
                 try:
                     return json.loads(v)
                 except Exception:
@@ -52,7 +52,6 @@ class Settings(BaseSettings):
         elif isinstance(v, (list, tuple)):
             return [str(i) for i in v]
         return ["http://localhost:3000", "http://127.0.0.1:3000"]
-
 
     @property
     def async_database_url(self) -> str:

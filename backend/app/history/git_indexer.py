@@ -63,7 +63,9 @@ class GitHistoryIndexer:
             existing = (await db.execute(existing_stmt)).scalar_one_or_none()
             if existing:
                 # Backfill file changes & diff metrics if missing
-                if (existing.files_changed_count == 0 or existing.insertions == 0) and pc.file_changes:
+                if (
+                    existing.files_changed_count == 0 or existing.insertions == 0
+                ) and pc.file_changes:
                     insertions = sum(fc.insertions for fc in pc.file_changes) or pc.insertions
                     deletions = sum(fc.deletions for fc in pc.file_changes) or pc.deletions
                     existing.files_changed_count = len(pc.file_changes)
@@ -82,7 +84,6 @@ class GitHistoryIndexer:
                         db.add(change_obj)
                     indexed_count += 1
                 continue
-
 
             insertions = sum(fc.insertions for fc in pc.file_changes)
             deletions = sum(fc.deletions for fc in pc.file_changes)
@@ -198,9 +199,7 @@ class GitHistoryIndexer:
         if not introducing_commit and commits_data:
             introducing_commit = commits_data[-1]
 
-        authors_list = sorted(
-            authors_map.values(), key=lambda a: a["commit_count"], reverse=True
-        )
+        authors_list = sorted(authors_map.values(), key=lambda a: a["commit_count"], reverse=True)
 
         return FileHistoryResult(
             file_path=file_path,
@@ -252,18 +251,20 @@ class GitHistoryIndexer:
                     }
                     for il in getattr(commit, "issue_links", [])
                 ]
-                unique_commits.append({
-                    "commit_hash": commit.commit_hash,
-                    "author_name": commit.author_name,
-                    "author_email": commit.author_email,
-                    "committed_at": commit.committed_at.isoformat(),
-                    "message": commit.message,
-                    "files_changed_count": commit.files_changed_count,
-                    "insertions": commit.insertions,
-                    "deletions": commit.deletions,
-                    "linked_pull_requests": linked_prs,
-                    "linked_issues": linked_issues,
-                })
+                unique_commits.append(
+                    {
+                        "commit_hash": commit.commit_hash,
+                        "author_name": commit.author_name,
+                        "author_email": commit.author_email,
+                        "committed_at": commit.committed_at.isoformat(),
+                        "message": commit.message,
+                        "files_changed_count": commit.files_changed_count,
+                        "insertions": commit.insertions,
+                        "deletions": commit.deletions,
+                        "linked_pull_requests": linked_prs,
+                        "linked_issues": linked_issues,
+                    }
+                )
                 authors_map[commit.author_name] = authors_map.get(commit.author_name, 0) + 1
 
             files_touched[change.file_path] = files_touched.get(change.file_path, 0) + 1
@@ -275,14 +276,18 @@ class GitHistoryIndexer:
             "total_commits": len(unique_commits),
             "introducing_commit": introducing_commit,
             "commits": unique_commits[:30],
-            "top_authors": [{"name": k, "commits": v} for k, v in sorted(authors_map.items(), key=lambda x: x[1], reverse=True)],
-            "files_touched": [{"path": k, "modifications": v} for k, v in sorted(files_touched.items(), key=lambda x: x[1], reverse=True)],
+            "top_authors": [
+                {"name": k, "commits": v}
+                for k, v in sorted(authors_map.items(), key=lambda x: x[1], reverse=True)
+            ],
+            "files_touched": [
+                {"path": k, "modifications": v}
+                for k, v in sorted(files_touched.items(), key=lambda x: x[1], reverse=True)
+            ],
         }
 
     @staticmethod
-    def parse_synthetic_payload(
-        payload: List[Dict[str, Any]]
-    ) -> List[ParsedCommit]:
+    def parse_synthetic_payload(payload: List[Dict[str, Any]]) -> List[ParsedCommit]:
         """Convert JSON commit payload to ParsedCommit list."""
         parsed: List[ParsedCommit] = []
         for item in payload:
@@ -300,7 +305,11 @@ class GitHistoryIndexer:
             file_changes = []
             for fc in item.get("file_changes", []):
                 ctype_str = str(fc.get("change_type", "modified")).lower()
-                ctype = ChangeType(ctype_str) if ctype_str in [c.value for c in ChangeType] else ChangeType.MODIFIED
+                ctype = (
+                    ChangeType(ctype_str)
+                    if ctype_str in [c.value for c in ChangeType]
+                    else ChangeType.MODIFIED
+                )
                 file_changes.append(
                     ParsedFileChange(
                         file_path=fc.get("file_path", ""),
@@ -325,7 +334,9 @@ class GitHistoryIndexer:
 
             parsed.append(
                 ParsedCommit(
-                    commit_hash=item.get("commit_hash") or item.get("hash") or f"sha_{uuid.uuid4().hex[:8]}",
+                    commit_hash=item.get("commit_hash")
+                    or item.get("hash")
+                    or f"sha_{uuid.uuid4().hex[:8]}",
                     author_name=item.get("author_name") or item.get("author") or "Developer",
                     author_email=item.get("author_email") or "dev@example.com",
                     committed_at=committed_at,

@@ -90,9 +90,5 @@ class PullRequestIssueLink(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     raw_reference: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     confidence: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
 
-    pull_request: Mapped["PullRequest"] = relationship(
-        "PullRequest", back_populates="issue_links"
-    )
-    issue: Mapped[Optional["Issue"]] = relationship(
-        "Issue", back_populates="pull_request_links"
-    )
+    pull_request: Mapped["PullRequest"] = relationship("PullRequest", back_populates="issue_links")
+    issue: Mapped[Optional["Issue"]] = relationship("Issue", back_populates="pull_request_links")

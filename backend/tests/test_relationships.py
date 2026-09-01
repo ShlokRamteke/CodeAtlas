@@ -18,9 +18,7 @@ def test_test_file_matching() -> None:
     )
     assert target1 == "src/services/PaymentService.ts"
 
-    target2 = RelationshipAnalyzer.find_target_for_test(
-        "backend/tests/test_auth.py", all_files
-    )
+    target2 = RelationshipAnalyzer.find_target_for_test("backend/tests/test_auth.py", all_files)
     assert target2 == "backend/app/auth.py"
 
 
@@ -36,8 +34,12 @@ def test_architecture_graph_generation() -> None:
                 ExtractedSymbol(name="charge", kind="method", line_start=5, line_end=15),
             ],
             dependencies=[
-                ExtractedDependency(target_path="./database", imported_symbol="db", kind="relative"),
-                ExtractedDependency(target_path="stripe", imported_symbol="Stripe", kind="external"),
+                ExtractedDependency(
+                    target_path="./database", imported_symbol="db", kind="relative"
+                ),
+                ExtractedDependency(
+                    target_path="stripe", imported_symbol="Stripe", kind="external"
+                ),
             ],
         ),
         ParsedFileResult(
@@ -47,7 +49,11 @@ def test_architecture_graph_generation() -> None:
                 ExtractedSymbol(name="testCharge", kind="function", line_start=1, line_end=10),
             ],
             dependencies=[
-                ExtractedDependency(target_path="./PaymentService", imported_symbol="PaymentService", kind="relative"),
+                ExtractedDependency(
+                    target_path="./PaymentService",
+                    imported_symbol="PaymentService",
+                    kind="relative",
+                ),
             ],
         ),
     ]

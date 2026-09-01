@@ -109,9 +109,7 @@ class HistoricalLinker:
             await db.flush()
 
             # 1. Extract and store PR -> Issue links
-            issue_refs = ReferenceExtractor.extract_from_pull_request(
-                pr_obj.title, pr_obj.body
-            )
+            issue_refs = ReferenceExtractor.extract_from_pull_request(pr_obj.title, pr_obj.body)
             for iref in issue_refs:
                 # Find matching Issue if already ingested
                 issue_stmt = select(Issue).where(
@@ -349,9 +347,7 @@ class HistoricalLinker:
             pr_links = list((await db.execute(pr_links_stmt)).scalars().all())
 
             # Get linked issues directly for this commit
-            issue_links_stmt = select(CommitIssueLink).where(
-                CommitIssueLink.commit_id == commit.id
-            )
+            issue_links_stmt = select(CommitIssueLink).where(CommitIssueLink.commit_id == commit.id)
             issue_links = list((await db.execute(issue_links_stmt)).scalars().all())
 
             linked_prs_data: List[Dict[str, Any]] = []
@@ -392,7 +388,9 @@ class HistoricalLinker:
                     "state": pr_detail.state.value if pr_detail else "unknown",
                     "author": pr_detail.author if pr_detail else "Unknown",
                     "link_type": pl.link_type,
-                    "merged_at": pr_detail.merged_at.isoformat() if pr_detail and pr_detail.merged_at else None,
+                    "merged_at": pr_detail.merged_at.isoformat()
+                    if pr_detail and pr_detail.merged_at
+                    else None,
                     "labels": pr_detail.labels if pr_detail else [],
                     "html_url": pr_detail.html_url if pr_detail else None,
                     "linked_issues": pr_issue_links,
@@ -424,17 +422,19 @@ class HistoricalLinker:
                 linked_issues_data.append(iss_item)
                 seen_issues[il.issue_number] = iss_item
 
-            trace_chain.append({
-                "commit_hash": commit.commit_hash,
-                "author_name": commit.author_name,
-                "committed_at": commit.committed_at.isoformat(),
-                "message": commit.message,
-                "change_type": change.change_type.value,
-                "insertions": change.insertions,
-                "deletions": change.deletions,
-                "linked_pull_requests": linked_prs_data,
-                "linked_issues": linked_issues_data,
-            })
+            trace_chain.append(
+                {
+                    "commit_hash": commit.commit_hash,
+                    "author_name": commit.author_name,
+                    "committed_at": commit.committed_at.isoformat(),
+                    "message": commit.message,
+                    "change_type": change.change_type.value,
+                    "insertions": change.insertions,
+                    "deletions": change.deletions,
+                    "linked_pull_requests": linked_prs_data,
+                    "linked_issues": linked_issues_data,
+                }
+            )
 
         return {
             "file_path": file_path,

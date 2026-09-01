@@ -83,7 +83,12 @@ async def test_history_api_endpoints(client: AsyncClient) -> None:
             "committed_at": "2025-01-05T10:00:00Z",
             "message": "feat(auth): initial AuthService implementation (PR #10) - fixes #50",
             "file_changes": [
-                {"file_path": "src/auth/AuthService.ts", "change_type": "added", "insertions": 40, "deletions": 0}
+                {
+                    "file_path": "src/auth/AuthService.ts",
+                    "change_type": "added",
+                    "insertions": 40,
+                    "deletions": 0,
+                }
             ],
         },
         {
@@ -93,7 +98,12 @@ async def test_history_api_endpoints(client: AsyncClient) -> None:
             "committed_at": "2025-02-15T15:00:00Z",
             "message": "Merge pull request #11 from fix/token\n\nFixes #51",
             "file_changes": [
-                {"file_path": "src/auth/AuthService.ts", "change_type": "modified", "insertions": 5, "deletions": 2}
+                {
+                    "file_path": "src/auth/AuthService.ts",
+                    "change_type": "modified",
+                    "insertions": 5,
+                    "deletions": 2,
+                }
             ],
         },
     ]
@@ -113,7 +123,10 @@ async def test_history_api_endpoints(client: AsyncClient) -> None:
     assert commits_list[0]["commit_hash"] == "sha_222"
     assert len(commits_list[0]["linked_pull_requests"]) == 1
     assert commits_list[0]["linked_pull_requests"][0]["pr_number"] == 11
-    assert commits_list[0]["linked_pull_requests"][0]["title"] == "fix(auth): handle expired token edge-case"
+    assert (
+        commits_list[0]["linked_pull_requests"][0]["title"]
+        == "fix(auth): handle expired token edge-case"
+    )
 
     # 6. List Pull Requests
     prs_res = await client.get(f"/api/v1/repositories/{repo_id}/pull-requests")
