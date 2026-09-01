@@ -39,72 +39,6 @@ class ParsedFileResult:
     summary: Optional[str] = None
 
 
-FILENAME_LANGUAGE_MAP: dict[str, str] = {
-    "dockerfile": "dockerfile",
-    "makefile": "makefile",
-    "gnumakefile": "makefile",
-    "cmakelists.txt": "cmake",
-    "gemfile": "ruby",
-    "rakefile": "ruby",
-    "procfile": "yaml",
-}
-
-EXTENSION_LANGUAGE_MAP: dict[str, str] = {
-    # TypeScript / JavaScript
-    ".ts": "typescript",
-    ".mts": "typescript",
-    ".cts": "typescript",
-    ".tsx": "tsx",
-    ".js": "javascript",
-    ".mjs": "javascript",
-    ".cjs": "javascript",
-    ".jsx": "javascript",
-    # Python
-    ".py": "python",
-    ".pyw": "python",
-    ".pyi": "python",
-    # Config & Markup
-    ".yml": "yaml",
-    ".yaml": "yaml",
-    ".json": "json",
-    ".jsonc": "json",
-    ".json5": "json",
-    ".md": "markdown",
-    ".markdown": "markdown",
-    ".mdx": "markdown",
-    ".toml": "toml",
-    ".xml": "xml",
-    ".svg": "svg",
-    ".html": "html",
-    ".htm": "html",
-    ".css": "css",
-    ".scss": "css",
-    ".sass": "css",
-    ".less": "css",
-    # Systems / Backends
-    ".go": "go",
-    ".rs": "rust",
-    ".java": "java",
-    ".c": "c",
-    ".h": "c",
-    ".cpp": "cpp",
-    ".cc": "cpp",
-    ".cxx": "cpp",
-    ".hpp": "cpp",
-    ".sh": "shell",
-    ".bash": "shell",
-    ".zsh": "shell",
-    ".sql": "sql",
-    ".rb": "ruby",
-    ".php": "php",
-    ".proto": "protobuf",
-    ".graphql": "graphql",
-    ".gql": "graphql",
-    ".txt": "text",
-    ".dockerfile": "dockerfile",
-}
-
-
 class ASTCodeParser:
     """Multi-language AST Parser using Tree-sitter for deterministic code understanding."""
 
@@ -115,17 +49,41 @@ class ASTCodeParser:
         self.py_lang = Language(tree_sitter_python.language())
 
     @staticmethod
-    def detect_language(file_path: str) -> str:
-        name = Path(file_path).name.lower()
-        if name in FILENAME_LANGUAGE_MAP:
-            return FILENAME_LANGUAGE_MAP[name]
-        if name.startswith("dockerfile."):
-            return "dockerfile"
-        if name.startswith(".env"):
-            return "config"
-
+    def detect_language(file_path: str, code: str = "") -> str:
+        """
+        Detect file programming language using open-source Pygments lexer resolution
+        with fast-path for Tree-sitter primary targets.
+        """
         ext = Path(file_path).suffix.lower()
-        return EXTENSION_LANGUAGE_MAP.get(ext, "unknown")
+        if ext in [".ts", ".mts", ".cts"]:
+            return "typescript"
+        if ext in [".tsx"]:
+            return "tsx"
+        if ext in [".js", ".mjs", ".cjs", ".jsx"]:
+            return "javascript"
+        if ext in [".py", ".pyw", ".pyi"]:
+            return "python"
+
+        # Use Pygments open-source language resolution for all 500+ file types
+        try:
+            from pygments.lexers import get_lexer_for_filename
+
+            lexer = get_lexer_for_filename(file_path, code or None)
+            name = lexer.name.lower()
+            if "sql" in name:
+                return "sql"
+            if "yaml" in name:
+                return "yaml"
+            if "json" in name:
+                return "json"
+            if "markdown" in name:
+                return "markdown"
+            return name
+        except Exception:
+            pass
+
+        # Fallback to extension name or unknown
+        return ext.lstrip(".") or "unknown"
 
     def _get_parser_for_path(self, file_path: str) -> tuple[Optional[Parser], str]:
         lang = self.detect_language(file_path)
@@ -138,6 +96,7 @@ class ASTCodeParser:
         if lang == "python":
             return Parser(self.py_lang), "python"
         return None, lang
+
 
 
     def parse_code(self, file_path: str, code: str) -> ParsedFileResult:
