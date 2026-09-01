@@ -34,7 +34,7 @@ IGNORED_DIRS = {
     "coverage",
 }
 
-# Ignore non-code extensions
+# Supported source, configuration, and documentation extensions
 SUPPORTED_EXTENSIONS = {
     ".ts",
     ".tsx",
@@ -43,11 +43,45 @@ SUPPORTED_EXTENSIONS = {
     ".mjs",
     ".cjs",
     ".py",
+    ".pyw",
+    ".pyi",
     ".json",
+    ".jsonc",
+    ".json5",
     ".md",
+    ".markdown",
+    ".mdx",
     ".yml",
     ".yaml",
+    ".toml",
+    ".sh",
+    ".bash",
+    ".zsh",
+    ".sql",
+    ".html",
+    ".htm",
+    ".css",
+    ".scss",
+    ".sass",
+    ".less",
+    ".go",
+    ".rs",
+    ".java",
+    ".c",
+    ".h",
+    ".cpp",
+    ".cc",
+    ".cxx",
+    ".hpp",
+    ".rb",
+    ".php",
+    ".proto",
+    ".graphql",
+    ".gql",
+    ".txt",
+    ".dockerfile",
 }
+
 
 # Regex secret scan patterns
 SECRET_PATTERNS = [
