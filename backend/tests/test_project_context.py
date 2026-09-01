@@ -15,15 +15,54 @@ def test_canonical_project_context_structure() -> None:
         {"id": "f2", "path": "src/services/PaymentService.test.ts", "language": "typescript"},
     ]
     symbols = [
-        {"id": "s1", "file_id": "f1", "name": "PaymentService", "kind": "class", "signature": "class PaymentService", "line_start": 1, "line_end": 20},
-        {"id": "s2", "file_id": "f1", "name": "charge", "kind": "method", "signature": "async charge()", "line_start": 10, "line_end": 15},
+        {
+            "id": "s1",
+            "file_id": "f1",
+            "name": "PaymentService",
+            "kind": "class",
+            "signature": "class PaymentService",
+            "line_start": 1,
+            "line_end": 20,
+        },
+        {
+            "id": "s2",
+            "file_id": "f1",
+            "name": "charge",
+            "kind": "method",
+            "signature": "async charge()",
+            "line_start": 10,
+            "line_end": 15,
+        },
     ]
     dependencies = [
-        {"source_file_id": "f1", "source_path": "src/services/PaymentService.ts", "target_path": "../models/User", "imported_symbol": "User", "kind": "relative", "confidence": 1.0},
+        {
+            "source_file_id": "f1",
+            "source_path": "src/services/PaymentService.ts",
+            "target_path": "../models/User",
+            "imported_symbol": "User",
+            "kind": "relative",
+            "confidence": 1.0,
+        },
     ]
     relationships = [
-        {"source_name": "CheckoutService", "source_path": "src/services/CheckoutService.ts", "target_name": "PaymentService", "target_path": "src/services/PaymentService.ts", "type": "imports", "confidence": 1.0, "resolution_method": "tree_sitter_ast"},
-        {"source_name": "PaymentService", "source_path": "src/services/PaymentService.ts", "target_name": "PaymentService.test", "target_path": "src/services/PaymentService.test.ts", "type": "tested_by", "confidence": 0.90, "resolution_method": "filename_heuristic"},
+        {
+            "source_name": "CheckoutService",
+            "source_path": "src/services/CheckoutService.ts",
+            "target_name": "PaymentService",
+            "target_path": "src/services/PaymentService.ts",
+            "type": "imports",
+            "confidence": 1.0,
+            "resolution_method": "tree_sitter_ast",
+        },
+        {
+            "source_name": "PaymentService",
+            "source_path": "src/services/PaymentService.ts",
+            "target_name": "PaymentService.test",
+            "target_path": "src/services/PaymentService.test.ts",
+            "type": "tested_by",
+            "confidence": 0.90,
+            "resolution_method": "filename_heuristic",
+        },
     ]
 
     context: ProjectContext = builder.build_project_context(
@@ -77,13 +116,35 @@ def test_project_context_incomplete_and_uncertain_data() -> None:
         {"id": "f2", "path": "src/empty/empty_file.ts", "language": "typescript"},
     ]
     symbols = [
-        {"id": "s1", "file_id": "f1", "name": "doSomethingUnchecked", "kind": "function", "signature": "function doSomethingUnchecked()", "line_start": 1, "line_end": 5},
+        {
+            "id": "s1",
+            "file_id": "f1",
+            "name": "doSomethingUnchecked",
+            "kind": "function",
+            "signature": "function doSomethingUnchecked()",
+            "line_start": 1,
+            "line_end": 5,
+        },
     ]
     dependencies = [
-        {"source_file_id": "f1", "source_path": "src/legacy/orphan_module.ts", "target_path": "external-unknown-pkg", "kind": "external", "confidence": 1.0},
+        {
+            "source_file_id": "f1",
+            "source_path": "src/legacy/orphan_module.ts",
+            "target_path": "external-unknown-pkg",
+            "kind": "external",
+            "confidence": 1.0,
+        },
     ]
     relationships = [
-        {"source_name": "orphan_module", "source_path": "src/legacy/orphan_module.ts", "target_name": "mystery_target", "target_path": "src/mystery.ts", "type": "calls", "confidence": 0.50, "resolution_method": "fuzzy_name_match"},
+        {
+            "source_name": "orphan_module",
+            "source_path": "src/legacy/orphan_module.ts",
+            "target_name": "mystery_target",
+            "target_path": "src/mystery.ts",
+            "type": "calls",
+            "confidence": 0.50,
+            "resolution_method": "fuzzy_name_match",
+        },
     ]
 
     context = builder.build_project_context(
@@ -118,8 +179,24 @@ def test_project_context_multiple_entity_types_and_languages() -> None:
         {"id": "ts1", "path": "src/types/models.ts", "language": "typescript"},
     ]
     symbols = [
-        {"id": "s_py", "file_id": "py1", "name": "AnalyticsEngine", "kind": "class", "signature": "class AnalyticsEngine:", "line_start": 4, "line_end": 20},
-        {"id": "s_ts", "file_id": "ts1", "name": "UserPayload", "kind": "interface", "signature": "interface UserPayload", "line_start": 1, "line_end": 6},
+        {
+            "id": "s_py",
+            "file_id": "py1",
+            "name": "AnalyticsEngine",
+            "kind": "class",
+            "signature": "class AnalyticsEngine:",
+            "line_start": 4,
+            "line_end": 20,
+        },
+        {
+            "id": "s_ts",
+            "file_id": "ts1",
+            "name": "UserPayload",
+            "kind": "interface",
+            "signature": "interface UserPayload",
+            "line_start": 1,
+            "line_end": 6,
+        },
     ]
 
     context = builder.build_project_context(
@@ -172,4 +249,3 @@ async def test_api_get_repository_context_endpoint(client: AsyncClient) -> None:
     assert "human_markdown" in data
     assert "llm_prompt_context" in data
     assert "Auth" in data["human_markdown"]
-

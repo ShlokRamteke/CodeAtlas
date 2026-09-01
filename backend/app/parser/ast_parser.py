@@ -29,7 +29,6 @@ class ExtractedDependency:
     resolution_method: str = "tree_sitter_ast"
 
 
-
 @dataclass
 class ParsedFileResult:
     path: str
@@ -48,17 +47,54 @@ class ASTCodeParser:
         self.js_lang = Language(tree_sitter_javascript.language())
         self.py_lang = Language(tree_sitter_python.language())
 
-    def _get_parser_for_path(self, file_path: str) -> tuple[Optional[Parser], str]:
+    @staticmethod
+    def detect_language(file_path: str, code: str = "") -> str:
+        """
+        Detect file programming language using open-source Pygments lexer resolution
+        with fast-path for Tree-sitter primary targets.
+        """
         ext = Path(file_path).suffix.lower()
         if ext in [".ts", ".mts", ".cts"]:
-            return Parser(self.ts_lang), "typescript"
+            return "typescript"
         if ext in [".tsx"]:
-            return Parser(self.tsx_lang), "tsx"
+            return "tsx"
         if ext in [".js", ".mjs", ".cjs", ".jsx"]:
+            return "javascript"
+        if ext in [".py", ".pyw", ".pyi"]:
+            return "python"
+
+        # Use Pygments open-source language resolution for all 500+ file types
+        try:
+            from pygments.lexers import get_lexer_for_filename
+
+            lexer = get_lexer_for_filename(file_path, code or None)
+            name = lexer.name.lower()
+            if "sql" in name:
+                return "sql"
+            if "yaml" in name:
+                return "yaml"
+            if "json" in name:
+                return "json"
+            if "markdown" in name:
+                return "markdown"
+            return name
+        except Exception:
+            pass
+
+        # Fallback to extension name or unknown
+        return ext.lstrip(".") or "unknown"
+
+    def _get_parser_for_path(self, file_path: str) -> tuple[Optional[Parser], str]:
+        lang = self.detect_language(file_path)
+        if lang == "typescript":
+            return Parser(self.ts_lang), "typescript"
+        if lang == "tsx":
+            return Parser(self.tsx_lang), "tsx"
+        if lang == "javascript":
             return Parser(self.js_lang), "javascript"
-        if ext in [".py"]:
+        if lang == "python":
             return Parser(self.py_lang), "python"
-        return None, "unknown"
+        return None, lang
 
     def parse_code(self, file_path: str, code: str) -> ParsedFileResult:
         parser, lang = self._get_parser_for_path(file_path)
@@ -117,8 +153,9 @@ class ASTCodeParser:
                     else:
                         kind = "external"
 
-
-                    clause_node = node.child_by_field_name("clause") or node.child_by_field_name("import")
+                    clause_node = node.child_by_field_name("clause") or node.child_by_field_name(
+                        "import"
+                    )
                     if not clause_node:
                         for child in node.children:
                             if child.type in ["import_clause", "named_imports"]:
@@ -141,7 +178,11 @@ class ASTCodeParser:
 
                     if imported_symbols:
                         for sym in imported_symbols:
-                            dependencies.append(ExtractedDependency(target_path=target, imported_symbol=sym, kind=kind))
+                            dependencies.append(
+                                ExtractedDependency(
+                                    target_path=target, imported_symbol=sym, kind=kind
+                                )
+                            )
                     else:
                         dependencies.append(ExtractedDependency(target_path=target, kind=kind))
 
@@ -270,7 +311,11 @@ class ASTCodeParser:
                             elif name.isupper():
                                 kind = "constant"
 
-                            first_line = code[declarator.start_byte : declarator.end_byte].split("\n")[0].strip()
+                            first_line = (
+                                code[declarator.start_byte : declarator.end_byte]
+                                .split("\n")[0]
+                                .strip()
+                            )
                             symbols.append(
                                 ExtractedSymbol(
                                     name=name,
@@ -334,7 +379,11 @@ class ASTCodeParser:
 
                     docstring = None
                     body = node.child_by_field_name("body")
-                    if body and body.named_children and body.named_children[0].type == "expression_statement":
+                    if (
+                        body
+                        and body.named_children
+                        and body.named_children[0].type == "expression_statement"
+                    ):
                         expr = body.named_children[0].named_children[0]
                         if expr.type == "string":
                             docstring = get_text(expr).strip("'\" \n")
@@ -358,7 +407,11 @@ class ASTCodeParser:
 
                     docstring = None
                     body = node.child_by_field_name("body")
-                    if body and body.named_children and body.named_children[0].type == "expression_statement":
+                    if (
+                        body
+                        and body.named_children
+                        and body.named_children[0].type == "expression_statement"
+                    ):
                         expr = body.named_children[0].named_children[0]
                         if expr.type == "string":
                             docstring = get_text(expr).strip("'\" \n")

@@ -182,6 +182,32 @@ export interface CommitFileChangeItem {
   oldPath?: string | null;
 }
 
+export interface LinkedPullRequest {
+  prNumber: number;
+  linkType: string;
+  rawReference?: string | null;
+  confidence?: number;
+  title?: string | null;
+  state?: 'open' | 'closed' | 'merged' | null;
+  author?: string | null;
+  mergedAt?: string | null;
+  labels?: string[];
+  htmlUrl?: string | null;
+}
+
+export interface LinkedIssue {
+  issueNumber: number;
+  linkType: string;
+  rawReference?: string | null;
+  confidence?: number;
+  title?: string | null;
+  state?: 'open' | 'closed' | null;
+  author?: string | null;
+  closedAt?: string | null;
+  labels?: string[];
+  htmlUrl?: string | null;
+}
+
 export interface CommitItem {
   id: string;
   repositoryId: string;
@@ -194,6 +220,8 @@ export interface CommitItem {
   insertions?: number;
   deletions?: number;
   fileChanges?: CommitFileChangeItem[];
+  linkedPullRequests?: LinkedPullRequest[];
+  linkedIssues?: LinkedIssue[];
 }
 
 export interface FileHistoryResponse {
@@ -208,6 +236,8 @@ export interface FileHistoryResponse {
     change_type: string;
     insertions: number;
     deletions: number;
+    linked_pull_requests?: Array<Record<string, any>>;
+    linked_issues?: Array<Record<string, any>>;
   } | null;
   commits: Array<{
     commit_hash: string;
@@ -218,6 +248,8 @@ export interface FileHistoryResponse {
     change_type: string;
     insertions: number;
     deletions: number;
+    linked_pull_requests?: Array<Record<string, any>>;
+    linked_issues?: Array<Record<string, any>>;
   }>;
   authors: Array<{
     name: string;
@@ -235,6 +267,27 @@ export interface ComponentHistoryResponse {
   filesTouched: Array<{ path: string; modifications: number }>;
 }
 
+export interface HistoricalTraceItem {
+  commitHash: string;
+  authorName: string;
+  committedAt: string;
+  message: string;
+  changeType: string;
+  insertions: number;
+  deletions: number;
+  linkedPullRequests: Array<Record<string, any>>;
+  linkedIssues: Array<Record<string, any>>;
+}
+
+export interface HistoricalTraceResponse {
+  filePath: string;
+  totalCommits: number;
+  totalPullRequests: number;
+  totalIssues: number;
+  traceChain: HistoricalTraceItem[];
+  allPullRequests: Array<Record<string, any>>;
+  allIssues: Array<Record<string, any>>;
+}
 
 export interface PullRequestItem {
   id: string;
@@ -245,7 +298,18 @@ export interface PullRequestItem {
   state: 'open' | 'closed' | 'merged';
   author: string;
   mergedAt?: string | null;
+  closedAt?: string | null;
+  labels?: string[];
+  htmlUrl?: string | null;
   createdAt: string;
+  linkedIssues?: LinkedIssue[];
+  linkedCommits?: Array<{
+    commitHash: string;
+    message: string;
+    authorName: string;
+    committedAt: string;
+    linkType: string;
+  }>;
 }
 
 export interface IssueItem {
@@ -257,7 +321,17 @@ export interface IssueItem {
   state: 'open' | 'closed';
   author: string;
   closedAt?: string | null;
+  labels?: string[];
+  htmlUrl?: string | null;
   createdAt: string;
+  linkedPullRequests?: LinkedPullRequest[];
+  linkedCommits?: Array<{
+    commitHash: string;
+    message: string;
+    authorName: string;
+    committedAt: string;
+    linkType: string;
+  }>;
 }
 
 export type InvestigationType = 'understand' | 'why' | 'history' | 'before_change';

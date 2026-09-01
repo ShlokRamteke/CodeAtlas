@@ -28,7 +28,6 @@ class RelationshipEdge:
     resolution_method: str = "tree_sitter_ast"
 
 
-
 @dataclass
 class ArchitectureGraph:
     file_count: int
@@ -160,7 +159,6 @@ class RelationshipAnalyzer:
                     resolution_method="filename_heuristic",
                 )
             )
-
 
         return ArchitectureGraph(
             file_count=len(parsed_files),

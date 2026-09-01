@@ -34,7 +34,7 @@ IGNORED_DIRS = {
     "coverage",
 }
 
-# Ignore non-code extensions
+# Supported source, configuration, and documentation extensions
 SUPPORTED_EXTENSIONS = {
     ".ts",
     ".tsx",
@@ -43,15 +43,51 @@ SUPPORTED_EXTENSIONS = {
     ".mjs",
     ".cjs",
     ".py",
+    ".pyw",
+    ".pyi",
     ".json",
+    ".jsonc",
+    ".json5",
     ".md",
+    ".markdown",
+    ".mdx",
     ".yml",
     ".yaml",
+    ".toml",
+    ".sh",
+    ".bash",
+    ".zsh",
+    ".sql",
+    ".html",
+    ".htm",
+    ".css",
+    ".scss",
+    ".sass",
+    ".less",
+    ".go",
+    ".rs",
+    ".java",
+    ".c",
+    ".h",
+    ".cpp",
+    ".cc",
+    ".cxx",
+    ".hpp",
+    ".rb",
+    ".php",
+    ".proto",
+    ".graphql",
+    ".gql",
+    ".txt",
+    ".dockerfile",
 }
+
 
 # Regex secret scan patterns
 SECRET_PATTERNS = [
-    re.compile(r"(?i)(?:api_key|apikey|secret_key|private_key|token|password)\s*[:=]\s*['\"]([a-zA-Z0-9_\-\.]{16,})['\"]"),
+    re.compile(
+        r"(?i)(?:api_key|apikey|secret_key|private_key|token|password)\s*[:=]\s*['\"]([a-zA-Z0-9_\-\.]{16,})['\"]"
+    ),
     re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
     re.compile(r"ghp_[0-9a-zA-Z]{36}"),
     re.compile(r"xox[baprs]-[0-9a-zA-Z]{10,48}"),
@@ -131,9 +167,7 @@ class IngestionEngine:
         await self.session.execute(
             delete(CodeDependency).where(CodeDependency.repository_id == repository_id)
         )
-        await self.session.execute(
-            delete(Symbol).where(Symbol.repository_id == repository_id)
-        )
+        await self.session.execute(delete(Symbol).where(Symbol.repository_id == repository_id))
         await self.session.execute(
             delete(SourceFile).where(SourceFile.repository_id == repository_id)
         )

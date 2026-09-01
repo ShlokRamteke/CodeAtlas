@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import uuid
 from typing import List, Optional
 
@@ -36,7 +37,6 @@ from app.schemas.repository import (
 router = APIRouter()
 
 
-
 @router.post("/connect-github", response_model=ConnectGitHubResponse)
 async def connect_and_ingest_github_repo(
     payload: ConnectGitHubRequest,
@@ -47,11 +47,13 @@ async def connect_and_ingest_github_repo(
         owner, name = fetcher.parse_repo_url(payload.url_or_slug)
         full_name = f"{owner}/{name}"
 
+        server_token = os.getenv("GITHUB_TOKEN")
+
         # 1. Fetch files from GitHub
         files, default_branch = await fetcher.fetch_public_repo_files(
             owner=owner,
             repo=name,
-            github_token=payload.github_token,
+            github_token=server_token,
         )
 
         if not files:
@@ -75,23 +77,59 @@ async def connect_and_ingest_github_repo(
         engine = IngestionEngine(db)
         arch = await engine.ingest_files(repo.id, files)
 
-        # 3b. Ingest Git Commits
+        # 3b. Ingest Git History, PRs, and Issues (GraphQL / REST)
         try:
             from app.history.git_indexer import GitHistoryIndexer
-            commits = await fetcher.fetch_public_repo_commits(
+            from app.history.historical_linker import HistoricalLinker
+
+            linker = HistoricalLinker()
+            indexer = GitHistoryIndexer()
+
+            # Attempt single-pass batched GraphQL query first
+            bundle = await fetcher.fetch_repo_bundle_graphql(
                 owner=owner,
                 repo=name,
-                github_token=payload.github_token,
+                github_token=server_token,
             )
-            if commits:
-                indexer = GitHistoryIndexer()
-                await indexer.index_commits(repo.id, commits, db)
+
+            if bundle:
+                commits, prs, issues = bundle
+                if prs:
+                    await linker.index_pull_requests(repo.id, prs, db)
+                if issues:
+                    await linker.index_issues(repo.id, issues, db)
+                if commits:
+                    await indexer.index_commits(repo.id, commits, db)
+            else:
+                # Fallback to individual endpoints
+                prs = await fetcher.fetch_public_repo_pull_requests(
+                    owner=owner,
+                    repo=name,
+                    github_token=server_token,
+                )
+                if prs:
+                    await linker.index_pull_requests(repo.id, prs, db)
+
+                issues = await fetcher.fetch_public_repo_issues(
+                    owner=owner,
+                    repo=name,
+                    github_token=server_token,
+                )
+                if issues:
+                    await linker.index_issues(repo.id, issues, db)
+
+                commits = await fetcher.fetch_public_repo_commits(
+                    owner=owner,
+                    repo=name,
+                    github_token=server_token,
+                )
+                if commits:
+                    await indexer.index_commits(repo.id, commits, db)
         except Exception:
             pass
 
         # 4. Refresh repo
         await db.refresh(repo)
-
 
         return ConnectGitHubResponse(
             repository=RepositoryRead.model_validate(repo),
@@ -131,6 +169,126 @@ async def connect_and_ingest_github_repo(
         ) from e
 
 
+@router.post("/{repository_id}/reindex", response_model=ConnectGitHubResponse)
+async def reindex_repository(
+    repository_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+) -> ConnectGitHubResponse:
+    """
+    Re-indexes an existing repository:
+    Fetches fresh files, AST symbols, commit history, pull requests, and issues via GitHub GraphQL/REST.
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository {repository_id} not found.",
+        )
+
+    fetcher = GitHubRepoFetcher()
+    owner = repo.owner
+    name = repo.name
+    token = os.getenv("GITHUB_TOKEN")
+
+    try:
+        # 1. Fetch & ingest source files
+        files, default_branch = await fetcher.fetch_public_repo_files(
+            owner=owner,
+            repo=name,
+            github_token=token,
+        )
+
+        engine = IngestionEngine(db)
+        arch = await engine.ingest_files(repo.id, files)
+
+        # 2. Ingest Commits, PRs, and Issues (GraphQL / REST)
+        try:
+            from app.history.git_indexer import GitHistoryIndexer
+            from app.history.historical_linker import HistoricalLinker
+
+            linker = HistoricalLinker()
+            indexer = GitHistoryIndexer()
+
+            bundle = await fetcher.fetch_repo_bundle_graphql(
+                owner=owner,
+                repo=name,
+                github_token=token,
+            )
+
+            if bundle:
+                commits, prs, issues = bundle
+                if prs:
+                    await linker.index_pull_requests(repo.id, prs, db)
+                if issues:
+                    await linker.index_issues(repo.id, issues, db)
+                if commits:
+                    await indexer.index_commits(repo.id, commits, db)
+            else:
+                prs = await fetcher.fetch_public_repo_pull_requests(
+                    owner=owner,
+                    repo=name,
+                    github_token=token,
+                )
+                if prs:
+                    await linker.index_pull_requests(repo.id, prs, db)
+
+                issues = await fetcher.fetch_public_repo_issues(
+                    owner=owner,
+                    repo=name,
+                    github_token=token,
+                )
+                if issues:
+                    await linker.index_issues(repo.id, issues, db)
+
+                commits = await fetcher.fetch_public_repo_commits(
+                    owner=owner,
+                    repo=name,
+                    github_token=token,
+                )
+                if commits:
+                    await indexer.index_commits(repo.id, commits, db)
+        except Exception:
+            pass
+
+        await db.refresh(repo)
+
+        return ConnectGitHubResponse(
+            repository=RepositoryRead.model_validate(repo),
+            architecture=ArchitectureOverviewResponse(
+                repository_id=repo.id,
+                file_count=arch.file_count,
+                symbol_count=arch.symbol_count,
+                dependency_count=arch.dependency_count,
+                languages=arch.languages,
+                major_components=[
+                    ComponentOverview(
+                        name=c.name,
+                        path=c.path,
+                        symbol_count=c.symbol_count,
+                        file_count=c.file_count,
+                        dependencies=c.dependencies,
+                        tested_by=c.tested_by,
+                    )
+                    for c in arch.major_components
+                ],
+                relationships=[
+                    ComponentRelationshipSchema(
+                        source_name=r.source_name,
+                        source_path=r.source_path,
+                        target_name=r.target_name,
+                        target_path=r.target_path,
+                        type=r.type,
+                    )
+                    for r in arch.relationships
+                ],
+            ),
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Reindex failed: {str(exc)}",
+        ) from exc
+
 
 @router.get("", response_model=List[RepositoryRead])
 @router.get("/", response_model=List[RepositoryRead], include_in_schema=False)
@@ -145,7 +303,9 @@ async def list_repositories(
 
 
 @router.post("", response_model=RepositoryRead, status_code=status.HTTP_201_CREATED)
-@router.post("/", response_model=RepositoryRead, status_code=status.HTTP_201_CREATED, include_in_schema=False)
+@router.post(
+    "/", response_model=RepositoryRead, status_code=status.HTTP_201_CREATED, include_in_schema=False
+)
 async def create_repository(
     payload: RepositoryCreate,
     db: AsyncSession = Depends(get_db),
@@ -197,7 +357,6 @@ async def ingest_repository_files(
         arch = await engine.ingest_files(repository_id, payload.files)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-
 
     return ArchitectureOverviewResponse(
         repository_id=repository_id,
@@ -432,15 +591,34 @@ async def get_repository_context_brief(
     builder = CurrentSystemContextBuilder()
     files_dict = [{"id": f.id, "path": f.path, "language": f.language} for f in files]
     symbols_dict = [
-        {"id": s.id, "file_id": s.file_id, "name": s.name, "kind": s.kind.value, "line_start": s.line_start, "line_end": s.line_end, "signature": s.signature}
+        {
+            "id": s.id,
+            "file_id": s.file_id,
+            "name": s.name,
+            "kind": s.kind.value,
+            "line_start": s.line_start,
+            "line_end": s.line_end,
+            "signature": s.signature,
+        }
         for s in symbols
     ]
     deps_dict = [
-        {"source_file_id": d.source_file_id, "target_path": d.target_path, "imported_symbol": d.imported_symbol, "kind": d.kind.value}
+        {
+            "source_file_id": d.source_file_id,
+            "target_path": d.target_path,
+            "imported_symbol": d.imported_symbol,
+            "kind": d.kind.value,
+        }
         for d in deps
     ]
     rels_dict = [
-        {"source_name": r.source_name, "source_path": r.source_path, "target_name": r.target_name, "target_path": r.target_path, "type": r.type}
+        {
+            "source_name": r.source_name,
+            "source_path": r.source_path,
+            "target_name": r.target_name,
+            "target_path": r.target_path,
+            "type": r.type,
+        }
         for r in arch.relationships
     ]
 
@@ -463,13 +641,14 @@ async def get_repository_context_brief(
     # Build component list
     components_list = [
         ComponentBriefSchema(
-
             name=c.name,
             path=c.path,
             language="typescript",
             symbol_count=c.symbol_count,
             symbols=[],
-            dependencies=[{"target": d, "kind": "internal", "confidence": "1.0"} for d in c.dependencies],
+            dependencies=[
+                {"target": d, "kind": "internal", "confidence": "1.0"} for d in c.dependencies
+            ],
             callers=[],
             tests=[c.tested_by] if c.tested_by else [],
             human_summary=f"Component `{c.name}` with {c.symbol_count} symbols.",
@@ -562,15 +741,39 @@ async def get_repository_context(
     builder = CurrentSystemContextBuilder()
     files_dict = [{"id": f.id, "path": f.path, "language": f.language} for f in files]
     symbols_dict = [
-        {"id": s.id, "file_id": s.file_id, "name": s.name, "kind": s.kind.value, "path": next((f.path for f in files if f.id == s.file_id), ""), "line_start": s.line_start, "line_end": s.line_end, "signature": s.signature}
+        {
+            "id": s.id,
+            "file_id": s.file_id,
+            "name": s.name,
+            "kind": s.kind.value,
+            "path": next((f.path for f in files if f.id == s.file_id), ""),
+            "line_start": s.line_start,
+            "line_end": s.line_end,
+            "signature": s.signature,
+        }
         for s in symbols
     ]
     deps_dict = [
-        {"source_file_id": d.source_file_id, "source_path": d.source_path, "target_path": d.target_path, "imported_symbol": d.imported_symbol, "kind": d.kind.value, "confidence": 1.0}
+        {
+            "source_file_id": d.source_file_id,
+            "source_path": d.source_path,
+            "target_path": d.target_path,
+            "imported_symbol": d.imported_symbol,
+            "kind": d.kind.value,
+            "confidence": 1.0,
+        }
         for d in deps
     ]
     rels_dict = [
-        {"source_name": r.source_name, "source_path": r.source_path, "target_name": r.target_name, "target_path": r.target_path, "type": r.type, "confidence": r.confidence, "resolution_method": r.resolution_method}
+        {
+            "source_name": r.source_name,
+            "source_path": r.source_path,
+            "target_name": r.target_name,
+            "target_path": r.target_path,
+            "type": r.type,
+            "confidence": r.confidence,
+            "resolution_method": r.resolution_method,
+        }
         for r in arch.relationships
     ]
 
@@ -588,5 +791,3 @@ async def get_repository_context(
     )
 
     return ProjectContextRead.model_validate(proj_ctx.to_dict())
-
-

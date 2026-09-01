@@ -43,6 +43,7 @@ services:
       VERSION: "0.1.0"
       API_V1_STR: "/api/v1"
       BACKEND_CORS_ORIGINS: '["http://localhost:3000", "http://127.0.0.1:3000"]'
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
     ports:
       - "8000:8000"
     volumes:
@@ -64,6 +65,9 @@ services:
       NEXT_PUBLIC_API_URL: "http://localhost:8000"
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+
     ports:
       - "3000:3000"
     volumes:

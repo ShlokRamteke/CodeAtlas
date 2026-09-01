@@ -16,21 +16,76 @@ from app.context_builder.project_context import (
 )
 
 NODE_STDLIB = {
-    "fs", "fs/promises", "path", "os", "events", "crypto", "stream", "http", "https",
-    "util", "url", "buffer", "process", "child_process", "cluster", "net", "tls",
-    "dgram", "dns", "readline", "zlib", "perf_hooks", "worker_threads", "assert",
-    "v8", "vm", "module", "string_decoder", "timers", "querystring"
+    "fs",
+    "fs/promises",
+    "path",
+    "os",
+    "events",
+    "crypto",
+    "stream",
+    "http",
+    "https",
+    "util",
+    "url",
+    "buffer",
+    "process",
+    "child_process",
+    "cluster",
+    "net",
+    "tls",
+    "dgram",
+    "dns",
+    "readline",
+    "zlib",
+    "perf_hooks",
+    "worker_threads",
+    "assert",
+    "v8",
+    "vm",
+    "module",
+    "string_decoder",
+    "timers",
+    "querystring",
 }
 
 PYTHON_STDLIB = {
-    "os", "sys", "re", "json", "math", "datetime", "typing", "collections", "itertools",
-    "functools", "pathlib", "uuid", "hashlib", "asyncio", "logging", "time", "random",
-    "copy", "enum", "dataclasses", "abc", "io", "urllib", "http", "unittest", "tempfile",
-    "shutil", "glob", "contextlib", "threading", "subprocess", "socket", "struct", "traceback"
+    "os",
+    "sys",
+    "re",
+    "json",
+    "math",
+    "datetime",
+    "typing",
+    "collections",
+    "itertools",
+    "functools",
+    "pathlib",
+    "uuid",
+    "hashlib",
+    "asyncio",
+    "logging",
+    "time",
+    "random",
+    "copy",
+    "enum",
+    "dataclasses",
+    "abc",
+    "io",
+    "urllib",
+    "http",
+    "unittest",
+    "tempfile",
+    "shutil",
+    "glob",
+    "contextlib",
+    "threading",
+    "subprocess",
+    "socket",
+    "struct",
+    "traceback",
 }
 
 KNOWN_STDLIB = NODE_STDLIB | PYTHON_STDLIB
-
 
 
 class CurrentSystemContextBuilder:
@@ -53,7 +108,8 @@ class CurrentSystemContextBuilder:
         # 1. Filter files if scoped to a specific component or path
         if component_filter:
             target_files = [
-                f for f in files
+                f
+                for f in files
                 if f.get("path", "").startswith(component_filter)
                 or Path(f.get("path", "")).stem.lower() == component_filter.lower()
             ]
@@ -81,7 +137,9 @@ class CurrentSystemContextBuilder:
             )
 
         # Add Symbol Entities
-        target_symbols = [s for s in symbols if not target_file_ids or s.get("file_id") in target_file_ids]
+        target_symbols = [
+            s for s in symbols if not target_file_ids or s.get("file_id") in target_file_ids
+        ]
         for s in target_symbols:
             entities.append(
                 ContextEntity(
@@ -100,7 +158,11 @@ class CurrentSystemContextBuilder:
         for r in relationships:
             src_path = r.get("source_path", "")
             tgt_path = r.get("target_path", "")
-            if not component_filter or src_path in target_file_paths or tgt_path in target_file_paths:
+            if (
+                not component_filter
+                or src_path in target_file_paths
+                or tgt_path in target_file_paths
+            ):
                 context_relationships.append(
                     ContextRelationship(
                         source_name=r.get("source_name", ""),
@@ -186,11 +248,17 @@ class CurrentSystemContextBuilder:
                     or tgt.startswith("app/")
                 )
                 if d.get("kind") == "external" and not is_alias:
-                    pkg_base = "/".join(tgt.split("/")[:2]) if tgt.startswith("@") else tgt.split("/")[0]
+                    pkg_base = (
+                        "/".join(tgt.split("/")[:2]) if tgt.startswith("@") else tgt.split("/")[0]
+                    )
                     pkg_base_lower = pkg_base.lower()
 
                     # If declared in package.json or is standard library -> resolved
-                    if pkg_base in declared_pkgs or pkg_base_lower in declared_pkgs or pkg_base in KNOWN_STDLIB:
+                    if (
+                        pkg_base in declared_pkgs
+                        or pkg_base_lower in declared_pkgs
+                        or pkg_base in KNOWN_STDLIB
+                    ):
                         continue
 
                     if tgt not in seen_external_pkgs:
@@ -214,12 +282,14 @@ class CurrentSystemContextBuilder:
                                 )
                             )
 
-
-
         # Check for empty files (no AST symbols extracted)
         symbol_file_ids = {s.get("file_id") for s in symbols if s.get("file_id")}
         for f in target_files:
-            if f.get("id") and f.get("id") not in symbol_file_ids and not self._is_test_path(f.get("path", "")):
+            if (
+                f.get("id")
+                and f.get("id") not in symbol_file_ids
+                and not self._is_test_path(f.get("path", ""))
+            ):
                 unknowns.append(
                     ContextUnknown(
                         kind="empty_file",
@@ -243,7 +313,9 @@ class CurrentSystemContextBuilder:
 
         # 6. Overall Confidence Calculation
         if context_relationships:
-            avg_rel_conf = sum(r.confidence for r in context_relationships) / len(context_relationships)
+            avg_rel_conf = sum(r.confidence for r in context_relationships) / len(
+                context_relationships
+            )
         else:
             avg_rel_conf = 1.0
         overall_confidence = round(avg_rel_conf, 2)
@@ -300,9 +372,17 @@ class CurrentSystemContextBuilder:
             path=component_path,
             language="typescript",
             symbol_count=len(sym_entities),
-            symbols=[{"name": s.name, "kind": s.kind, "signature": s.signature or ""} for s in sym_entities],
+            symbols=[
+                {"name": s.name, "kind": s.kind, "signature": s.signature or ""}
+                for s in sym_entities
+            ],
             dependencies=[
-                {"target": r.target_path, "symbol": r.target_name, "kind": "internal", "confidence": str(r.confidence)}
+                {
+                    "target": r.target_path,
+                    "symbol": r.target_name,
+                    "kind": "internal",
+                    "confidence": str(r.confidence),
+                }
                 for r in ctx.relationships
                 if r.type == "imports"
             ],
@@ -341,7 +421,12 @@ class CurrentSystemContextBuilder:
                 if content:
                     try:
                         data = json.loads(content)
-                        for sec in ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]:
+                        for sec in [
+                            "dependencies",
+                            "devDependencies",
+                            "peerDependencies",
+                            "optionalDependencies",
+                        ]:
                             if isinstance(data.get(sec), dict):
                                 declared.update(data[sec].keys())
                     except Exception:
@@ -366,7 +451,6 @@ class CurrentSystemContextBuilder:
         return has_manifest, declared
 
 
-
 @dataclass
 class ComponentBrief:
     name: str
@@ -379,4 +463,3 @@ class ComponentBrief:
     tests: List[str]
     human_summary: str
     llm_context: str
-

@@ -42,7 +42,7 @@ Build the historical dataset:
 - [x] Output: Current entities can be linked to Git history.
 
 
-### PH3-02 — Commit → PR → Issue Linking
+### PH3-02 — Commit → PR → Issue Linking (Completed)
 Connect historical artifacts:
 ```text
 Code / Entity
@@ -53,9 +53,13 @@ Code / Entity
      ↓
    Issue
 ```
-- Parse PR and issue reference patterns from commit messages (e.g. `Fixes #123`, `Merge pull request #45`).
-- Ingest GitHub PR metadata (title, body, author, merged_at) and issue metadata (title, body, labels, state).
-- Output: A developer can trace a change beyond the commit itself.
+- [x] `ReferenceExtractor` parsing PR and issue reference patterns from commits and PR bodies (`Fixes #123`, `Merge pull request #45`, `PR #45`, `GH-101`, `resolves #99`).
+- [x] Models & Alembic migration `0004_add_pr_issue_links` (`CommitPullRequestLink`, `CommitIssueLink`, `PullRequestIssueLink`).
+- [x] `HistoricalLinker` service resolving bidirectional Code → Commit → PR → Issue lineage and unlinked cross-references.
+- [x] `GitHubRepoFetcher` fetching PRs and Issues via GitHub REST API.
+- [x] REST endpoints (`GET /pull-requests`, `GET /issues`, `GET /trace/{file_path:path}`, `POST /pull-requests/ingest`, `POST /issues/ingest`).
+- [x] Frontend interactive Traceability, PRs, and Issues views with cross-referenced chips in Next.js UI.
+- [x] Output: A developer can trace a change beyond the commit itself.
 
 ### PH3-03 — Historical Retrieval
 Add deterministic retrieval specifically for historical questions:

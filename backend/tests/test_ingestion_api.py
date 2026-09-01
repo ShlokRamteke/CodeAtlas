@@ -78,7 +78,6 @@ async def test_repository_ingest_and_query_endpoints(client: AsyncClient) -> Non
     assert filtered[0]["name"] == "PaymentService"
     assert filtered[0]["kind"] == "class"
 
-
     # 4. Query dependencies
     deps_res = await client.get(f"/api/v1/repositories/{repo_id}/dependencies")
     assert deps_res.status_code == 200

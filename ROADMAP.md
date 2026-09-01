@@ -95,7 +95,7 @@ This phase answers:
 
 ### Structured Tasks
 - **PH3-01 — Git History Indexing** *(Completed)*: Commits, file histories, authors, introducing commits, and evolution viewer.
-- **PH3-02 — Commit → PR → Issue Linking**: Code &rarr; Commit &rarr; PR &rarr; Issue traceability.
+- **PH3-02 — Commit → PR → Issue Linking** *(Completed)*: Code &rarr; Commit &rarr; PR &rarr; Issue traceability and cross-reference extraction.
 - **PH3-03 — Historical Retrieval**: Deterministic component/query historical search without LLMs.
 - **PH3-04 — Engineering Context**: Documentation, READMEs, ADRs, design constraints.
 - **PH3-05 — Enrich ProjectContext**: Single unified canonical model enriched with history and engineering context.

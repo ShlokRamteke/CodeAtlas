@@ -64,6 +64,9 @@ services:
       NEXT_PUBLIC_API_URL: "http://localhost:8000"
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+
     ports:
       - "3000:3000"
     volumes:

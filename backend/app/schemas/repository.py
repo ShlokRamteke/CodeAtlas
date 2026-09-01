@@ -96,7 +96,6 @@ class IngestFilesRequest(BaseModel):
 
 class ConnectGitHubRequest(BaseModel):
     url_or_slug: str
-    github_token: Optional[str] = None
 
 
 class ConnectGitHubResponse(BaseModel):
@@ -181,6 +180,3 @@ class ContextBriefResponse(BaseModel):
     human_summary: str
     llm_context: str
     project_context: Optional[ProjectContextRead] = None
-
-
-

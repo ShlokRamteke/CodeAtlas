@@ -13,6 +13,7 @@ from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
     from app.models.commit_file_change import CommitFileChange
+    from app.models.historical_link import CommitIssueLink, CommitPullRequestLink
     from app.models.repository import Repository
 
 
@@ -42,6 +43,18 @@ class Commit(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     repository: Mapped["Repository"] = relationship("Repository", back_populates="commits")
     file_changes: Mapped[List["CommitFileChange"]] = relationship(
         "CommitFileChange",
+        back_populates="commit",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    pull_request_links: Mapped[List["CommitPullRequestLink"]] = relationship(
+        "CommitPullRequestLink",
+        back_populates="commit",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    issue_links: Mapped[List["CommitIssueLink"]] = relationship(
+        "CommitIssueLink",
         back_populates="commit",
         cascade="all, delete-orphan",
         lazy="selectin",

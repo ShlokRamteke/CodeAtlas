@@ -13,9 +13,10 @@ import {
   ArrowRight,
   AlertCircle,
   CheckCircle2,
+  RefreshCw,
 } from "lucide-react";
 import type { HealthResponse, Repository } from "@archaeologist/contracts";
-import { fetchHealth, fetchRepositories, connectGitHubRepository } from "@/lib/api";
+import { fetchHealth, fetchRepositories, connectGitHubRepository, reindexRepository } from "@/lib/api";
 import { ArchitectureExplorer } from "@/components/ArchitectureExplorer";
 
 export default function Home() {
@@ -23,6 +24,7 @@ export default function Home() {
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [selectedRepo, setSelectedRepo] = useState<Repository | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reindexing, setReindexing] = useState(false);
 
   // GitHub Connect state
   const [githubInput, setGithubInput] = useState("https://github.com/ShlokRamteke/archlogist-prg");
@@ -42,6 +44,31 @@ export default function Home() {
     }
     loadData();
   }, []);
+
+  async function handleReindex() {
+    if (!selectedRepo) return;
+    setReindexing(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    try {
+      const result = await reindexRepository(selectedRepo.id);
+      if (result) {
+        setRepositories((prev) =>
+          prev.map((r) => (r.id === result.repository.id ? result.repository : r))
+        );
+        setSelectedRepo(result.repository);
+        setSuccessMsg(
+          `Successfully re-indexed ${result.repository.fullName}! (${result.architecture.symbolCount} symbols updated)`
+        );
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to re-index repository.");
+    } finally {
+      setReindexing(false);
+    }
+  }
+
 
   async function handleConnectGitHub(e: React.FormEvent) {
     e.preventDefault();
@@ -200,13 +227,28 @@ export default function Home() {
                     {repo.fullName || `${repo.owner}/${repo.name}`} ({repo.fileCount ?? 0} files, {repo.symbolCount ?? 0} symbols)
                   </option>
                 ))}
-
               </select>
             ) : (
               <span className="text-xs text-slate-500">No repositories yet &mdash; connect one above!</span>
             )}
           </div>
+
+          {selectedRepo && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleReindex}
+                disabled={reindexing}
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 disabled:opacity-50 text-xs font-semibold text-indigo-300 border border-indigo-500/40 hover:border-indigo-400 transition shadow-sm"
+                title="Re-fetch from GitHub and rebuild all AST, commit, PR, and issue indexes"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-indigo-400 ${reindexing ? "animate-spin" : ""}`} />
+                <span>{reindexing ? "Reindexing..." : "Re-index Repository"}</span>
+              </button>
+            </div>
+          )}
         </section>
+
+
 
         {/* Phase 2: Architecture Explorer */}
         {selectedRepo ? (
