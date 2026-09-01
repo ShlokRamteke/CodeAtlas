@@ -49,11 +49,13 @@ async def connect_and_ingest_github_repo(
         owner, name = fetcher.parse_repo_url(payload.url_or_slug)
         full_name = f"{owner}/{name}"
 
+        server_token = os.getenv("GITHUB_TOKEN")
+
         # 1. Fetch files from GitHub
         files, default_branch = await fetcher.fetch_public_repo_files(
             owner=owner,
             repo=name,
-            github_token=payload.github_token,
+            github_token=server_token,
         )
 
         if not files:
@@ -89,7 +91,7 @@ async def connect_and_ingest_github_repo(
             bundle = await fetcher.fetch_repo_bundle_graphql(
                 owner=owner,
                 repo=name,
-                github_token=payload.github_token,
+                github_token=server_token,
             )
 
             if bundle:
@@ -105,7 +107,7 @@ async def connect_and_ingest_github_repo(
                 prs = await fetcher.fetch_public_repo_pull_requests(
                     owner=owner,
                     repo=name,
-                    github_token=payload.github_token,
+                    github_token=server_token,
                 )
                 if prs:
                     await linker.index_pull_requests(repo.id, prs, db)
@@ -113,7 +115,7 @@ async def connect_and_ingest_github_repo(
                 issues = await fetcher.fetch_public_repo_issues(
                     owner=owner,
                     repo=name,
-                    github_token=payload.github_token,
+                    github_token=server_token,
                 )
                 if issues:
                     await linker.index_issues(repo.id, issues, db)
@@ -121,12 +123,13 @@ async def connect_and_ingest_github_repo(
                 commits = await fetcher.fetch_public_repo_commits(
                     owner=owner,
                     repo=name,
-                    github_token=payload.github_token,
+                    github_token=server_token,
                 )
                 if commits:
                     await indexer.index_commits(repo.id, commits, db)
         except Exception:
             pass
+
 
         # 4. Refresh repo
         await db.refresh(repo)
@@ -173,7 +176,6 @@ async def connect_and_ingest_github_repo(
 @router.post("/{repository_id}/reindex", response_model=ConnectGitHubResponse)
 async def reindex_repository(
     repository_id: uuid.UUID,
-    github_token: Optional[str] = Query(None, description="Optional GitHub Personal Access Token"),
     db: AsyncSession = Depends(get_db),
 ) -> ConnectGitHubResponse:
     """
@@ -190,7 +192,8 @@ async def reindex_repository(
     fetcher = GitHubRepoFetcher()
     owner = repo.owner
     name = repo.name
-    token = github_token or os.getenv("GITHUB_TOKEN")
+    token = os.getenv("GITHUB_TOKEN")
+
 
     try:
         # 1. Fetch & ingest source files

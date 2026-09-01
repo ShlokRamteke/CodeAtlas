@@ -96,7 +96,7 @@ class IngestFilesRequest(BaseModel):
 
 class ConnectGitHubRequest(BaseModel):
     url_or_slug: str
-    github_token: Optional[str] = None
+
 
 
 class ConnectGitHubResponse(BaseModel):

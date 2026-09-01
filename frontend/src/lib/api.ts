@@ -72,8 +72,7 @@ export async function fetchRepositories(): Promise<Repository[]> {
 }
 
 export async function connectGitHubRepository(
-  urlOrSlug: string,
-  githubToken?: string
+  urlOrSlug: string
 ): Promise<{ repository: Repository; architecture: ArchitectureOverview } | null> {
   try {
     const res = await fetch(`${API_BASE}/api/v1/repositories/connect-github`, {
@@ -81,7 +80,6 @@ export async function connectGitHubRepository(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         url_or_slug: urlOrSlug,
-        github_token: githubToken || undefined,
       }),
     });
     if (!res.ok) {
@@ -128,15 +126,14 @@ export async function connectGitHubRepository(
 }
 
 export async function reindexRepository(
-  repositoryId: string,
-  githubToken?: string
+  repositoryId: string
 ): Promise<{ repository: Repository; architecture: ArchitectureOverview } | null> {
   try {
-    const query = githubToken ? `?github_token=${encodeURIComponent(githubToken)}` : "";
-    const res = await fetch(`${API_BASE}/api/v1/repositories/${repositoryId}/reindex${query}`, {
+    const res = await fetch(`${API_BASE}/api/v1/repositories/${repositoryId}/reindex`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
     });
+
     if (!res.ok) {
       let errDetail = "Failed to reindex repository";
       try {
