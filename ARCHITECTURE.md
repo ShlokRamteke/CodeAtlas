@@ -102,6 +102,20 @@ same underlying facts, evidence, provenance, and confidence.
 - GitHub App (read-only MVP)
 - MCP Python SDK
 
+### Current Operational Architecture Matrix
+
+| Capability / Intelligence Layer | Implementation Services | Database Storage | Operational Status |
+| :--- | :--- | :--- | :--- |
+| **Structural AST Intelligence** | Tree-sitter AST Parser (`backend/app/parser/`) | `repositories`, `components`, `code_symbols` | **Live** (Phase 2) |
+| **Project Graph Traversal** | Project Graph Engine (`backend/app/services/project_graph.py`) | `graph_nodes`, `graph_edges` | **Live** (Phase 2) |
+| **Git History & Origin Commits** | `GitHistoryIndexer` (`backend/app/history/git_indexer.py`) | `commits`, `commit_file_changes` | **Live** (PH3-01) |
+| **Cross-Artifact Traceability** | `HistoricalLinker` & `ReferenceExtractor` (`backend/app/history/`) | `commit_pr_links`, `commit_issue_links`, `pr_issue_links` | **Live** (PH3-02) |
+| **Deterministic Historical Retrieval** | `HistoricalRetriever` (`backend/app/history/historical_retriever.py`) | PostgreSQL indexed relational models | **Live** (PH3-03) |
+| **Engineering Context & Invariants** | `EngineeringContextIndexer` & `Parser` (`backend/app/history/`) | `engineering_documents`, `design_constraints` | **Live** (PH3-04) |
+| **Multi-Container Local Deployment** | Podman / Docker Compose (`compose.yaml` / `podman-compose.yml`) | PostgreSQL 16 + pgvector, FastAPI, Next.js, Adminer | **Live** (Phase 1) |
+| **Canonical Context Enrichment** | `ContextBuilder` (`backend/app/services/context_builder.py`) | Unified `ProjectContext` with human & agent projections | **In Progress** (PH3-05) |
+| **Change Investigation Engine** | 12-Step Pre-Change Investigation Pipeline | Pre-Change Briefs, claims, citations | **Planned** (Phase 4) |
+
 ## 5. Repository Ingestion
 
 Inputs:
