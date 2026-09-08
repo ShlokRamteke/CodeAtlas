@@ -70,12 +70,15 @@ Add deterministic retrieval specifically for historical questions:
 - [x] Output: A component or query retrieves relevant historical evidence.
 
 
-### PH3-04 — Engineering Context
+### PH3-04 — Engineering Context (Completed)
 Add non-Git engineering context:
-- Index `README.md`, `docs/`, architecture docs.
-- Index ADRs (Architecture Decision Records) if present.
-- Extract design constraints and testing rationale.
-- Output: Unified knowledge consisting of Current System + History + Engineering Context.
+- [x] Deterministic `EngineeringContextParser` parsing `README.md`, `docs/`, architecture docs, and ADRs without LLM.
+- [x] Models `EngineeringDocument` and `DesignConstraint` with Alembic migration `0005_add_engineering_context`.
+- [x] Extracted design constraints and architectural invariants using RFC 2119 imperatives categorized into Security, Architecture, Performance, Testing, and Data Integrity.
+- [x] `EngineeringContextIndexer` service supporting documentation ingestion, ADR indexing, constraint querying, and keyword search.
+- [x] REST endpoints (`/engineering/overview`, `/docs`, `/adrs`, `/constraints`, `/search`, `/ingest`).
+- [x] Frontend interactive **Engineering Context** tab & `EngineeringContextViewer` component.
+- [x] Output: Unified knowledge consisting of Current System + History + Engineering Context.
 
 ### PH3-05 — Enrich ProjectContext
 Key integration task. Extend the single canonical `ProjectContext` with historical and contextual evidence:

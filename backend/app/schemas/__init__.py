@@ -1,3 +1,13 @@
+from app.schemas.engineering import (
+    ADRRead,
+    DesignConstraintRead,
+    EngineeringContextOverviewResponse,
+    EngineeringDocumentDetail,
+    EngineeringDocumentRead,
+    EngineeringSearchResponse,
+    IngestEngineeringDocsRequest,
+    IngestEngineeringDocsResponse,
+)
 from app.schemas.health import HealthResponse
 from app.schemas.history import (
     CommitFileChangeRead,
@@ -92,4 +102,12 @@ __all__ = [
     "HistoricalRetrievalRequest",
     "HistoricalRetrievalResponse",
     "SymbolHistoryResponse",
+    "DesignConstraintRead",
+    "EngineeringDocumentRead",
+    "EngineeringDocumentDetail",
+    "ADRRead",
+    "EngineeringSearchResponse",
+    "IngestEngineeringDocsRequest",
+    "IngestEngineeringDocsResponse",
+    "EngineeringContextOverviewResponse",
 ]

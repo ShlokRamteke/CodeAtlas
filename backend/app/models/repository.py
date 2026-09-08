@@ -12,6 +12,7 @@ from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 if TYPE_CHECKING:
     from app.models.commit import Commit
     from app.models.dependency import CodeDependency
+    from app.models.engineering_doc import EngineeringDocument
     from app.models.investigation import Investigation
     from app.models.issue import Issue
     from app.models.pull_request import PullRequest
@@ -60,4 +61,7 @@ class Repository(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     investigations: Mapped[List["Investigation"]] = relationship(
         "Investigation", back_populates="repository", cascade="all, delete-orphan"
+    )
+    engineering_docs: Mapped[List["EngineeringDocument"]] = relationship(
+        "EngineeringDocument", back_populates="repository", cascade="all, delete-orphan"
     )

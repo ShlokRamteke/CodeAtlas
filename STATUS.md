@@ -6,7 +6,7 @@ Phase 3 — Historical + Engineering Context
 
 ## Current Task
 
-PH3-03 Complete &mdash; Next: PH3-04 (Engineering Context)
+PH3-04 Complete &mdash; Next: PH3-05 (Enrich ProjectContext)
 
 ## Status
 
@@ -48,9 +48,16 @@ engineering context, and AI reasoning.
   - Frontend interactive **Deterministic Search & Evidence** explorer in Next.js UI with live keyword querying, multi-attribute filter chips, symbol evolution timeline inspector, and ranked evidence cards.
   - 100% automated test pass rate (32/32 pytest tests, clean frontend build & contracts typecheck).
 
+- **Phase 3 — Task PH3-04 (Engineering Context)**:
+  - `EngineeringContextParser` parsing Markdown headings, sections, ADR statuses/deciders, and extracting RFC 2119 design constraints and architectural invariants into Security, Architecture, Performance, Testing, and Data Integrity domains without LLM calls.
+  - Database models `EngineeringDocument` and `DesignConstraint` with Alembic migration `0005_add_engineering_context`.
+  - `EngineeringContextIndexer` service ingesting repository documentation, indexing ADRs, querying design constraints, and performing deterministic context searches.
+  - REST endpoints: `GET /api/v1/repositories/{id}/engineering/overview`, `GET /docs`, `GET /docs/{doc_id}`, `GET /adrs`, `GET /constraints`, `GET /search`, and `POST /ingest`.
+  - Frontend interactive **Engineering Context** tab & `EngineeringContextViewer` component in Next.js UI with ADR cards, design constraints matrix, document catalog, and real-time context search.
+  - 100% automated test pass rate (39/39 pytest tests, clean frontend build & contracts typecheck).
+
 ## Remaining
 
-- **PH3-04**: Engineering Context
 - **PH3-05**: Enrich ProjectContext
 - **PH3-06**: Historical Timeline / Developer View
 
@@ -60,7 +67,7 @@ None
 
 ## Next Action
 
-Start Task PH3-04: Implement Engineering Context indexing (parse README.md, docs/, architecture docs, ADRs, and extract design constraints).
+Start Task PH3-05: Enrich ProjectContext (extend unified ProjectContext with historical changes, PRs, issues, ADRs, and design constraints).
 
 
 

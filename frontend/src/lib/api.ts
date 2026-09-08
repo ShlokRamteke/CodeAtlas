@@ -20,6 +20,12 @@ import type {
   HistoricalRetrievalRequest,
   HistoricalRetrievalResponse,
   SymbolHistoryResponse,
+  EngineeringDocumentItem,
+  EngineeringDocumentDetailItem,
+  DesignConstraintItem,
+  ADRItem,
+  EngineeringSearchResponse,
+  EngineeringContextOverviewResponse,
 } from "@archaeologist/contracts";
 
 
@@ -902,5 +908,239 @@ export async function getSymbolHistory(
     return null;
   }
 }
+
+export async function fetchEngineeringOverview(
+  repositoryId: string
+): Promise<EngineeringContextOverviewResponse | null> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/v1/repositories/${repositoryId}/engineering/overview`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      repositoryId: data.repository_id,
+      totalDocs: data.total_docs,
+      totalAdrs: data.total_adrs,
+      totalConstraints: data.total_constraints,
+      docsByType: data.docs_by_type || {},
+      constraintsByCategory: data.constraints_by_category || {},
+      adrs: (data.adrs || []).map((a: any) => ({
+        id: a.id,
+        repositoryId: a.repository_id,
+        path: a.path,
+        title: a.title,
+        status: a.status,
+        deciders: a.deciders,
+        summary: a.summary,
+        createdAt: a.created_at,
+        updatedAt: a.updated_at,
+      })),
+      topConstraints: (data.top_constraints || []).map((c: any) => ({
+        id: c.id,
+        repositoryId: c.repository_id,
+        documentId: c.document_id,
+        category: c.category,
+        level: c.level,
+        title: c.title,
+        statement: c.statement,
+        sourcePath: c.source_path,
+        lineStart: c.line_start,
+        lineEnd: c.line_end,
+        confidence: c.confidence,
+        extraMetadata: c.extra_metadata || {},
+        createdAt: c.created_at,
+      })),
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function fetchEngineeringDocs(
+  repositoryId: string,
+  docType?: string
+): Promise<EngineeringDocumentItem[]> {
+  try {
+    const url = new URL(`${API_BASE}/api/v1/repositories/${repositoryId}/engineering/docs`);
+    if (docType) url.searchParams.set("doc_type", docType);
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.map((d: any) => ({
+      id: d.id,
+      repositoryId: d.repository_id,
+      path: d.path,
+      docType: d.doc_type,
+      title: d.title,
+      format: d.format,
+      contentHash: d.content_hash,
+      status: d.status,
+      deciders: d.deciders,
+      summary: d.summary,
+      extraMetadata: d.extra_metadata || {},
+      createdAt: d.created_at,
+      updatedAt: d.updated_at,
+    }));
+  } catch (error) {
+    return [];
+  }
+}
+
+export async function fetchEngineeringDocDetail(
+  repositoryId: string,
+  docId: string
+): Promise<EngineeringDocumentDetailItem | null> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/v1/repositories/${repositoryId}/engineering/docs/${docId}`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) return null;
+    const d = await res.json();
+    return {
+      id: d.id,
+      repositoryId: d.repository_id,
+      path: d.path,
+      docType: d.doc_type,
+      title: d.title,
+      format: d.format,
+      contentHash: d.content_hash,
+      status: d.status,
+      deciders: d.deciders,
+      summary: d.summary,
+      rawContent: d.raw_content,
+      extraMetadata: d.extra_metadata || {},
+      createdAt: d.created_at,
+      updatedAt: d.updated_at,
+      constraints: (d.constraints || []).map((c: any) => ({
+        id: c.id,
+        repositoryId: c.repository_id,
+        documentId: c.document_id,
+        category: c.category,
+        level: c.level,
+        title: c.title,
+        statement: c.statement,
+        sourcePath: c.source_path,
+        lineStart: c.line_start,
+        lineEnd: c.line_end,
+        confidence: c.confidence,
+        extraMetadata: c.extra_metadata || {},
+        createdAt: c.created_at,
+      })),
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function fetchADRs(
+  repositoryId: string,
+  status?: string
+): Promise<ADRItem[]> {
+  try {
+    const url = new URL(`${API_BASE}/api/v1/repositories/${repositoryId}/engineering/adrs`);
+    if (status) url.searchParams.set("adr_status", status);
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.map((a: any) => ({
+      id: a.id,
+      repositoryId: a.repository_id,
+      path: a.path,
+      title: a.title,
+      status: a.status,
+      deciders: a.deciders,
+      summary: a.summary,
+      createdAt: a.created_at,
+      updatedAt: a.updated_at,
+    }));
+  } catch (error) {
+    return [];
+  }
+}
+
+export async function fetchDesignConstraints(
+  repositoryId: string,
+  category?: string,
+  level?: string,
+  sourcePath?: string
+): Promise<DesignConstraintItem[]> {
+  try {
+    const url = new URL(`${API_BASE}/api/v1/repositories/${repositoryId}/engineering/constraints`);
+    if (category) url.searchParams.set("category", category);
+    if (level) url.searchParams.set("level", level);
+    if (sourcePath) url.searchParams.set("source_path", sourcePath);
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.map((c: any) => ({
+      id: c.id,
+      repositoryId: c.repository_id,
+      documentId: c.document_id,
+      category: c.category,
+      level: c.level,
+      title: c.title,
+      statement: c.statement,
+      sourcePath: c.source_path,
+      lineStart: c.line_start,
+      lineEnd: c.line_end,
+      confidence: c.confidence,
+      extraMetadata: c.extra_metadata || {},
+      createdAt: c.created_at,
+    }));
+  } catch (error) {
+    return [];
+  }
+}
+
+export async function searchEngineeringContext(
+  repositoryId: string,
+  query: string
+): Promise<EngineeringSearchResponse | null> {
+  try {
+    const url = new URL(`${API_BASE}/api/v1/repositories/${repositoryId}/engineering/search`);
+    url.searchParams.set("q", query);
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      repositoryId: data.repository_id,
+      query: data.query,
+      totalMatches: data.total_matches,
+      docs: data.docs || [],
+      constraints: data.constraints || [],
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function ingestEngineeringDocs(
+  repositoryId: string,
+  files: Record<string, string>
+): Promise<{ success: boolean; message: string; docCount: number; constraintCount: number }> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/repositories/${repositoryId}/engineering/ingest`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ files }),
+    });
+    if (!res.ok) {
+      return { success: false, message: `Failed with status ${res.status}`, docCount: 0, constraintCount: 0 };
+    }
+    const data = await res.json();
+    return {
+      success: true,
+      message: data.message,
+      docCount: data.indexed_doc_count,
+      constraintCount: data.total_constraints_count,
+    };
+  } catch (error: any) {
+    return { success: false, message: error.message || "Network error", docCount: 0, constraintCount: 0 };
+  }
+}
+
 
 

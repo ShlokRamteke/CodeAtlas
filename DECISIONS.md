@@ -331,5 +331,27 @@ Answering historical questions such as "When was symbol X added?", "Which PRs to
 - Evidence records conform to structured `HistoricalEvidenceRecord` interfaces with confidence scores, query matching scores, and provenance citations.
 - Downstream AI reasoning in Phase 4 can consume these pre-filtered, structured evidence records directly in prompt context without performing brute-force repository searches.
 
+---
+
+## ADR-015 — Deterministic Engineering Context Indexing & Architectural Invariants
+
+**Status:** Accepted
+
+**Date:** 2026-09-08
+
+**Decision**
+
+Deterministically index engineering documentation, Architecture Decision Records (ADRs), and extract design constraints/invariants (RFC 2119 directives categorized into Security, Architecture, Performance, Testing, and Data Integrity) without LLM calls during indexing.
+
+**Reason**
+
+Non-Git engineering context (`README.md`, `ARCHITECTURE.md`, `docs/`, `DECISIONS.md`, ADRs) holds the design intent and constraints behind why code exists. Parsing document structure, ADR statuses, and RFC 2119 imperative statements (`MUST`, `MUST NOT`, `SHALL`, `NEVER`, `INVARIANT`) deterministically ensures high performance, zero API costs during ingestion, and absolute groundedness without hallucinations.
+
+**Implication**
+
+- `EngineeringContextParser` and `EngineeringContextIndexer` extract structured `EngineeringDocument` and `DesignConstraint` models into Postgres.
+- Design constraints are linked directly to source documents with line-level citations.
+- REST endpoints and frontend visualizers allow both human inspection and downstream LLM agents in Phase 4 to reference verified architectural constraints.
+
 
 
