@@ -10,21 +10,18 @@ PH3-04 Complete &mdash; Next: PH3-05 (Enrich ProjectContext)
 
 ## Status
 
-
 IN PROGRESS
 
 ## Product Focus
 
-The product goal is to help developers understand unfamiliar software.
-
-History is a major differentiator and marketing hook, but not the entire
-product. The core system combines current architecture, historical context,
-engineering context, and AI reasoning.
+Project Archaeologist is centered on **Pre-Change Investigation**. The product
+uses current code, relationships, history, and engineering evidence to help a
+developer understand a proposed change before implementation.
 
 ## Completed
 
 - **Phase 1 — Foundation**: Complete foundation (Postgres, Alembic, FastAPI, Contracts, Next.js).
-- **Phase 2 — Repository Understanding**: Complete current-system layer (Tree-sitter AST, relationships, Context Builder, unified `ProjectContext`).
+- **Phase 2 — Repository Understanding**: Complete current-system layer (Tree-sitter AST, relationships, Context Builder, canonical `ProjectContext`).
 - **Phase 3 — Task PH3-01 (Git History Indexing)**:
   - Database model `CommitFileChange` (`ChangeType`: added, modified, deleted, renamed) and `0003_add_commit_file_changes` migration.
   - `GitHistoryIndexer` service calculating file history and identifying the **introducing commit** (origin commit) for any file or component.
@@ -47,7 +44,6 @@ engineering context, and AI reasoning.
   - REST endpoints: `GET /api/v1/repositories/{id}/history/search`, `POST /api/v1/repositories/{id}/history/retrieve`, and `GET /api/v1/repositories/{id}/symbols/{name}/history`.
   - Frontend interactive **Deterministic Search & Evidence** explorer in Next.js UI with live keyword querying, multi-attribute filter chips, symbol evolution timeline inspector, and ranked evidence cards.
   - 100% automated test pass rate (32/32 pytest tests, clean frontend build & contracts typecheck).
-
 - **Phase 3 — Task PH3-04 (Engineering Context)**:
   - `EngineeringContextParser` parsing Markdown headings, sections, ADR statuses/deciders, and extracting RFC 2119 design constraints and architectural invariants into Security, Architecture, Performance, Testing, and Data Integrity domains without LLM calls.
   - Database models `EngineeringDocument` and `DesignConstraint` with Alembic migration `0005_add_engineering_context`.
@@ -58,31 +54,30 @@ engineering context, and AI reasoning.
 
 ## Remaining
 
-- **PH3-05**: Enrich ProjectContext
+- **PH3-05**: Enrich ProjectContext (extend canonical ProjectContext with historical changes, PRs, issues, ADRs, and design constraints)
 - **PH3-06**: Historical Timeline / Developer View
 
 ## Blockers
 
-None
+None known.
 
 ## Next Action
 
-Start Task PH3-05: Enrich ProjectContext (extend unified ProjectContext with historical changes, PRs, issues, ADRs, and design constraints).
-
-
+Start Task PH3-05: Enrich ProjectContext (extend canonical ProjectContext with historical changes, PRs, issues, ADRs, and design constraints, preserving provenance for downstream change investigation).
 
 ## Session Rule
 
-Update this file after meaningful development sessions.
-
-If work is incomplete:
-- keep the task in progress,
-- list remaining work,
-- record blockers,
-- set the next actionable step.
+Update this file after meaningful development sessions. If work is incomplete,
+keep the task in progress, record blockers, and set the next actionable step.
 
 Do not advance phases until the current phase definition of done is satisfied.
 
+## Architecture Principle
+
+There is one canonical `ProjectContext`. Current-system, historical, and
+engineering evidence enrich the same model. Human UI and AI/agent consumers
+receive scoped views of that model.
+
 ## Last Updated
 
-2026-08-28
+2026-09-08

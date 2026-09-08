@@ -1,59 +1,76 @@
 # Project Archaeologist — Architecture
 
-## 1. Architecture Goal
+## 1. System Goal
 
-Turn a repository into **Project Intelligence** with three layers:
+Turn a GitHub repository into structured project intelligence and use a
+controlled investigation workflow to answer: **what will this change affect,
+why is the current implementation this way, and what should a developer know
+before changing it?**
 
-1. **Current System** — what exists today
-2. **Historical Context** — how it evolved
-3. **Engineering Context** — docs, decisions, tests, issues, constraints
+The primary deliverable is a grounded **Pre-Change Investigation Brief**.
 
-The agentic layer investigates this intelligence to answer developer questions with evidence.
-
-## 2. Core Architecture
+## 2. Simple System View
 
 ```mermaid
-flowchart TB
-    USER[Developer] --> WEB[Next.js SaaS]
+flowchart LR
+    U[Developer] --> WEB[Next.js SaaS]
     WEB --> API[FastAPI]
 
     API --> GH[GitHub App<br/>Read Only]
     GH --> ING[Repository Ingestion]
 
-    ING --> CURRENT[Current System Analysis]
-    ING --> HISTORY[Historical Analysis]
-    ING --> CONTEXT[Engineering Context]
+    ING --> KNOW[(Project Knowledge)]
+    KNOW --> CB[Context Builder]
+    CB --> CTX[Canonical ProjectContext]
+    CTX --> GRAPH[Project Graph]
 
-    CURRENT --> KNOWLEDGE[Project Intelligence]
-    HISTORY --> KNOWLEDGE
-    CONTEXT --> KNOWLEDGE
+    API --> ENG[Investigation Engine]
+    ENG --> RET[Scoped Retrieval]
+    RET --> EVIDENCE[Evidence]
+    EVIDENCE --> LLM[LLM Reasoning]
+    LLM --> VERIFY[Verification]
+    VERIFY --> RESULT[Pre-Change Investigation Brief]
 
-    KNOWLEDGE --> RET[Retrieval]
-
-    API --> INVEST[Archaeological Investigation]
-    INVEST --> RET
-
-    RET --> BUILDER[Context Builder]
-    BUILDER --> HUMAN[Human View]
-    BUILDER --> REASON[LLM Reasoning]
-
-    REASON --> VERIFY[Evidence Verification]
-    VERIFY --> RESULT[Answer + Sources]
-    RESULT --> WEB
+    CTX --> RET
+    GRAPH --> RET
 ```
 
-## 3. Major Components
+## 3. Canonical Context Model
+
+There is one canonical `ProjectContext` model. It is progressively enriched by
+three intelligence layers:
+
+```text
+                    ProjectContext
+                          │
+        ┌─────────────────┼─────────────────┐
+        ↓                 ↓                 ↓
+ Current System      Historical        Engineering
+    Context           Context            Context
+        │                 │                 │
+        └─────────────────┼─────────────────┘
+                          ↓
+                   Project Graph
+                          ↓
+                Scoped Investigation
+```
+
+Human UI and AI/agent consumers are different **views/serializations** of the
+same underlying facts, evidence, provenance, and confidence.
+
+## 4. Major Components
 
 ### Frontend
-- Next.js
+- Next.js 14 (App Router)
 - TypeScript
 - Tailwind CSS
 - shadcn/ui
-- React Flow
+- React Flow / Recharts
 
 ### Backend
-- Python
+- Python 3.11+
 - FastAPI
+- SQLAlchemy + Alembic
 
 ### AI
 - LangGraph
@@ -61,19 +78,20 @@ flowchart TB
 - OpenAI / Anthropic / Gemini-compatible providers
 
 ### Storage
-- PostgreSQL
+- PostgreSQL 16
 - pgvector
-- PostgreSQL relationship tables initially
+- PostgreSQL relationship tables for the Project Graph initially
 
 ### Code Intelligence
-- Tree-sitter
+- Tree-sitter (structural AST parser)
 - TypeScript Compiler API where useful
 - GitPython
-- GitHub REST/GraphQL APIs
+- GitHub GraphQL API v4 & REST API v3
 
-### Async
+### Async & Infrastructure
 - Inngest
-- Redis only when needed for caching/short-lived state
+- Redis only when short-lived state or caching is justified
+- Podman / Docker Compose multi-container orchestrated stack
 
 ### Observability
 - OpenTelemetry
@@ -81,381 +99,260 @@ flowchart TB
 - Sentry
 
 ### Integration
-- GitHub App
+- GitHub App (read-only MVP)
 - MCP Python SDK
-
-## 4. Current System Context Layer
-
-Phase 2 builds a **reliable current-system context layer**.
-
-The goal is not to perfectly understand every runtime behavior or every programming language.
-
-The goal is to produce enough trustworthy structure that:
-- a human can understand an unfamiliar component,
-- retrieval can find the right code and relationships,
-- the LLM can receive a compact, useful briefing.
-
-### Structural Analysis
-
-Use deterministic tooling for:
-- files
-- symbols
-- imports/exports
-- functions/classes
-- basic references
-- basic calls
-- APIs
-- test locations
-
-Tree-sitter is the primary structural parser.
-
-### Semantic Analysis
-
-Use language-aware tooling where useful for:
-- symbol resolution
-- types
-- call targets
-- import resolution
-
-For the initial TypeScript/JavaScript implementation, use the TypeScript Compiler API where it materially improves resolution.
-
-Do not attempt perfect dynamic-runtime analysis.
-
-### Metadata Analysis
-
-Collect:
-- package/framework metadata
-- configuration
-- test framework
-- database/service indicators
-- repository structure
-
-### Relationship Confidence
-
-Relationships should carry provenance and confidence when applicable.
-
-```text
-PaymentService
-    ↓ calls
-StripePayment.refund()
-
-confidence: 0.98
-resolution_method: typescript_type_checker
-```
-
-Heuristic relationships should be labeled accordingly.
-
-### Current-System Model
-
-The normalized model should support:
-
-```text
-Repository
-├── Applications
-├── Services / Modules
-├── Components
-├── APIs
-├── Symbols
-├── Dependencies
-├── Tests
-└── External Dependencies
-```
-
-### Canonical Unified ProjectContext
-
-Phase 2 introduces the canonical `ProjectContext` model.
-
-It serves as the single authoritative context layer shared by both the human UI and AI/Agent prompt pipelines without maintaining separate knowledge extraction pipelines.
-
-```text
-Project Knowledge
-      ↓
-Context Builder
-      ↓
-Project Context
-   ├── Human UI (Markdown / Visual graph)
-   └── AI / Agent (Token-efficient prompt serialization)
-```
-
-The canonical `ProjectContext` model preserves:
-- **Entities**: Files, AST symbols (classes, functions, interfaces, methods, types)
-- **Relationships**: Outbound dependencies, inbound callers, inheritance, test links
-- **Evidence**: Concrete AST nodes and import lines with provenance
-- **Confidence**: Deterministic extraction confidence scores (e.g. `1.0` for AST, `0.90` for filename heuristics)
-- **Unknowns & Gaps**: Untested components, unresolved external packages, empty files, low-confidence relationships
-
-#### Structured Projections from One Context
-
-1. **Human UI Projection (`to_human_markdown()` / `human_markdown`)**:
-   Formatted markdown with component structure, symbol line spans, caller trees, and verified test suites.
-
-2. **AI / Agent Projection (`to_llm_prompt()` / `llm_prompt_context`)**:
-   Token-efficient, compressed prompt context briefing ready for agent injection in Phase 4/5 without leaking raw codebase contents.
-
-The Context Builder is the deterministic bridge between repository analysis and downstream AI reasoning.
-
-
-### Manifest-Aware Dependency Resolution
-
-To prevent false-positive architectural uncertainties, the Context Builder implements manifest-aware dependency checking:
-- **Manifest Inspection**: Scans `package.json`, `pyproject.toml`, and `requirements.txt` for declared dependencies (`dependencies`, `devDependencies`, `peerDependencies`).
-- **Runtime Stdlib Recognition**: Recognizes Node.js and Python built-in standard libraries (`fs`, `path`, `os`, `sys`, `json`, `math`, `asyncio`, etc.).
-- **Accurate Gap Demarcation**:
-  - *Declared External Package* &rarr; Resolved external boundary (no uncertainty raised).
-  - *Internal Path Alias* (`@/`, `~/`, `$lib/`, `src/`) &rarr; Resolved to local source files.
-  - *Undeclared Import* &rarr; Flagged as `undeclared_dependency` (a genuine codebase configuration gap).
-  - *Broken Relative Import* &rarr; Flagged as `broken_import`.
-
-### Phase 2 Questions
-
-Phase 2 should support current-state questions such as:
-- Where is X?
-- What does X depend on?
-- What depends on X?
-- Which tests relate to X?
-- How does X connect to the rest of the system?
-
-Historical "why" questions are deferred to Phase 3/4.
 
 ## 5. Repository Ingestion
 
-Ingestion is deterministic and asynchronous.
+Inputs:
+- Source code
+- Package manifests (`package.json`, `pyproject.toml`, `requirements.txt`)
+- Configuration files
+- Git history
+- Pull requests & discussions
+- Issues & bug reports
+- Documentation (`README.md`, `docs/`, ADRs)
+- Test suites
+
+Never execute repository code during indexing.
 
 ```mermaid
 flowchart LR
     GH[GitHub] --> FETCH[Fetcher]
-    FETCH --> SOURCE[Source Files]
-    FETCH --> GIT[Git History]
-    FETCH --> PR[Pull Requests]
+    FETCH --> FILES[Source Files]
+    FETCH --> HISTORY[Git History]
+    FETCH --> PRS[PRs]
     FETCH --> ISSUES[Issues]
-    FETCH --> DOCS[Documentation]
+    FETCH --> DOCS[Docs / ADRs]
 
-    SOURCE --> PARSER[Tree-sitter]
-    GIT --> GITANALYZER[Git Analyzer]
+    FILES --> CODE[Tree-sitter Analyzer]
+    HISTORY --> GITANALYZER[Git History Indexer]
 
-    PARSER --> STORE[(PostgreSQL + pgvector)]
-    GITANALYZER --> STORE
-    PR --> STORE
-    ISSUES --> STORE
-    DOCS --> STORE
+    CODE --> DB[(PostgreSQL)]
+    GITANALYZER --> DB
+    PRS --> DB
+    ISSUES --> DB
+    DOCS --> DB
+
+    CODE --> VECTOR[(pgvector)]
+    PRS --> VECTOR
+    ISSUES --> VECTOR
+    DOCS --> VECTOR
 ```
 
-Never execute repository code during indexing.
+## 6. Current System Context (Phase 2 Implemented)
 
-## 6. Historical Analysis (Phase 3)
+Phase 2 establishes deterministic facts about the software as it exists now:
 
-Git history is a first-class source for the archaeology layer.
+- Files and modules
+- Symbols and source locations (functions, classes, interfaces, methods, types)
+- Imports and exports
+- Call relationships and inheritance
+- Inbound callers and outbound dependencies
+- API definitions and route handlers
+- Unit and integration test associations
+- Configuration and infrastructure metadata
+
+Every material fact or relationship retains source location, provenance, and a confidence signal.
+
+### Manifest-Aware Dependency Resolution
+- **Manifest Inspection**: Scans `package.json`, `pyproject.toml`, and `requirements.txt` for declared dependencies.
+- **Runtime Stdlib Recognition**: Recognizes Node.js and Python built-in standard libraries (`fs`, `path`, `os`, `sys`, `json`, `asyncio`).
+- **Gap Demarcation**:
+  - *Declared External Package* &rarr; Resolved external boundary (no uncertainty).
+  - *Path Alias* (`@/`, `~/`, `$lib/`, `src/`) &rarr; Resolved to local source files.
+  - *Undeclared Import* &rarr; Flagged as `undeclared_dependency`.
+  - *Broken Relative Import* &rarr; Flagged as `broken_import`.
+
+### Structured Projections from One Context
+1. **Human UI Projection (`to_human_markdown()` / `human_markdown`)**:
+   Formatted markdown with component structure, symbol line spans, caller trees, and verified test suites.
+2. **AI / Agent Projection (`to_llm_prompt()` / `llm_prompt_context`)**:
+   Token-efficient, compressed prompt context briefing ready for agent injection without leaking raw codebase contents.
+
+## 7. Project Graph
+
+The Project Graph is an application-level abstraction over relationship data.
+Initial implementation uses PostgreSQL relationship tables.
+
+Example operations:
+- `get_dependencies(entity_id)`
+- `get_callers(entity_id)`
+- `find_path(source, target)`
+- `get_related_tests(entity_id)`
+- `get_historical_changes(entity_id)`
+- `get_co_changes(entity_id)`
+
+The graph is a retrieval and traversal mechanism, not a separate knowledge base for the LLM.
+
+## 8. Historical Analysis (Phase 3 Implemented)
+
+Git history is a first-class source for the archaeology and change-investigation layer:
 
 ```mermaid
 flowchart LR
-    CODE[Current Component] --> BLAME[File History / Blame]
+    CODE[Current Entity] --> BLAME[File History / Changes]
     BLAME --> COMMIT[Introducing Commit]
     COMMIT --> PR[Pull Request]
-    PR --> ISSUE[Issue / Requirement]
-    ISSUE --> CONTEXT[Enriched Context]
+    PR --> ISSUE[Originating Issue]
+    ISSUE --> CONTEXT[Canonical ProjectContext]
     PR --> CONTEXT
     COMMIT --> CONTEXT
 ```
 
-The goal is not simply to display Git history; it is to connect changes directly to current system context and answer: *"How did this component get here?"*
-
 ### Git History Indexing Engine (`GitHistoryIndexer`)
-
-1. **Commit & Diff Persistence**:
-   - `Commit`: Stores hash, author, email, timestamp, message, parent hashes, and aggregate diff metrics (`insertions`, `deletions`, `files_changed_count`).
-   - `CommitFileChange`: Tracks per-file modifications with `ChangeType` (`added`, `modified`, `deleted`, `renamed`), old path tracking, and line delta counts.
-
-2. **Introducing Commit (Origin) Detection**:
-   - Deterministically calculates the origin commit for any file or logical component directory (earliest commit with `change_type == 'added'`).
-   - Powers the developer file evolution timeline without requiring an LLM call.
+- **Commit & Diff Persistence**: Stores hash, author, email, timestamp, message, parents, and line delta counts (`insertions`, `deletions`, `files_changed_count`).
+- **CommitFileChange**: Tracks per-file modifications with `ChangeType` (`added`, `modified`, `deleted`, `renamed`).
+- **Introducing Commit Detection**: Deterministically identifies the origin commit for any file, component, or symbol.
 
 ### Artifact Traceability Engine (`HistoricalLinker` & `ReferenceExtractor`)
-
-1. **Deterministic Pattern Extraction (`ReferenceExtractor`)**:
-   - Regex extraction of PR merge/squash/explicit patterns (`Merge pull request #123`, `(#123)`, `PR #123`).
-   - Regex extraction of Issue resolution keywords (`Fixes #101`, `Closes #102`, `Resolves GH-103`, `Refs #104`).
-   - Cross-references extracted from both commit messages and Pull Request bodies.
-
-2. **Bidirectional Artifact Linking**:
-   - `CommitPullRequestLink`, `CommitIssueLink`, `PullRequestIssueLink` models and association graph.
-   - Self-reconciling link resolution as PRs, Issues, and Commits are indexed asynchronously.
-   - End-to-end provenance tracing (`GET /trace/{file_path}`) connecting Code &rarr; Commit &rarr; PR &rarr; Issue.
+- **Deterministic Pattern Extraction**: Regex extraction of PR merge/squash patterns (`Merge pull request #123`, `(#123)`) and issue resolution keywords (`Fixes #101`, `Closes #102`, `Resolves GH-103`).
+- **Bidirectional Artifact Linking**: Relational association models `CommitPullRequestLink`, `CommitIssueLink`, `PullRequestIssueLink`.
+- **Single-Pass Provenance Tracing**: `GET /trace/{file_path}` resolves full `Code -> Commit -> PR -> Issue` provenance.
 
 ### Historical Retrieval Engine (`HistoricalRetriever`)
-
-1. **Deterministic Multi-Attribute Searching**:
-   - Commits: keyword filtering on messages, author names/emails, touched file paths, and timestamp ranges (`since`, `until`).
-   - Pull Requests & Issues: keyword filtering on titles/bodies, status (`open`, `closed`, `merged`), authors, and labels.
-2. **Symbol Evolution Timeline**:
-   - Scopes modifications to the exact file and line spans containing a code symbol.
-   - Identifies the origin commit that introduced the symbol, and tracks feature additions/refactors over time.
-3. **Ranked Historical Evidence Synthesis**:
-   - Multi-artifact retrieval producing ranked `HistoricalEvidenceRecord` items.
-   - Deterministic relevance scoring based on query term matches, scope exactness, introducing commit bonus, and recency without calling an LLM.
+- **Multi-Attribute Searching**: Keyword, author, file path, status, label, and timestamp range filtering across commits, PRs, and issues without LLMs.
+- **Symbol Evolution Timeline**: Scopes modifications to symbol line spans, identifying introducing commits and chronological evolution milestones.
+- **Ranked Historical Evidence Synthesis**: Deterministic relevance scoring based on query matching, scope exactness, origin commit bonuses, and recency into structured `HistoricalEvidenceRecord` items.
 
 ### GitHub GraphQL Ingestion Protocol (`GitHubRepoFetcher`)
+- **Primary GraphQL v4 Queries**: When `GITHUB_TOKEN` is configured, repository metadata, commit histories, parent graphs, PRs, and issues are batched into single HTTP requests.
+- **REST v3 Fallback**: Seamless fallback when unauthenticated or for raw file content.
 
+## 9. Engineering Context (Phase 3 Implemented)
 
-- **Primary GraphQL v4 Queries**: When an authenticated GitHub token is present, repository metadata, commit histories, parent graphs, associated PRs, and linked issues are retrieved in a single batched GraphQL query (`RepoArchaeology`).
-- **REST v3 Fallback**: In unauthenticated local mode or when fetching raw file contents, the fetcher transparently falls back to GitHub REST v3 endpoints.
+Surrounding non-Git engineering context explains the design intent and constraints behind why code exists:
 
+- **Documentation Ingestion**: `EngineeringContextParser` parses Markdown headings, structure, and ADR metadata (`status`, `deciders`, `date`).
+- **Architectural Invariants Extraction**: Deterministically extracts RFC 2119 imperatives (`MUST`, `MUST NOT`, `SHALL`, `NEVER`, `INVARIANT`) into structured `DesignConstraint` models categorized across 5 domains:
+  1. `SECURITY`
+  2. `ARCHITECTURE`
+  3. `PERFORMANCE`
+  4. `TESTING`
+  5. `DATA_INTEGRITY`
+- **Line-Level Citations**: Design constraints link directly to source documents with exact line numbers.
+- **Context Search & Indexing**: `EngineeringContextIndexer` provides search across documents, ADRs, and constraints.
 
-## 7. Project Intelligence Storage
+## 10. Retrieval
 
-PostgreSQL stores:
-- repositories
-- files
-- symbols
-- commits
-- pull requests
-- issues
-- docs
-- tests
-- evidence
-- investigations
-- agent runs
-- metadata
-- relationships
+Use progressive, scoped retrieval:
 
-Relationships should store provenance/confidence where practical.
+### Current-System Retrieval
+- Exact symbol/path lookup
+- Metadata filters
+- Relationship traversal
+- Dependency / caller lookup
 
-pgvector stores embeddings for semantic retrieval.
+### Historical & Engineering Retrieval
+- Commit/file history and symbol timelines
+- PR/issue lookup
+- Keyword / full-text search
+- Architectural constraints and ADR lookup
+- Co-change / hidden-coupling signals
 
-Do not add a separate graph database until real workload requires it.
-
-## 8. Retrieval
-
-Retrieval is progressive.
-
-### Phase 2
-- exact symbol/path search
-- metadata filtering
-- relationship traversal
-
-### Phase 3
-- vector search
-- keyword/full-text search
-- historical search
-- richer evidence ranking
-
-The final retrieval layer combines these paths.
-
-## 9. Context Builder
-
-The Context Builder is a core system boundary.
-
-Input:
-- user question
-- retrieved current-system evidence
-- retrieved historical/engineering evidence
-
-Output:
-- compact human-facing context
-- compact LLM context
-- source references
-- confidence/provenance
-
-The Context Builder should remove irrelevant evidence before model submission.
-
-## 10. Investigation Engine
-
-Use a bounded LangGraph workflow, not a large autonomous swarm.
-
-```mermaid
-flowchart TB
-    Q[Question] --> P[Planner]
-    P --> TOOLS[Read-only Tools]
-    TOOLS --> EVIDENCE[Evidence Pool]
-    EVIDENCE --> BUILDER[Context Builder]
-    BUILDER --> REASON[Reasoning Agent]
-    REASON --> VERIFY[Evidence Verifier]
-    VERIFY --> RESULT[Structured Result]
-```
-
-Initial tools:
-- search_code()
-- get_file()
-- get_symbol()
-- get_dependencies()
-- get_callers()
-- search_history()
-- get_commit()
-- search_pull_requests()
-- search_issues()
-- search_docs()
-- get_related_tests()
-- trace_feature()
-- get_architecture()
-
-## 11. Investigation Types
-
-### Understand
-How does this component/feature work?
-
-### Why
-Why does this workaround or design exist?
-
-### History
-How did this component evolve?
-
-### Before Change
-What should I know before modifying this component?
-
-## 12. Evidence Model
-
-Claims are classified as:
-- fact
-- inference
-- unknown
-
-Important claims reference Evidence IDs.
-
-## 13. LLM Usage
-
-Use LLMs for:
-- question interpretation
-- investigation planning
-- evidence correlation
-- historical reasoning
-- synthesis
-- optional verification
-
-Do not use LLMs for deterministic extraction.
-
-Target normal investigation:
-- optional planner call
-- one reasoning call
-- optional lightweight verification
-
-Never send the whole repository to a model.
-
-## 14. Token Efficiency
+### Investigation Retrieval
+Start from the proposed change target, expand through relevant relationships,
+then retrieve only the most relevant historical and engineering evidence.
 
 Core principle:
+> **Index once, retrieve narrowly, reason once.**
 
-> **Index once, retrieve narrowly, build a compact context, reason once.**
+## 11. Change Investigation Engine (Phase 4)
 
-Use:
-- deterministic preprocessing
-- incremental indexing
-- content hashes
-- cached embeddings
-- metadata filtering
-- compact tool output
-- small evidence sets
+Phase 4 is the product differentiator. The engine takes a proposed change and
+performs a bounded, evidence-driven investigation.
+
+Example input:
+> “Replace the Stripe integration with another payment provider.”
+
+Investigation sequence:
+```text
+Change Intent
+    ↓
+Target Identification
+    ↓
+Dependency / Caller Expansion (blast radius)
+    ↓
+Tests + API + Configuration Mapping
+    ↓
+Historical Changes & Origin Commits
+    ↓
+PRs / Issues / ADR Decisions
+    ↓
+Co-change / Hidden-Coupling Signals
+    ↓
+Evidence Ranking
+    ↓
+Bounded LLM Synthesis (1–3 model calls)
+    ↓
+Verification & Citation Checks
+    ↓
+Pre-Change Investigation Brief
+```
+
+The agent is bounded, stateful, read-only, and evidence-driven.
+
+LLMs perform:
+- Intent interpretation
+- Investigation planning
+- Cross-source correlation
+- Reasoning about implications and risks
+- Synthesis into the brief
+- Claim classification (fact, inference, unknown)
+- Lightweight verification
+
+LLMs do not extract deterministic facts such as symbol locations, imports, commit dates, or dependency edges.
+
+## 12. Pre-Change Investigation Brief
+
+The result is structured around the change rather than generic chat:
+
+- **Change Scope**: Target components and modified surfaces
+- **Affected Components**: Direct and transitive dependencies (blast radius)
+- **Dependency / Call Paths**: Inbound callers and outbound connections
+- **Relevant Tests**: Test suites and verification requirements
+- **Historical Context**: Why the current code exists and how it evolved
+- **Related PRs / Issues**: Predecessor decisions and discussions
+- **Historical Failures / Reversions**: Prior regressions where discoverable
+- **Hidden Coupling / Co-change Signals**: Files that frequently change together
+- **Known Constraints**: ADRs and RFC 2119 design invariants
+- **Important Unknowns**: Explicit gaps, untested areas, ambiguous dependencies
+- **Recommended Areas to Inspect**: Pre-implementation guidance
+- **Evidence / Source Locations**: Line-level citations and Evidence IDs
+
+## 13. Token Efficiency
+
+- Index repository facts once deterministically.
+- Resolve entities and blast radius before calling LLMs.
+- Retrieve only scoped evidence relevant to the change.
+- Avoid full-repository prompts.
+- Use structured tool outputs and compressed context.
+- Keep most investigations to roughly 1–3 model calls.
+
+## 14. Incremental Indexing
+
+Use content hashes to avoid reprocessing unchanged files or chunks:
+
+```mermaid
+flowchart LR
+    FILE[File / Chunk] --> HASH[Content Hash]
+    HASH --> CHECK{Changed?}
+    CHECK -->|No| REUSE[Reuse Existing Data]
+    CHECK -->|Yes| PROCESS[Reparse + Re-embed]
+```
 
 ## 15. Security
 
-- GitHub App read-only in MVP.
-- Server-side authorization.
-- Tenant/repository isolation.
-- Repository content treated as untrusted data.
-- Secret scanning before persistence/model submission.
+- GitHub App is read-only for MVP.
+- Enforce authorization server-side for repository-scoped operations.
+- Preserve tenant and repository isolation.
+- Treat repository content as untrusted data, never as instructions.
+- Secret-scan before persistence and model submission.
 - Never execute repository code during indexing.
-- No arbitrary shell/code execution tools.
-- Read-only MCP.
-- Minimal LLM context.
+- No arbitrary shell or code-execution tools.
+- MCP is read-only for MVP.
 - Minimize raw source retention.
+- Keep model context limited to authorized evidence.
 
 ## 16. Privacy-Aware RAG
 
@@ -464,53 +361,52 @@ GitHub = source of truth
 PostgreSQL = derived project intelligence
 ```
 
-Persist mainly:
-- embeddings
-- hashes
-- metadata
-- Git metadata
-- relationships
-
-When raw source is needed:
-1. resolve repository + commit + path
-2. authorize
-3. retrieve exact source
-4. redact secrets
-5. send only required context to the model
+When raw source is required:
+1. Resolve repository + commit + path
+2. Authorize access
+3. Retrieve exact source
+4. Redact secrets
+5. Send only the required excerpt to the model
 
 Treat embeddings as sensitive customer data.
 
-## 17. MCP
+## 17. SaaS / Deployment
 
-Expose read-only tools such as:
-- why_does_this_exist()
-- trace_feature()
-- search_history()
-- get_architecture()
-- get_change_context()
+Initial deployment:
+- Next.js &rarr; Vercel
+- FastAPI &rarr; Railway / Render / Container
+- PostgreSQL + pgvector &rarr; Supabase / Managed Postgres
+- Inngest &rarr; Asynchronous background workflows
+- External LLM provider or BYOK
+- GitHub Actions &rarr; CI/CD
 
-Use the same authorization boundary as the web API.
+## 18. MCP Integration
 
-## 18. Evaluation
+Expose read-only investigation tools for external AI coding assistants:
+- `investigate_change(target, proposed_change)`
+- `get_change_context(target)`
+- `get_dependencies(entity_id)`
+- `trace_feature(feature_name)`
+- `search_history(query)`
+- `get_related_issues(symbol_or_path)`
+- `why_does_this_exist(symbol_or_path)`
 
-Evaluate:
-- current-system understanding
-- feature tracing
-- historical reconstruction
-- why reasoning
-- pre-change context
+Uses the same authorization boundary as the web API.
 
-Metrics:
-- retrieval recall
-- citation accuracy
-- groundedness
-- historical accuracy
-- tool selection accuracy
-- agent success rate
-- token usage
-- latency
+## 19. Evaluation
 
-## 19. Containerization & Deployment Stack
+Measure whether the system improves pre-change understanding:
+- Affected-component recall (blast-radius detection)
+- Dependency / call-path recall
+- Historical evidence retrieval accuracy
+- Citation accuracy and groundedness (>95%)
+- Investigation completeness
+- Claim accuracy
+- Tool selection accuracy
+- Token usage (<$0.05 per investigation)
+- Latency (<5s standard investigation)
+
+## 20. Containerization & Deployment Stack
 
 Project Archaeologist runs as an orchestrated multi-container architecture via Podman / Docker Compose (`compose.yaml` / `podman-compose.yml`):
 
@@ -533,4 +429,3 @@ podman compose up -d (or make up)
 ### Storage Persistence & Live Development
 - **Database Volumes**: The PostgreSQL service uses a dedicated named volume (`postgres_data`) ensuring data is never lost across container restarts (`make up` / `make down`).
 - **Live Code Reloading**: The backend (`./backend/app:/app/app:Z`) and frontend (`./frontend/src:/app/frontend/src:Z`) bind mounts allow instant hot-reloading in development without container restarts.
-

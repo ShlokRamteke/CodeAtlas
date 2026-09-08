@@ -1,144 +1,98 @@
 # Project Archaeologist
 
-> **Understand why your software became what it is.**
+> **Investigate software before you change it.**
 
-Your code tells you **what** the system does.  
-Your Git history tells you **what changed**.  
-**Project Archaeologist helps explain why.**
+Project Archaeologist is an AI-powered software change-investigation system.
+It reconstructs the current codebase, its relationships, and its history so
+developers can understand the consequences and constraints of a proposed
+change before implementation.
 
-Project Archaeologist is an AI-powered SaaS for understanding unfamiliar
-software by combining the system's current architecture with its historical and
-engineering context.
+## The Problem
 
-## What It Understands
+When you inherit unfamiliar software, the important context is rarely in one
+place. It is spread across source code, dependencies, tests, Git history, PRs,
+issues, documentation, and architectural decisions.
 
-```text
-Current System
-├── Code
-├── Components
-├── APIs
-├── Dependencies
-└── Tests
-
-Historical Context
-├── Commits
-├── Pull Requests
-├── Issues
-└── Evolution
-
-Engineering Context
-├── Documentation
-├── Decisions
-└── Constraints
-```
-
-The system connects these sources and uses AI to investigate questions such as:
-
-- How does checkout work across the system?
-- Why does this workaround exist?
-- How did authentication evolve?
-- What historical context should I know before changing this service?
-- Which previous decisions or issues explain this architecture?
-
-## Core Experience
-
-### Understand
-See how the system works today.
-
-### History
-See how the system became what it is.
-
-### Explain
-Use AI to connect current behavior with historical evidence and explain why.
-
-### Before You Change
-Get a compact engineering brief before modifying unfamiliar code.
+Project Archaeologist connects these sources and turns them into a grounded
+investigation.
 
 ## Core Workflow
 
 ```text
 GitHub Repository
       ↓
-Deterministic Analysis
+Deterministic Code + History Analysis
       ↓
-Project Intelligence
-      ├── Current System
-      ├── Historical Context
-      └── Engineering Context
+Project Knowledge
       ↓
-Hybrid Retrieval
+Canonical ProjectContext + Project Graph (PostgreSQL)
       ↓
-Archaeological Investigation
+Change Investigation
       ↓
-Evidence Verification
+Evidence + Reasoning + Verification
       ↓
-Answer + Sources
+Pre-Change Investigation Brief
 ```
+
+## Example
+
+> “I want to replace Stripe in the payment service. What should I know before
+> changing it?”
+
+The system investigates affected code, callers, dependencies, tests, related
+historical changes, PRs/issues, and other relevant evidence, then presents a
+scoped brief with sources and unknowns.
+
+## What It Understands
+
+- current code structure and symbols
+- imports, calls, dependencies, and relationships
+- APIs and tests where detectable
+- Git history and file evolution
+- pull requests and issues
+- documentation and engineering decisions
+- historical and change-related evidence
+
+## Main Experiences
+
+- Repository Overview
+- Architecture / Component Explorer
+- Historical Timeline
+- Change Investigation
+- Pre-Change Investigation Brief
+- Why Does This Exist?
+- Evidence-backed answers
+- MCP integration
 
 ## Initial Stack
 
 - Next.js + TypeScript
 - Python + FastAPI
-- LangGraph
+- LangGraph + LiteLLM
 - PostgreSQL + pgvector
+- PostgreSQL relationship tables for the Project Graph
 - Tree-sitter
 - GitHub App
 - MCP
-- OpenTelemetry / Langfuse
-
-## Main Features
-
-- Repository Overview
-- Architecture Explorer
-- Historical Timeline
-- Ask the Archaeologist
-- Why Does This Exist?
-- Feature Archaeology
-- Pre-Change Brief
-- Evidence-backed answers
-- MCP integration
-
-## Product Positioning
-
-Project Archaeologist is **not** a generic "chat with your codebase" product.
-
-It combines:
-
-> **Current system understanding + history + engineering context + AI reasoning**
-
-History is a key differentiator, but the product goal is broader:
-
-> **Help developers understand unfamiliar software before they change it.**
+- OpenTelemetry / Langfuse / Sentry
+- Podman / Docker Compose multi-container local stack
 
 ## Development Context
 
-- `AGENTS.md` — how coding agents should work
+- `AGENTS.md` — coding-agent development rules
 - `PROJECT.md` — product intent and scope
-- `ARCHITECTURE.md` — current technical design
-- `ROADMAP.md` — phase-level development plan
+- `ARCHITECTURE.md` — technical design
+- `ROADMAP.md` — phase plan
 - `STATUS.md` — current implementation state
-- `DECISIONS.md` — significant technical decisions
-- `phases/` — phase goals and acceptance criteria
-- `.agents/workflows/` — optional Antigravity workflows
+- `DECISIONS.md` — significant decisions
+- `phases/` — phase-specific goals and acceptance criteria
 
 For coding-agent work, start with `AGENTS.md` and `STATUS.md`.
 
 ## Current Status
 
-See `STATUS.md`.
+See [`STATUS.md`](file:///Users/shlok/Projects/Archelogiest/STATUS.md).
 
 ## License
 
 TBD.
-
-
-## Development Workflows
-
-For Antigravity, optional workflows can live under `.agents/workflows/`.
-These workflows operate on the same project source of truth and should not
-duplicate product or architecture documentation.
-
-Suggested workflows:
-- `start-task`
-- `finish-task`
-- `architecture-change`

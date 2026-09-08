@@ -1,7 +1,6 @@
 # Architecture Decisions
 
-This file records significant technical and architectural decisions.
-
+This file records significant technical and product-architecture decisions.
 Keep entries short and factual. Do not record routine implementation choices.
 
 ---
@@ -82,8 +81,7 @@ autonomous multi-agent swarm.
 
 **Reason**
 
-Project Archaeologist needs reliable, explainable investigations with low
-token usage.
+The product needs reliable, explainable investigations with low token usage.
 
 **Target**
 
@@ -110,7 +108,68 @@ state authoritative.
 
 ---
 
-## ADR-006 — Living Project Documentation
+## ADR-006 — Pre-Change Investigation as the Primary Product Workflow
+
+**Status:** Accepted
+
+**Decision**
+
+Position Project Archaeologist around investigating proposed software changes,
+with code understanding and software archaeology serving as the underlying
+intelligence layers.
+
+**Reason**
+
+Generic codebase intelligence, code search, history analysis, graphs, and MCP
+are increasingly commoditized or offered by established products. A focused
+pre-change investigation workflow provides a clearer product job and a more
+specific user outcome.
+
+**Trade-off**
+
+The system should prioritize change-investigation quality over breadth of
+generic repository features.
+
+---
+
+## ADR-007 — One Canonical ProjectContext
+
+**Status:** Accepted
+
+**Decision**
+
+Use a single canonical `ProjectContext` enriched by current-system, historical,
+and engineering evidence. Human UI and AI/agent consumers use scoped views of
+the same model.
+
+**Reason**
+
+Avoids duplicate knowledge pipelines and prevents divergence between what the
+UI shows and what the agent reasons over.
+
+---
+
+## ADR-008 — Project Graph Abstraction, PostgreSQL Implementation
+
+**Status:** Accepted
+
+**Decision**
+
+Define a Project Graph abstraction in application code, backed initially by
+PostgreSQL relationship tables.
+
+**Reason**
+
+The product requires graph traversal for dependencies, callers, history, and
+impact analysis, but a dedicated graph database is not yet justified.
+
+**Trade-off**
+
+Complex graph workloads may require a dedicated graph store later.
+
+---
+
+## ADR-009 — Living Project Documentation
 
 **Status:** Accepted
 
@@ -130,96 +189,6 @@ Static documentation drifts as implementation evolves.
 
 Automatic updates must be limited to substantive changes to avoid documentation
 noise.
-
----
-
-## ADR-007 — History Is a Core Intelligence Layer, Not the Entire Product
-
-**Status:** Accepted
-
-**Date:** 2026-08-22
-
-**Decision**
-
-Position Project Archaeologist as AI software understanding. Historical analysis is
-a major differentiator and marketing hook, but the system also understands the
-current architecture and surrounding engineering context.
-
-**Reason**
-
-Pure Git-history analysis is narrower and increasingly crowded. The product is
-more valuable when it answers the broader developer question:
-
-> What do I need to know about this software before I change it?
-
-**Implication**
-
-The architecture and roadmap should treat:
-- current system understanding,
-- historical context,
-- engineering context
-
-as first-class inputs to the same investigation engine.
-
----
-
-## ADR-008 — Current-System Context Before AI Reasoning
-
-**Status:** Accepted
-
-**Decision**
-
-Build a deterministic/language-aware Current System Context layer before introducing historical AI investigation.
-
-**Reason**
-
-Humans and LLMs do not need the entire codebase. They need a compact, trustworthy representation of the relevant part of the current system.
-
-This reduces token usage, improves grounding, and avoids turning the project into a full compiler or autonomous code-understanding system.
-
-**Implication**
-
-Phase 2 focuses on:
-- structural parsing,
-- semantic resolution where useful,
-- relationships,
-- tests,
-- current-system Context Builder.
-
-Historical reasoning is added on top in later phases.
-
----
-
-## ADR-009 — Unified Project Context
-
-**Status:** Accepted
-
-**Date:** 2026-08-25
-
-**Decision**
-
-Use a single canonical `ProjectContext` model as the authoritative shared context layer for both the human UI and AI/Agent prompt pipelines.
-
-Do not maintain separate Human Context and LLM Context knowledge extraction pipelines.
-
-```text
-Project Knowledge
-      ↓
-Context Builder
-      ↓
-Project Context
-   ├── Human UI (Markdown / Visual graph)
-   └── AI / Agent (Token-efficient prompt serialization)
-```
-
-**Reason**
-
-Maintaining divergent data structures or extraction logic for human exploration versus AI prompts introduces drift, inconsistent grounding, and duplicated indexing pipelines.
-
-A single canonical `ProjectContext` model guarantees that:
-1. Both human users and AI agents reason over the identical set of entities, relationship edges, evidence, confidence scores, and identified unknowns/gaps.
-2. Serialization methods (`to_human_markdown()` and `to_llm_prompt()`) are deterministic projections of the same underlying data structure.
-3. Unknowns (e.g. untested code, unresolved external dependencies, ambiguous types) are explicitly preserved and visible to both humans and LLMs.
 
 ---
 
@@ -352,6 +321,3 @@ Non-Git engineering context (`README.md`, `ARCHITECTURE.md`, `docs/`, `DECISIONS
 - `EngineeringContextParser` and `EngineeringContextIndexer` extract structured `EngineeringDocument` and `DesignConstraint` models into Postgres.
 - Design constraints are linked directly to source documents with line-level citations.
 - REST endpoints and frontend visualizers allow both human inspection and downstream LLM agents in Phase 4 to reference verified architectural constraints.
-
-
-

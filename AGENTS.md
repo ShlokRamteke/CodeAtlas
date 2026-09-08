@@ -43,6 +43,7 @@ Do not load all documents or all phase files for every task.
 - Keep modules independently testable.
 - Prefer typed contracts and structured data over free-form internal messages.
 - Keep deterministic processing separate from AI reasoning.
+- Treat the proposed change as the investigation task boundary; do not turn the product into generic repository chat by default.
 
 ## AI / Agent Rules
 

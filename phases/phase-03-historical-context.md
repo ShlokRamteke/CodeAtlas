@@ -2,13 +2,14 @@
 
 ## Goal
 
-Extend the canonical current-system context layer with historical and engineering evidence that explains how the software became what it is.
+Enrich the canonical `ProjectContext` with evidence explaining how the current
+system evolved and what engineering context surrounds it.
 
 Core question:
 
 > **How did this software/component get here?**
 
-Phase 3 finds and organizes the deterministic evidence. Phase 4 uses AI to explain it.
+Phase 3 finds and organizes the deterministic evidence. Phase 4 uses AI to reason over it for change investigations.
 
 ---
 
@@ -17,13 +18,13 @@ Phase 3 finds and organizes the deterministic evidence. Phase 4 uses AI to expla
 ```text
 Current Project Context
         ↓
-Git History (Commits, Authors, Timestamps)
+Git History (Commits, Authors, Timestamps, Introducing Commits)
         ↓
-Commit → PR → Issue Relationships
+Commit → PR → Issue Traceability & Relationships
         ↓
-Historical Retrieval & Engineering Context (Docs, ADRs)
+Historical Retrieval & Engineering Context (Docs, ADRs, Constraints)
         ↓
-Enriched ProjectContext
+Enriched Canonical ProjectContext
         ↓
 Historical Timeline / Developer View
 ```
@@ -41,7 +42,6 @@ Build the historical dataset:
 - [x] Interactive Git History tab & File Evolution Inspector in Next.js UI.
 - [x] Output: Current entities can be linked to Git history.
 
-
 ### PH3-02 — Commit → PR → Issue Linking (Completed)
 Connect historical artifacts:
 ```text
@@ -56,7 +56,7 @@ Code / Entity
 - [x] `ReferenceExtractor` parsing PR and issue reference patterns from commits and PR bodies (`Fixes #123`, `Merge pull request #45`, `PR #45`, `GH-101`, `resolves #99`).
 - [x] Models & Alembic migration `0004_add_pr_issue_links` (`CommitPullRequestLink`, `CommitIssueLink`, `PullRequestIssueLink`).
 - [x] `HistoricalLinker` service resolving bidirectional Code → Commit → PR → Issue lineage and unlinked cross-references.
-- [x] `GitHubRepoFetcher` fetching PRs and Issues via GitHub REST API.
+- [x] `GitHubRepoFetcher` fetching PRs and Issues via GitHub REST & GraphQL APIs.
 - [x] REST endpoints (`GET /pull-requests`, `GET /issues`, `GET /trace/{file_path:path}`, `POST /pull-requests/ingest`, `POST /issues/ingest`).
 - [x] Frontend interactive Traceability, PRs, and Issues views with cross-referenced chips in Next.js UI.
 - [x] Output: A developer can trace a change beyond the commit itself.
@@ -68,7 +68,6 @@ Add deterministic retrieval specifically for historical questions:
 - [x] Find historical change events and evolution timeline scoped to a specific component or symbol.
 - [x] Retrieve ranked historical evidence records with provenance without invoking an LLM.
 - [x] Output: A component or query retrieves relevant historical evidence.
-
 
 ### PH3-04 — Engineering Context (Completed)
 Add non-Git engineering context:
@@ -87,13 +86,14 @@ ProjectContext
 ├── Current State (Files, Symbols, Languages)
 ├── Relationships (Imports, Callers, Dependencies)
 ├── Tests (Test suites, Test bindings)
-├── Historical Changes (Commits, Authors, Timelines)
+├── Historical Changes (Commits, Authors, Timelines, Introducing Changes)
 ├── Related PRs (Pull requests, Discussions)
 ├── Related Issues (Issues, Labels, Resolving commits)
-├── Documentation (Docs, ADRs, Constraints)
+├── Documentation (Docs, ADRs, Architectural Invariants)
 └── Evidence (Grounded provenance records)
 ```
-- Do not create `HistoricalContext` as a separate competing model.
+- Attach historical and engineering evidence directly to current-system entities.
+- Do not create a separate, competing `HistoricalContext` model.
 
 ### PH3-06 — Historical Timeline / Developer View
 Expose the result interactively to the developer:
@@ -103,12 +103,12 @@ Expose the result interactively to the developer:
 
 ---
 
-## Phase 3 Definition of Done
+## Definition of Done
 
 A task is complete only when:
 
 ```text
-Select component
+Select component / path
       ↓
 Current Project Context
       ↓
@@ -121,8 +121,5 @@ Engineering context added
 Timeline/evidence displayed
 ```
 
-And the user can answer:
-
-> **"How did this component get here?"**
-
-without an LLM.
+And relevant code can be traced into its history and supporting engineering evidence
+with provenance, without requiring an LLM to establish basic historical facts.
