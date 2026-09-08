@@ -281,7 +281,20 @@ The goal is not simply to display Git history; it is to connect changes directly
    - Self-reconciling link resolution as PRs, Issues, and Commits are indexed asynchronously.
    - End-to-end provenance tracing (`GET /trace/{file_path}`) connecting Code &rarr; Commit &rarr; PR &rarr; Issue.
 
+### Historical Retrieval Engine (`HistoricalRetriever`)
+
+1. **Deterministic Multi-Attribute Searching**:
+   - Commits: keyword filtering on messages, author names/emails, touched file paths, and timestamp ranges (`since`, `until`).
+   - Pull Requests & Issues: keyword filtering on titles/bodies, status (`open`, `closed`, `merged`), authors, and labels.
+2. **Symbol Evolution Timeline**:
+   - Scopes modifications to the exact file and line spans containing a code symbol.
+   - Identifies the origin commit that introduced the symbol, and tracks feature additions/refactors over time.
+3. **Ranked Historical Evidence Synthesis**:
+   - Multi-artifact retrieval producing ranked `HistoricalEvidenceRecord` items.
+   - Deterministic relevance scoring based on query term matches, scope exactness, introducing commit bonus, and recency without calling an LLM.
+
 ### GitHub GraphQL Ingestion Protocol (`GitHubRepoFetcher`)
+
 
 - **Primary GraphQL v4 Queries**: When an authenticated GitHub token is present, repository metadata, commit histories, parent graphs, associated PRs, and linked issues are retrieved in a single batched GraphQL query (`RepoArchaeology`).
 - **REST v3 Fallback**: In unauthenticated local mode or when fetching raw file contents, the fetcher transparently falls back to GitHub REST v3 endpoints.

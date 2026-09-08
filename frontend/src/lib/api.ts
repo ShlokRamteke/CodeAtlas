@@ -14,7 +14,14 @@ import type {
   PullRequestItem,
   IssueItem,
   HistoricalTraceResponse,
+  HistoricalEvidenceRecord,
+  HistoricalSearchQuery,
+  HistoricalSearchResponse,
+  HistoricalRetrievalRequest,
+  HistoricalRetrievalResponse,
+  SymbolHistoryResponse,
 } from "@archaeologist/contracts";
+
 
 
 
@@ -688,4 +695,212 @@ export async function ingestRepositoryIssues(
     return false;
   }
 }
+
+export async function searchHistory(
+  repositoryId: string,
+  params: HistoricalSearchQuery = {}
+): Promise<HistoricalSearchResponse | null> {
+  try {
+    const url = new URL(`${API_BASE}/api/v1/repositories/${repositoryId}/history/search`);
+    if (params.query) url.searchParams.set("query", params.query);
+    if (params.author) url.searchParams.set("author", params.author);
+    if (params.filePath) url.searchParams.set("file_path", params.filePath);
+    if (params.state) url.searchParams.set("state", params.state);
+    if (params.label) url.searchParams.set("label", params.label);
+    if (params.since) url.searchParams.set("since", params.since);
+    if (params.until) url.searchParams.set("until", params.until);
+    if (params.limit) url.searchParams.set("limit", params.limit.toString());
+
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = await res.json();
+
+    return {
+      repositoryId: data.repository_id,
+      query: data.query,
+      totalCommits: data.total_commits,
+      totalPullRequests: data.total_pull_requests,
+      totalIssues: data.total_issues,
+      commits: (data.commits || []).map((c: any) => ({
+        id: c.id,
+        repositoryId: c.repository_id,
+        commitHash: c.commit_hash,
+        authorName: c.author_name,
+        authorEmail: c.author_email,
+        committedAt: c.committed_at,
+        message: c.message,
+        filesChangedCount: c.files_changed_count,
+        insertions: c.insertions,
+        deletions: c.deletions,
+        fileChanges: (c.file_changes || []).map((fc: any) => ({
+          id: fc.id,
+          commitId: fc.commit_id,
+          filePath: fc.file_path,
+          changeType: fc.change_type,
+          insertions: fc.insertions,
+          deletions: fc.deletions,
+          oldPath: fc.old_path,
+        })),
+        linkedPullRequests: (c.linked_pull_requests || []).map((pr: any) => ({
+          prNumber: pr.pr_number,
+          linkType: pr.link_type,
+          rawReference: pr.raw_reference,
+          confidence: pr.confidence,
+          title: pr.title,
+          state: pr.state,
+          author: pr.author,
+          mergedAt: pr.merged_at,
+          labels: pr.labels || [],
+          htmlUrl: pr.html_url,
+        })),
+        linkedIssues: (c.linked_issues || []).map((iss: any) => ({
+          issueNumber: iss.issue_number,
+          linkType: iss.link_type,
+          rawReference: iss.raw_reference,
+          confidence: iss.confidence,
+          title: iss.title,
+          state: iss.state,
+          author: iss.author,
+          closedAt: iss.closed_at,
+          labels: iss.labels || [],
+          htmlUrl: iss.html_url,
+        })),
+      })),
+      pullRequests: (data.pull_requests || []).map((pr: any) => ({
+        id: pr.id,
+        repositoryId: pr.repository_id,
+        number: pr.number,
+        title: pr.title,
+        body: pr.body,
+        state: pr.state,
+        author: pr.author,
+        mergedAt: pr.merged_at,
+        closedAt: pr.closed_at,
+        labels: pr.labels || [],
+        htmlUrl: pr.html_url,
+        createdAt: pr.created_at,
+        linkedIssues: (pr.linked_issues || []).map((iss: any) => ({
+          issueNumber: iss.issue_number,
+          linkType: iss.link_type,
+          rawReference: iss.raw_reference,
+          confidence: iss.confidence,
+          title: iss.title,
+          state: iss.state,
+          author: iss.author,
+          closedAt: iss.closed_at,
+          labels: iss.labels || [],
+          htmlUrl: iss.html_url,
+        })),
+        linkedCommits: pr.linked_commits || [],
+      })),
+      issues: (data.issues || []).map((iss: any) => ({
+        id: iss.id,
+        repositoryId: iss.repository_id,
+        number: iss.number,
+        title: iss.title,
+        body: iss.body,
+        state: iss.state,
+        author: iss.author,
+        closedAt: iss.closed_at,
+        labels: iss.labels || [],
+        htmlUrl: iss.html_url,
+        createdAt: iss.created_at,
+        linkedPullRequests: (iss.linked_pull_requests || []).map((pr: any) => ({
+          prNumber: pr.pr_number,
+          linkType: pr.link_type,
+          rawReference: pr.raw_reference,
+          confidence: pr.confidence,
+          title: pr.title,
+          state: pr.state,
+          author: pr.author,
+          mergedAt: pr.merged_at,
+          labels: pr.labels || [],
+          htmlUrl: pr.html_url,
+        })),
+        linkedCommits: iss.linked_commits || [],
+      })),
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function retrieveHistoricalEvidence(
+  repositoryId: string,
+  payload: HistoricalRetrievalRequest
+): Promise<HistoricalRetrievalResponse | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/repositories/${repositoryId}/history/retrieve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: payload.query,
+        component_path: payload.componentPath,
+        file_path: payload.filePath,
+        symbol_name: payload.symbolName,
+        author: payload.author,
+        since: payload.since,
+        until: payload.until,
+        source_types: payload.sourceTypes,
+        limit: payload.limit || 25,
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      repositoryId: data.repository_id,
+      query: data.query,
+      scope: data.scope || {},
+      totalEvidenceCount: data.total_evidence_count,
+      evidence: (data.evidence || []).map((e: any) => ({
+        id: e.id,
+        sourceType: e.source_type,
+        sourceId: e.source_id,
+        title: e.title,
+        snippet: e.snippet,
+        author: e.author,
+        timestamp: e.timestamp,
+        confidence: e.confidence,
+        score: e.score,
+        metadata: e.metadata || {},
+        citations: e.citations || [],
+      })),
+      summary: data.summary,
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function getSymbolHistory(
+  repositoryId: string,
+  symbolName: string,
+  filePath?: string
+): Promise<SymbolHistoryResponse | null> {
+  try {
+    const url = new URL(
+      `${API_BASE}/api/v1/repositories/${repositoryId}/symbols/${encodeURIComponent(symbolName)}/history`
+    );
+    if (filePath) url.searchParams.set("file_path", filePath);
+
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      symbolName: data.symbol_name,
+      filePath: data.file_path,
+      lineStart: data.line_start,
+      lineEnd: data.line_end,
+      introducingCommit: data.introducing_commit,
+      totalCommits: data.total_commits,
+      commits: data.commits || [],
+      linkedPullRequests: data.linked_pull_requests || [],
+      linkedIssues: data.linked_issues || [],
+      evolutionTimeline: data.evolution_timeline || [],
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
 

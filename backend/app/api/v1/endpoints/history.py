@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_db
 from app.history.git_indexer import GitHistoryIndexer
 from app.history.historical_linker import HistoricalLinker
+from app.history.retriever import HistoricalRetriever
 from app.models.commit import Commit
 from app.models.commit_file_change import CommitFileChange
 from app.models.issue import Issue
@@ -20,6 +22,9 @@ from app.schemas.history import (
     CommitRead,
     ComponentHistoryResponse,
     FileHistoryResponse,
+    HistoricalRetrievalRequest,
+    HistoricalRetrievalResponse,
+    HistoricalSearchResponse,
     HistoricalTraceItem,
     HistoricalTraceResponse,
     IngestCommitsRequest,
@@ -32,9 +37,114 @@ from app.schemas.history import (
     LinkedIssueRead,
     LinkedPullRequestRead,
     PullRequestRead,
+    SymbolHistoryResponse,
 )
 
 router = APIRouter()
+
+
+async def _format_pr_read(pr: PullRequest, db: AsyncSession) -> PullRequestRead:
+    """Format PullRequest with populated linked issues and commits."""
+    issue_links: List[LinkedIssueRead] = []
+    for pil in getattr(pr, "issue_links", []):
+        iss_obj = await db.get(Issue, pil.issue_id) if pil.issue_id else None
+        issue_links.append(
+            LinkedIssueRead(
+                issue_number=pil.issue_number,
+                link_type=pil.link_type,
+                raw_reference=pil.raw_reference,
+                confidence=pil.confidence,
+                title=iss_obj.title if iss_obj else None,
+                state=iss_obj.state.value if iss_obj else None,
+                author=iss_obj.author if iss_obj else None,
+                closed_at=iss_obj.closed_at if iss_obj else None,
+                labels=iss_obj.labels if iss_obj and iss_obj.labels else [],
+                html_url=iss_obj.html_url if iss_obj else None,
+            )
+        )
+
+    commit_links_data: List[Dict[str, Any]] = []
+    for cl in getattr(pr, "commit_links", []):
+        c_obj = await db.get(Commit, cl.commit_id) if cl.commit_id else None
+        if c_obj:
+            commit_links_data.append(
+                {
+                    "commit_hash": c_obj.commit_hash,
+                    "message": c_obj.message,
+                    "author_name": c_obj.author_name,
+                    "committed_at": c_obj.committed_at.isoformat(),
+                    "link_type": cl.link_type,
+                }
+            )
+
+    return PullRequestRead(
+        id=pr.id,
+        repository_id=pr.repository_id,
+        number=pr.number,
+        title=pr.title,
+        body=pr.body,
+        state=pr.state.value,
+        author=pr.author,
+        merged_at=pr.merged_at,
+        closed_at=pr.closed_at,
+        labels=pr.labels or [],
+        html_url=pr.html_url,
+        created_at=pr.created_at,
+        linked_issues=issue_links,
+        linked_commits=commit_links_data,
+    )
+
+
+async def _format_issue_read(issue: Issue, db: AsyncSession) -> IssueRead:
+    """Format Issue with populated linked pull requests and commits."""
+    pr_links_data: List[LinkedPullRequestRead] = []
+    for pil in getattr(issue, "pull_request_links", []):
+        pr_obj = await db.get(PullRequest, pil.pull_request_id) if pil.pull_request_id else None
+        if pr_obj:
+            pr_links_data.append(
+                LinkedPullRequestRead(
+                    pr_number=pr_obj.number,
+                    link_type=pil.link_type,
+                    raw_reference=pil.raw_reference,
+                    confidence=pil.confidence,
+                    title=pr_obj.title,
+                    state=pr_obj.state.value,
+                    author=pr_obj.author,
+                    merged_at=pr_obj.merged_at,
+                    labels=pr_obj.labels or [],
+                    html_url=pr_obj.html_url,
+                )
+            )
+
+    commit_links_data: List[Dict[str, Any]] = []
+    for cl in getattr(issue, "commit_links", []):
+        c_obj = await db.get(Commit, cl.commit_id) if cl.commit_id else None
+        if c_obj:
+            commit_links_data.append(
+                {
+                    "commit_hash": c_obj.commit_hash,
+                    "message": c_obj.message,
+                    "author_name": c_obj.author_name,
+                    "committed_at": c_obj.committed_at.isoformat(),
+                    "link_type": cl.link_type,
+                }
+            )
+
+    return IssueRead(
+        id=issue.id,
+        repository_id=issue.repository_id,
+        number=issue.number,
+        title=issue.title,
+        body=issue.body,
+        state=issue.state.value,
+        author=issue.author,
+        closed_at=issue.closed_at,
+        labels=issue.labels or [],
+        html_url=issue.html_url,
+        created_at=issue.created_at,
+        linked_pull_requests=pr_links_data,
+        linked_commits=commit_links_data,
+    )
 
 
 async def _format_commit_read(commit: Commit, db: AsyncSession) -> CommitRead:
@@ -662,3 +772,143 @@ async def get_historical_trace(
         all_pull_requests=result["all_pull_requests"],
         all_issues=result["all_issues"],
     )
+
+
+# --- Deterministic Historical Search & Retrieval Endpoints ---
+
+
+@router.get("/{repository_id}/history/search", response_model=HistoricalSearchResponse)
+async def search_repository_history(
+    repository_id: uuid.UUID,
+    query: Optional[str] = Query(
+        None, description="Search keyword in commit messages, PRs, issues"
+    ),
+    author: Optional[str] = Query(None, description="Filter by author name or email"),
+    file_path: Optional[str] = Query(
+        None, description="Filter commits touching specific file/path"
+    ),
+    state: Optional[str] = Query(None, description="Filter PR/Issue state (open, closed, merged)"),
+    label: Optional[str] = Query(None, description="Filter PR/Issue label"),
+    since: Optional[datetime] = Query(None, description="Start date filter"),
+    until: Optional[datetime] = Query(None, description="End date filter"),
+    limit: int = Query(50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+) -> HistoricalSearchResponse:
+    """
+    Deterministic multi-entity search across commits, pull requests, and issues.
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Repository not found",
+        )
+
+    retriever = HistoricalRetriever()
+    commits = await retriever.search_commits(
+        repository_id=repository_id,
+        db=db,
+        query=query,
+        author=author,
+        file_path=file_path,
+        since=since,
+        until=until,
+        limit=limit,
+    )
+    prs = await retriever.search_pull_requests(
+        repository_id=repository_id,
+        db=db,
+        query=query,
+        state=state,
+        author=author,
+        label=label,
+        since=since,
+        until=until,
+        limit=limit,
+    )
+    issues = await retriever.search_issues(
+        repository_id=repository_id,
+        db=db,
+        query=query,
+        state=state,
+        author=author,
+        label=label,
+        since=since,
+        until=until,
+        limit=limit,
+    )
+
+    commits_read = [await _format_commit_read(c, db) for c in commits]
+    prs_read = [await _format_pr_read(pr, db) for pr in prs]
+    issues_read = [await _format_issue_read(iss, db) for iss in issues]
+
+    return HistoricalSearchResponse(
+        repository_id=repository_id,
+        query=query,
+        total_commits=len(commits_read),
+        total_pull_requests=len(prs_read),
+        total_issues=len(issues_read),
+        commits=commits_read,
+        pull_requests=prs_read,
+        issues=issues_read,
+    )
+
+
+@router.post("/{repository_id}/history/retrieve", response_model=HistoricalRetrievalResponse)
+async def retrieve_historical_evidence(
+    repository_id: uuid.UUID,
+    payload: HistoricalRetrievalRequest,
+    db: AsyncSession = Depends(get_db),
+) -> HistoricalRetrievalResponse:
+    """
+    Retrieve ranked deterministic historical evidence items without an LLM.
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Repository not found",
+        )
+
+    retriever = HistoricalRetriever()
+    return await retriever.retrieve_historical_evidence(
+        repository_id=repository_id,
+        req=payload,
+        db=db,
+    )
+
+
+@router.get("/{repository_id}/symbols/{symbol_name}/history", response_model=SymbolHistoryResponse)
+async def get_symbol_history(
+    repository_id: uuid.UUID,
+    symbol_name: str,
+    file_path: Optional[str] = Query(None, description="Optional path of file containing symbol"),
+    limit: int = Query(50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+) -> SymbolHistoryResponse:
+    """
+    Retrieve evolutionary history, introducing commit, and provenance for a specific code symbol.
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Repository not found",
+        )
+
+    retriever = HistoricalRetriever()
+    result = await retriever.retrieve_symbol_history(
+        repository_id=repository_id,
+        symbol_name=symbol_name,
+        db=db,
+        file_path=file_path,
+        limit=limit,
+    )
+
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Symbol '{symbol_name}' not found",
+        )
+
+    return result

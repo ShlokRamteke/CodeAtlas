@@ -61,13 +61,14 @@ Code / Entity
 - [x] Frontend interactive Traceability, PRs, and Issues views with cross-referenced chips in Next.js UI.
 - [x] Output: A developer can trace a change beyond the commit itself.
 
-### PH3-03 — Historical Retrieval
+### PH3-03 — Historical Retrieval (Completed)
 Add deterministic retrieval specifically for historical questions:
-- Search commits by message, author, file path, date range.
-- Search PRs and issues by keyword and status.
-- Find historical change events scoped to a specific component or symbol.
-- Retrieve relevant historical evidence records without invoking an LLM.
-- Output: A component or query retrieves relevant historical evidence.
+- [x] Search commits by message, author, file path, date range.
+- [x] Search PRs and issues by keyword, state, and labels.
+- [x] Find historical change events and evolution timeline scoped to a specific component or symbol.
+- [x] Retrieve ranked historical evidence records with provenance without invoking an LLM.
+- [x] Output: A component or query retrieves relevant historical evidence.
+
 
 ### PH3-04 — Engineering Context
 Add non-Git engineering context:

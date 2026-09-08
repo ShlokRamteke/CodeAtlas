@@ -309,4 +309,27 @@ The GitHub REST API requires multiple roundtrips per repository (e.g. separate c
 - If GraphQL returns 401 or no token is configured, the fetcher transparently falls back to public REST endpoints.
 - All future repository analysis tasks (code structure, blame, history, PRs, issues, discussions) should prioritize GraphQL queries over multi-endpoint REST polling.
 
+---
+
+## ADR-014 — Deterministic Multi-Artifact Historical Retrieval & Evidence Ranking
+
+**Status:** Accepted
+
+**Date:** 2026-09-01
+
+**Decision**
+
+Implement a pure deterministic retrieval and ranking engine (`HistoricalRetriever`) for commits, pull requests, issues, and symbol evolutions without invoking an LLM.
+
+**Reason**
+
+Answering historical questions such as "When was symbol X added?", "Which PRs touched path Y?", or "Find commits related to Z" requires fast, deterministic, repeatable searches. Using LLMs for retrieval introduces latency, cost, and hallucination risks. PostgreSQL indexed relational queries, pattern matching, time range scoping, and score weighting provide instant, 100% grounded historical evidence records with exact citation links.
+
+**Implication**
+
+- Endpoints `/history/search`, `/history/retrieve`, and `/symbols/{name}/history` operate deterministically in sub-second latency.
+- Evidence records conform to structured `HistoricalEvidenceRecord` interfaces with confidence scores, query matching scores, and provenance citations.
+- Downstream AI reasoning in Phase 4 can consume these pre-filtered, structured evidence records directly in prompt context without performing brute-force repository searches.
+
+
 

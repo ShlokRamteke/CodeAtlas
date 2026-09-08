@@ -15,6 +15,7 @@ from app.history.reference_extractor import (
     ExtractedReferences,
     ReferenceExtractor,
 )
+from app.history.retriever import HistoricalRetriever
 
 __all__ = [
     "GitHistoryIndexer",
@@ -28,4 +29,5 @@ __all__ = [
     "ExtractedPRRef",
     "ExtractedIssueRef",
     "ExtractedReferences",
+    "HistoricalRetriever",
 ]
