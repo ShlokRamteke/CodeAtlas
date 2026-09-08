@@ -152,3 +152,41 @@ async def test_history_api_endpoints(client: AsyncClient) -> None:
     assert trace["total_pull_requests"] == 2
     assert trace["total_issues"] == 2
     assert len(trace["trace_chain"]) == 2
+
+    # 9. Deterministic Search Endpoint
+    search_res = await client.get(
+        f"/api/v1/repositories/{repo_id}/history/search?query=AuthService"
+    )
+    assert search_res.status_code == 200
+    search_data = search_res.json()
+    assert search_data["total_commits"] == 1
+    assert search_data["total_pull_requests"] == 1
+    assert search_data["commits"][0]["commit_hash"] == "sha_111"
+    assert search_data["pull_requests"][0]["number"] == 10
+
+    # 10. Deterministic Historical Retrieval & Evidence Ranking Endpoint
+    retrieve_res = await client.post(
+        f"/api/v1/repositories/{repo_id}/history/retrieve",
+        json={
+            "query": "AuthService",
+            "file_path": "src/auth/AuthService.ts",
+            "limit": 10,
+        },
+    )
+    assert retrieve_res.status_code == 200
+    retrieval_data = retrieve_res.json()
+    assert retrieval_data["total_evidence_count"] >= 2
+    assert len(retrieval_data["evidence"]) >= 2
+    assert "AuthService" in retrieval_data["summary"]
+
+    # 11. Symbol History Endpoint (with file_path fallback)
+    sym_res = await client.get(
+        f"/api/v1/repositories/{repo_id}/symbols/AuthService/history?file_path=src/auth/AuthService.ts"
+    )
+    assert sym_res.status_code == 200
+    sym_data = sym_res.json()
+    assert sym_data["symbol_name"] == "AuthService"
+    assert sym_data["file_path"] == "src/auth/AuthService.ts"
+    assert sym_data["introducing_commit"]["commit_hash"] == "sha_111"
+    assert len(sym_data["commits"]) == 2
+    assert len(sym_data["evolution_timeline"]) == 2

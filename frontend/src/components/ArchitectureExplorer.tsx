@@ -12,6 +12,8 @@ import type {
   PullRequestItem,
   IssueItem,
   HistoricalTraceResponse,
+  HistoricalEvidenceRecord,
+  SymbolHistoryResponse,
 } from "@archaeologist/contracts";
 import {
   fetchRepositoryArchitecture,
@@ -23,6 +25,9 @@ import {
   fetchRepositoryPullRequests,
   fetchRepositoryIssues,
   fetchHistoricalTrace,
+  retrieveHistoricalEvidence,
+  getSymbolHistory,
+  searchHistory,
   ingestRepositoryCommits,
   ingestRepositoryPullRequests,
   ingestRepositoryIssues,
@@ -40,7 +45,6 @@ import {
   Network,
   RefreshCw,
   RotateCw,
-
   FolderTree,
   UploadCloud,
   FilePlus,
@@ -64,7 +68,11 @@ import {
   User,
   PlusCircle,
   Tag,
+  Filter,
+  Target,
+  Clock,
 } from "lucide-react";
+
 
 interface ArchitectureExplorerProps {
   repository: Repository;
@@ -353,7 +361,9 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
   const [activeTab, setActiveTab] = useState<
     "components" | "symbols" | "relationships" | "project_context" | "git_history" | "ingest"
   >("components");
-  const [historySubTab, setHistorySubTab] = useState<"commits" | "trace" | "prs" | "issues">("commits");
+  const [historySubTab, setHistorySubTab] = useState<
+    "commits" | "trace" | "prs" | "issues" | "retrieval"
+  >("commits");
   const [architecture, setArchitecture] = useState<ArchitectureOverview | null>(null);
   const [symbols, setSymbols] = useState<SymbolItem[]>([]);
   const [symbolQuery, setSymbolQuery] = useState("");
@@ -373,8 +383,21 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
   const [reindexing, setReindexing] = useState(false);
   const [ingesting, setIngesting] = useState(false);
 
+  // Deterministic Historical Retrieval State
+  const [retrievalQuery, setRetrievalQuery] = useState("");
+  const [retrievalAuthor, setRetrievalAuthor] = useState("");
+  const [retrievalPath, setRetrievalPath] = useState("");
+  const [retrievalSymbol, setRetrievalSymbol] = useState("");
+  const [retrievalType, setRetrievalType] = useState<"all" | "commit" | "pull_request" | "issue">("all");
+  const [retrievalState, setRetrievalState] = useState("");
+  const [retrievedEvidence, setRetrievedEvidence] = useState<HistoricalEvidenceRecord[]>([]);
+  const [evidenceSummary, setEvidenceSummary] = useState<string>("");
+  const [symbolHistoryData, setSymbolHistoryData] = useState<SymbolHistoryResponse | null>(null);
+  const [retrievalLoading, setRetrievalLoading] = useState(false);
+
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [copiedLlm, setCopiedLlm] = useState(false);
+
 
   // Custom File Editor state for Ingest tab
   const [customPath, setCustomPath] = useState("src/utils/calculator.ts");
@@ -455,6 +478,42 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
     setPullRequests(prList);
     setIssues(issList);
   }
+
+  async function handleExecuteRetrieval() {
+    setRetrievalLoading(true);
+    const sourceTypes = retrievalType === "all" ? undefined : [retrievalType];
+    const res = await retrieveHistoricalEvidence(repository.id, {
+      query: retrievalQuery.trim() || undefined,
+      author: retrievalAuthor.trim() || undefined,
+      filePath: retrievalPath.trim() || undefined,
+      symbolName: retrievalSymbol.trim() || undefined,
+      sourceTypes: sourceTypes as any,
+      limit: 30,
+    });
+    if (res) {
+      setRetrievedEvidence(res.evidence);
+      setEvidenceSummary(res.summary);
+    }
+
+    if (retrievalSymbol.trim()) {
+      const symRes = await getSymbolHistory(
+        repository.id,
+        retrievalSymbol.trim(),
+        retrievalPath.trim() || undefined
+      );
+      setSymbolHistoryData(symRes);
+    } else {
+      setSymbolHistoryData(null);
+    }
+    setRetrievalLoading(false);
+  }
+
+  useEffect(() => {
+    if (activeTab === "git_history" && historySubTab === "retrieval") {
+      handleExecuteRetrieval();
+    }
+  }, [activeTab, historySubTab, retrievalType, repository.id]);
+
 
   async function handleReindex() {
     setReindexing(true);
@@ -963,8 +1022,20 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
                   <CircleDot className="w-3.5 h-3.5" />
                   Issues ({issues.length})
                 </button>
+                <button
+                  onClick={() => setHistorySubTab("retrieval")}
+                  className={`px-3 py-1 rounded-md font-medium transition flex items-center gap-1.5 ${
+                    historySubTab === "retrieval"
+                      ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <Target className="w-3.5 h-3.5 text-cyan-400" />
+                  Search &amp; Evidence
+                </button>
               </div>
             </div>
+
 
             {/* Commits Sub-Tab */}
             {historySubTab === "commits" && (
@@ -1390,8 +1461,298 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
                 )}
               </div>
             )}
+
+            {/* Historical Retrieval & Evidence Sub-Tab */}
+            {historySubTab === "retrieval" && (
+              <div className="space-y-6">
+                {/* Search & Filter Header Box */}
+                <div className="p-5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 bg-cyan-500/10 border border-cyan-500/20 rounded-lg text-cyan-400">
+                        <Target className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h5 className="text-xs font-semibold text-white">
+                          Deterministic Historical Retrieval Engine
+                        </h5>
+                        <p className="text-[11px] text-slate-400">
+                          Multi-attribute querying across Commits, Pull Requests, and Issues without LLM invocation.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-mono">
+                        Zero LLM Calls &bull; 100% Deterministic
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Main Query Bar */}
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                      <input
+                        type="text"
+                        value={retrievalQuery}
+                        onChange={(e) => setRetrievalQuery(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleExecuteRetrieval()}
+                        placeholder="Search commit messages, PR titles/bodies, and issue descriptions (e.g. 'stripe payment', 'fix: crash', '#45')..."
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
+                      />
+                    </div>
+                    <button
+                      onClick={handleExecuteRetrieval}
+                      disabled={retrievalLoading}
+                      className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition flex items-center gap-1.5 shadow-sm"
+                    >
+                      {retrievalLoading ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Target className="w-3.5 h-3.5" />
+                      )}
+                      <span>{retrievalLoading ? "Searching..." : "Retrieve"}</span>
+                    </button>
+                  </div>
+
+                  {/* Advanced Multi-Attribute Filters Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-slate-800/80">
+                    <div>
+                      <label className="text-[11px] font-medium text-slate-400 block mb-1">
+                        Symbol Scope:
+                      </label>
+                      <input
+                        type="text"
+                        value={retrievalSymbol}
+                        onChange={(e) => setRetrievalSymbol(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleExecuteRetrieval()}
+                        placeholder="Symbol name (e.g. Order, processPayment)..."
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-medium text-slate-400 block mb-1">
+                        Component / File Path:
+                      </label>
+                      <input
+                        type="text"
+                        value={retrievalPath}
+                        onChange={(e) => setRetrievalPath(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleExecuteRetrieval()}
+                        placeholder="Path prefix (e.g. src/services, app/)..."
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-medium text-slate-400 block mb-1">
+                        Author Name / Email:
+                      </label>
+                      <input
+                        type="text"
+                        value={retrievalAuthor}
+                        onChange={(e) => setRetrievalAuthor(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleExecuteRetrieval()}
+                        placeholder="Author (e.g. Shlok, core@)..."
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-medium text-slate-400 block mb-1">
+                        Artifact Filter:
+                      </label>
+                      <select
+                        value={retrievalType}
+                        onChange={(e) => setRetrievalType(e.target.value as any)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                      >
+                        <option value="all">All Artifacts (Commits + PRs + Issues)</option>
+                        <option value="commit">Commits Only</option>
+                        <option value="pull_request">Pull Requests Only</option>
+                        <option value="issue">Issues Only</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Evidence Summary Banner */}
+                {evidenceSummary && (
+                  <div className="p-4 rounded-xl bg-slate-950/60 border border-cyan-500/20 flex items-start gap-3">
+                    <div className="p-2 bg-cyan-500/10 rounded-lg text-cyan-400 flex-shrink-0 mt-0.5">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-xs font-semibold text-cyan-300">
+                        Retrieval Findings Summary
+                      </div>
+                      <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                        {evidenceSummary}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Symbol Evolution Timeline Inspector */}
+                {symbolHistoryData && (
+                  <div className="p-5 rounded-xl bg-slate-950/90 border border-indigo-500/30 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Code2 className="w-4 h-4 text-indigo-400" />
+                          <h5 className="text-xs font-bold text-white font-mono">
+                            Symbol Evolution: {symbolHistoryData.symbolName}
+                          </h5>
+                        </div>
+                        <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                          {symbolHistoryData.filePath}
+                          {symbolHistoryData.lineStart && ` (lines ${symbolHistoryData.lineStart}-${symbolHistoryData.lineEnd})`}
+                        </p>
+                      </div>
+
+                      {symbolHistoryData.introducingCommit && (
+                        <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-300">
+                          <span className="text-[10px] uppercase font-bold text-amber-400">Origin:</span>
+                          <span className="font-mono font-semibold">{symbolHistoryData.introducingCommit.commitHash.slice(0, 7)}</span>
+                          <span className="text-slate-400">&bull; {symbolHistoryData.introducingCommit.authorName}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Timeline Events */}
+                    <div className="space-y-3">
+                      <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                        Evolutionary Milestones ({symbolHistoryData.evolutionTimeline.length})
+                      </div>
+                      <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                        {symbolHistoryData.evolutionTimeline.map((ev, idx) => (
+                          <div
+                            key={idx}
+                            className="p-3 rounded-lg bg-slate-900 border border-slate-800 flex items-start justify-between gap-3 text-xs"
+                          >
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-mono uppercase font-bold ${
+                                    ev.eventType === "introduction"
+                                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                                      : ev.eventType === "symbol_modification"
+                                      ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                                      : "bg-slate-800 text-slate-400"
+                                  }`}
+                                >
+                                  {ev.eventType.replace("_", " ")}
+                                </span>
+                                <span className="font-mono text-cyan-400 font-semibold">{ev.commitHash.slice(0, 7)}</span>
+                                <span className="text-slate-400">&bull; {ev.author}</span>
+                              </div>
+                              <div className="text-slate-300 text-xs font-mono">{ev.summary}</div>
+                            </div>
+
+                            <div className="text-[11px] text-slate-500 flex-shrink-0 font-mono">
+                              {ev.timestamp.slice(0, 10)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Ranked Evidence Results */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-cyan-400" />
+                      Ranked Historical Evidence Records ({retrievedEvidence.length})
+                    </h5>
+                    <span className="text-[11px] text-slate-500">
+                      Ranked by query relevance &bull; recency &bull; confidence
+                    </span>
+                  </div>
+
+                  {retrievedEvidence.length === 0 ? (
+                    <div className="py-12 text-center bg-slate-950/40 rounded-xl border border-slate-800">
+                      <Target className="w-8 h-8 text-slate-600 mx-auto mb-3" />
+                      <p className="text-slate-400 text-sm font-medium">No matching historical evidence found.</p>
+                      <p className="text-slate-500 text-xs mt-1">
+                        Try adjusting query keywords, component path, or artifact filters.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {retrievedEvidence.map((ev) => (
+                        <div
+                          key={ev.id}
+                          className="p-4 rounded-xl bg-slate-950/80 border border-slate-800/90 hover:border-cyan-500/30 transition space-y-3"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="flex items-start gap-2.5">
+                              <div className="mt-0.5">
+                                {ev.sourceType === "commit" ? (
+                                  <div className="p-1.5 bg-amber-500/10 border border-amber-500/20 rounded-md text-amber-400">
+                                    <GitCommit className="w-3.5 h-3.5" />
+                                  </div>
+                                ) : ev.sourceType === "pull_request" ? (
+                                  <div className="p-1.5 bg-purple-500/10 border border-purple-500/20 rounded-md text-purple-400">
+                                    <GitPullRequest className="w-3.5 h-3.5" />
+                                  </div>
+                                ) : (
+                                  <div className="p-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md text-emerald-400">
+                                    <CircleDot className="w-3.5 h-3.5" />
+                                  </div>
+                                )}
+                              </div>
+
+                              <div>
+                                <div className="text-xs font-semibold text-white flex items-center gap-2 flex-wrap">
+                                  <span>{ev.title}</span>
+                                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                                    {ev.id}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-3 text-[11px] text-slate-400 mt-1 flex-wrap">
+                                  {ev.author && <span>Author: <strong className="text-slate-300">{ev.author}</strong></span>}
+                                  {ev.timestamp && <span>Timestamp: {ev.timestamp.slice(0, 10)}</span>}
+                                  <span>Match Score: <strong className="text-cyan-400">{Math.round(ev.score * 100)}%</strong></span>
+                                  <span>Confidence: <strong className="text-emerald-400">{Math.round(ev.confidence * 100)}%</strong></span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Snippet Block */}
+                          <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 text-xs font-mono text-slate-300 whitespace-pre-wrap leading-relaxed">
+                            {ev.snippet}
+                          </div>
+
+                          {/* Citations & Trace Tags */}
+                          {ev.citations && ev.citations.length > 0 && (
+                            <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-slate-800/80">
+                              <span className="text-[11px] text-slate-500">Citations:</span>
+                              {ev.citations.map((cite, idx) => (
+                                <span
+                                  key={idx}
+                                  className="text-[10px] px-2 py-0.5 rounded bg-cyan-950/40 text-cyan-300 border border-cyan-500/30 font-mono"
+                                >
+                                  {cite}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         ) : activeTab === "project_context" ? (
+
           /* Canonical Unified ProjectContext Tab */
           <div className="space-y-6">
             {/* Target Header Bar */}

@@ -4,6 +4,10 @@ from app.schemas.history import (
     CommitRead,
     ComponentHistoryResponse,
     FileHistoryResponse,
+    HistoricalEvidenceItem,
+    HistoricalRetrievalRequest,
+    HistoricalRetrievalResponse,
+    HistoricalSearchResponse,
     HistoricalTraceItem,
     HistoricalTraceResponse,
     IngestCommitsRequest,
@@ -16,6 +20,7 @@ from app.schemas.history import (
     LinkedIssueRead,
     LinkedPullRequestRead,
     PullRequestRead,
+    SymbolHistoryResponse,
 )
 from app.schemas.investigation import (
     EvidenceItemSchema,
@@ -82,4 +87,9 @@ __all__ = [
     "LinkedIssueRead",
     "LinkedPullRequestRead",
     "PullRequestRead",
+    "HistoricalEvidenceItem",
+    "HistoricalSearchResponse",
+    "HistoricalRetrievalRequest",
+    "HistoricalRetrievalResponse",
+    "SymbolHistoryResponse",
 ]

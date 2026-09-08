@@ -384,3 +384,98 @@ export interface InvestigationResponse {
   latencyMs?: number;
   createdAt: string;
 }
+
+export interface HistoricalEvidenceRecord {
+  id: string;
+  sourceType: 'commit' | 'pull_request' | 'issue';
+  sourceId: string;
+  title: string;
+  snippet: string;
+  author?: string | null;
+  timestamp?: string | null;
+  confidence: number;
+  score: number;
+  metadata?: Record<string, unknown>;
+  citations?: string[];
+}
+
+export interface HistoricalSearchQuery {
+  query?: string;
+  author?: string;
+  filePath?: string;
+  state?: string;
+  label?: string;
+  since?: string;
+  until?: string;
+  limit?: number;
+}
+
+export interface HistoricalSearchResponse {
+  repositoryId: string;
+  query?: string | null;
+  totalCommits: number;
+  totalPullRequests: number;
+  totalIssues: number;
+  commits: CommitItem[];
+  pullRequests: PullRequestItem[];
+  issues: IssueItem[];
+}
+
+export interface HistoricalRetrievalRequest {
+  query?: string;
+  componentPath?: string;
+  filePath?: string;
+  symbolName?: string;
+  author?: string;
+  since?: string;
+  until?: string;
+  sourceTypes?: Array<'commit' | 'pull_request' | 'issue'>;
+  limit?: number;
+}
+
+export interface HistoricalRetrievalResponse {
+  repositoryId: string;
+  query?: string | null;
+  scope: Record<string, unknown>;
+  totalEvidenceCount: number;
+  evidence: HistoricalEvidenceRecord[];
+  summary: string;
+}
+
+export interface SymbolHistoryResponse {
+  symbolName: string;
+  filePath: string;
+  lineStart?: number | null;
+  lineEnd?: number | null;
+  introducingCommit?: {
+    commitHash: string;
+    authorName: string;
+    committedAt: string;
+    message: string;
+  } | null;
+  totalCommits: number;
+  commits: Array<{
+    commitHash: string;
+    authorName: string;
+    committedAt: string;
+    message: string;
+    changeType: string;
+    insertions: number;
+    deletions: number;
+    mentionsSymbol: boolean;
+    linkedPullRequests: LinkedPullRequest[];
+    linkedIssues: LinkedIssue[];
+  }>;
+  linkedPullRequests: LinkedPullRequest[];
+  linkedIssues: LinkedIssue[];
+  evolutionTimeline: Array<{
+    eventType: string;
+    timestamp: string;
+    commitHash: string;
+    author: string;
+    summary: string;
+    linkedPrs: number[];
+    linkedIssues: number[];
+  }>;
+}
+

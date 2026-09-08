@@ -171,3 +171,62 @@ class IngestIssuesResponse(BaseModel):
     repository_id: uuid.UUID
     indexed_count: int
     message: str
+
+
+class HistoricalEvidenceItem(BaseModel):
+    id: str
+    source_type: str  # 'commit' | 'pull_request' | 'issue'
+    source_id: str
+    title: str
+    snippet: str
+    author: Optional[str] = None
+    timestamp: Optional[datetime] = None
+    confidence: float = 1.0
+    score: float = 1.0
+    metadata: Dict[str, Any] = {}
+    citations: List[str] = []
+
+
+class HistoricalSearchResponse(BaseModel):
+    repository_id: uuid.UUID
+    query: Optional[str] = None
+    total_commits: int
+    total_pull_requests: int
+    total_issues: int
+    commits: List[CommitRead] = []
+    pull_requests: List[PullRequestRead] = []
+    issues: List[IssueRead] = []
+
+
+class HistoricalRetrievalRequest(BaseModel):
+    query: Optional[str] = None
+    component_path: Optional[str] = None
+    file_path: Optional[str] = None
+    symbol_name: Optional[str] = None
+    author: Optional[str] = None
+    since: Optional[datetime] = None
+    until: Optional[datetime] = None
+    source_types: Optional[List[str]] = None  # ['commit', 'pull_request', 'issue']
+    limit: int = 25
+
+
+class HistoricalRetrievalResponse(BaseModel):
+    repository_id: uuid.UUID
+    query: Optional[str] = None
+    scope: Dict[str, Any] = {}
+    total_evidence_count: int
+    evidence: List[HistoricalEvidenceItem] = []
+    summary: str
+
+
+class SymbolHistoryResponse(BaseModel):
+    symbol_name: str
+    file_path: str
+    line_start: Optional[int] = None
+    line_end: Optional[int] = None
+    introducing_commit: Optional[Dict[str, Any]] = None
+    total_commits: int
+    commits: List[Dict[str, Any]] = []
+    linked_pull_requests: List[Dict[str, Any]] = []
+    linked_issues: List[Dict[str, Any]] = []
+    evolution_timeline: List[Dict[str, Any]] = []

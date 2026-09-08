@@ -6,9 +6,10 @@ Phase 3 — Historical + Engineering Context
 
 ## Current Task
 
-PH3-02 Complete &mdash; Next: PH3-03 (Historical Retrieval)
+PH3-03 Complete &mdash; Next: PH3-04 (Engineering Context)
 
 ## Status
+
 
 IN PROGRESS
 
@@ -39,10 +40,16 @@ engineering context, and AI reasoning.
   - REST endpoints: `GET /api/v1/repositories/{id}/pull-requests`, `GET /api/v1/repositories/{id}/issues`, `GET /api/v1/repositories/{id}/trace/{file_path:path}`, and ingestion endpoints.
   - Frontend interactive **Historical Traceability & Artifact Linking** sub-views in Next.js UI with live cross-referenced chips on commits, PRs, and issues.
   - 100% automated test pass rate (31/31 pytest tests, clean frontend build & contracts typecheck).
+- **Phase 3 — Task PH3-03 (Historical Retrieval)**:
+  - `HistoricalRetriever` service enabling multi-dimensional searching across commits (message, author, touched path, date ranges), PRs (keyword, state, author, label), and issues (keyword, state, author, label).
+  - Symbol history extraction identifying the introducing commit, file path, line span, and chronological evolutionary milestones for any code symbol.
+  - Multi-artifact deterministic evidence synthesis ranking `HistoricalEvidenceRecord` items with query relevance score, recency, confidence metrics, and citation links without LLM calls.
+  - REST endpoints: `GET /api/v1/repositories/{id}/history/search`, `POST /api/v1/repositories/{id}/history/retrieve`, and `GET /api/v1/repositories/{id}/symbols/{name}/history`.
+  - Frontend interactive **Deterministic Search & Evidence** explorer in Next.js UI with live keyword querying, multi-attribute filter chips, symbol evolution timeline inspector, and ranked evidence cards.
+  - 100% automated test pass rate (32/32 pytest tests, clean frontend build & contracts typecheck).
 
 ## Remaining
 
-- **PH3-03**: Historical Retrieval
 - **PH3-04**: Engineering Context
 - **PH3-05**: Enrich ProjectContext
 - **PH3-06**: Historical Timeline / Developer View
@@ -53,7 +60,8 @@ None
 
 ## Next Action
 
-Start Task PH3-03: Implement Deterministic Historical Retrieval (commit message/author/path filters, PR/issue keyword search, component-scoped historical evidence query without LLMs).
+Start Task PH3-04: Implement Engineering Context indexing (parse README.md, docs/, architecture docs, ADRs, and extract design constraints).
+
 
 
 ## Session Rule

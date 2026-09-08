@@ -72,7 +72,9 @@ services:
     volumes:
       - ./frontend/src:/app/frontend/src:Z
       - ./frontend/public:/app/frontend/public:Z
+      - ./packages/contracts:/app/packages/contracts:Z
     depends_on:
+
       - backend
     networks:
       - archaeologist-network
