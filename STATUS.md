@@ -22,6 +22,11 @@ developer understand a proposed change before implementation.
 
 - **Phase 1 — Foundation**: Complete foundation (Postgres, Alembic, FastAPI, Contracts, Next.js).
 - **Phase 2 — Repository Understanding**: Complete current-system layer (Tree-sitter AST, relationships, Context Builder, canonical `ProjectContext`).
+- **Clean-Room Reference Architecture & Licensing Assessment**:
+  - Analyzed reference codebase `repowise` in an isolated, untracked local quarantine (`repowise/` in `.gitignore`).
+  - Formulated **ADR-016 (Clean-Room Intellectual Property Boundary & Licensing Policy)**: Enforced strict clean-room isolation against AGPL-3.0 contamination, guaranteeing Project Archaeologist remains 100% MIT permissive with zero code, schema, prompt, or test copying.
+  - Formulated **ADR-017 (Quantitative Change Risk, Historical Co-Change, and Guarding Test Reachability)**: Adopted published peer-reviewed algorithms (Kamei et al. Just-in-Time defect prediction with Shannon churn entropy, historical co-change hidden coupling detection, reach-ranked guarding test signals, and token-budgeted output distillation).
+  - Updated live documentation across `ARCHITECTURE.md`, `DECISIONS.md`, and `phases/phase-04-change-investigation.md`.
 - **Phase 3 — Task PH3-01 (Git History Indexing)**:
   - Database model `CommitFileChange` (`ChangeType`: added, modified, deleted, renamed) and `0003_add_commit_file_changes` migration.
   - `GitHistoryIndexer` service calculating file history and identifying the **introducing commit** (origin commit) for any file or component.

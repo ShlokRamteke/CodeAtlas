@@ -321,3 +321,74 @@ Non-Git engineering context (`README.md`, `ARCHITECTURE.md`, `docs/`, `DECISIONS
 - `EngineeringContextParser` and `EngineeringContextIndexer` extract structured `EngineeringDocument` and `DesignConstraint` models into Postgres.
 - Design constraints are linked directly to source documents with line-level citations.
 - REST endpoints and frontend visualizers allow both human inspection and downstream LLM agents in Phase 4 to reference verified architectural constraints.
+
+---
+
+## ADR-016 — Clean-Room Intellectual Property Boundary & Licensing Policy
+
+**Status:** Accepted
+
+**Date:** 2026-09-08
+
+**Decision**
+
+Maintain a strict clean-room intellectual property boundary between Project Archaeologist (licensed under permissive MIT) and external copyleft reference codebases (specifically AGPL-3.0 repositories such as Repowise).
+
+Under this policy:
+1. **Zero Source Code Contamination:** No functions, classes, database schemas, prompt templates, or tests may be copied, vendored, transliterated, or dynamically imported from AGPL-3.0 repositories.
+2. **Permitted Borrowing (Ideas & Standards Only):** We borrow only non-copyrightable elements:
+   - Published peer-reviewed academic algorithms (e.g. Kamei et al. Just-in-Time defect prediction, Shannon entropy of code churn, Louvain/Leiden graph clustering, exponential recency decay).
+   - Public industry protocols (e.g. Model Context Protocol JSON-RPC 2.0 specifications, standard Git CLI commands).
+   - High-level functional requirements and behavioral heuristics (e.g. flagging co-change partners missing from diffs, ordering test suites by changed file reach).
+3. **Independent Clean Implementation:** All features are designed from scratch and authored independently in Python/FastAPI/PostgreSQL adhering to Project Archaeologist's existing schemas and patterns.
+4. **Local Repository Quarantine:** Any external reference repositories used for functional study (e.g. `repowise/`, `_references/`) must remain permanently ignored in `.gitignore`, never committed to git, and never packaged in production container images.
+
+**Reason**
+
+Repowise is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0). Under AGPL Section 13, linking, importing, or creating a derivative work from AGPL code would contaminate Project Archaeologist, legally requiring the entire codebase and SaaS platform to be open-sourced under AGPL-3.0. A strict clean-room boundary guarantees Project Archaeologist remains 100% MIT permissive, enabling full commercial flexibility for enterprise SaaS and closed-source customer deployments.
+
+**Implication**
+
+- Project Archaeologist retains its MIT license with zero legal risk.
+- Algorithmic models are implemented from primary literature (citing academic papers in code docstrings).
+- External clones remain strictly local reference tools on developer workstations.
+
+---
+
+## ADR-017 — Quantitative Change Risk, Historical Co-Change, and Guarding Test Reachability
+
+**Status:** Accepted
+
+**Date:** 2026-09-08
+
+**Decision**
+
+Incorporate quantitative change risk metrics, historical co-change mining, and reach-ranked guarding test signals into the Phase 4 Change Investigation Engine and canonical `ProjectContext`:
+
+1. **Quantitative Change Risk Scoring (Kamei Model + Defect History):**
+   - Adopt the empirical software engineering model by Kamei et al. (IEEE TSE 2013) for Just-in-Time defect risk.
+   - Compute churn shape: lines added ($LA$), lines deleted ($LD$), files touched ($NF$), distinct directories ($ND$), distinct subsystems ($NS$).
+   - Compute Shannon churn entropy: $H(P) = -\sum p_i \log_2 p_i$, measuring the diffusion and scatter of the proposed change across modules.
+   - Compute historical defect pressure: Mine past bug-fix commits touching target files using a deep git log walk (up to 20,000 commits) discounted by exponential recency decay ($\tau = 365\text{d}$).
+2. **Historical Co-Change & Hidden Coupling Warnings:**
+   - Mine commit diff history to identify files that frequently change together ($\text{co-change frequency} > 60\%$).
+   - Classify coupling into *corroborated* (static import/call edge exists) and *unexplained / hidden coupling* (no static edge, but historical co-change is high).
+   - Emit pre-change alerts if a proposed change modifies file $A$ but omits historical co-change partner file $B$.
+3. **Guarding Test Reachability & Stale Test Detection:**
+   - Trace static AST call graphs to identify test suites that transitively exercise modified functions.
+   - Rank guarding tests by *reach* (prioritizing test files that cover the greatest number of touched components so developers/agents run the highest-impact tests first).
+   - Flag *Untested Changes* (modified lines/symbols with zero covering tests) and *Stale Test Candidates* (exercised code modified without corresponding updates to its guarding test files).
+4. **Token-Budgeted Output & Omission Markers:**
+   - Enforce strict token ceilings for pre-change investigation payloads.
+   - If evidence exceeds the budget, shed lower-priority details and attach recoverable omission markers (`[ref#<id>]`), allowing AI agents (Claude Code, Cursor, Copilot) to selectively expand context on demand without overflowing context windows.
+
+**Reason**
+
+Static AST analysis answers "what is connected", but fails to answer "what is risky", "what usually breaks", or "what files are implicitly coupled without an import". Combining static graph reachability with deterministic Git churn metrics, defect histories, and co-change patterns creates an industrial-strength pre-change investigation brief that prevents regressions before code is written.
+
+**Implication**
+
+- `CanonicalProjectContext` is enriched with co-change partners, defect pressure scores, and guarding test rankings.
+- Step 5 (Blast Radius), Step 7 (Change Risk), Step 8 (Guarding Tests), and Step 10/11 (Budgeted Projection) of the 12-step engine are formally standardized with concrete mathematical formulas.
+- All algorithms execute deterministically in PostgreSQL and Python without relying on LLM hallucination for risk computation.
+

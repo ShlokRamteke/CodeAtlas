@@ -259,49 +259,66 @@ Core principle:
 
 ## 11. Change Investigation Engine (Phase 4)
 
-Phase 4 is the product differentiator. The engine takes a proposed change and
-performs a bounded, evidence-driven investigation.
+Phase 4 is the product differentiator. The engine takes a proposed change (e.g. natural language intent, branch diff, or file list) and executes a bounded, 12-step evidence-driven pre-change investigation.
 
 Example input:
 > “Replace the Stripe integration with another payment provider.”
 
-Investigation sequence:
+Detailed 12-step investigation sequence:
 ```text
-Change Intent
+ 1. Intent Intake & Normalization (target symbols, paths, action verbs)
     ↓
-Target Identification
+ 2. Entity & Target Resolution (AST symbols, file boundaries)
     ↓
-Dependency / Caller Expansion (blast radius)
+ 3. Call-Graph & Interface Expansion (direct callers, callees, API contracts)
     ↓
-Tests + API + Configuration Mapping
+ 4. Architectural & Decision Constraint Checking (ADRs, RFC 2119 invariants)
     ↓
-Historical Changes & Origin Commits
+ 5. Blast Radius & Co-Change Mining (structural ancestors + historical hidden coupling)
     ↓
-PRs / Issues / ADR Decisions
+ 6. Historical Evolution & Origin Tracing (git blame, PR discussions, origin commits)
     ↓
-Co-change / Hidden-Coupling Signals
+ 7. Quantitative Change Risk & Defect Pressure (Kamei entropy + 20k-walk defect history)
     ↓
-Evidence Ranking
+ 8. Guarding Test & Verification Gap Detection (reach-ranked tests + stale test candidates)
     ↓
-Bounded LLM Synthesis (1–3 model calls)
+ 9. Intent Archaeology & Invariant Synthesis (why code was written this way)
     ↓
-Verification & Citation Checks
+10. Token Budgeting & Distillation (priority shedding + recoverable omission markers)
     ↓
-Pre-Change Investigation Brief
+11. Dual-Format Projection (Human-facing Markdown + Agent-facing JSON)
+    ↓
+12. Pre-Change Investigation Brief Delivery (API / MCP / UI)
 ```
+
+### Deterministic Risk & Coupling Models
+
+To avoid LLM hallucinations, the engine evaluates mathematical and graph algorithms deterministically before any AI reasoning:
+
+1. **Quantitative Change Risk (Kamei Empirical Model + Defect History):**
+   - **Churn Spread:** Lines added ($LA$), lines deleted ($LD$), files touched ($NF$), distinct directories ($ND$), distinct subsystems ($NS$).
+   - **Shannon Churn Entropy:** $H(P) = -\sum_{i=1}^n p_i \log_2 p_i$, quantifying whether the change is localized ($H \approx 0$) or diffused across unrelated areas ($H > 2.5$).
+   - **Historical Defect Pressure:** Deep git log walk (up to 20,000 commits) analyzing past bug-fix commits touching those files, discounted by exponential recency decay ($w = 2^{-\Delta t / \tau}$, $\tau = 365\text{d}$).
+2. **Historical Co-Change & Hidden Coupling Warnings:**
+   - Evaluates commit diff co-occurrence frequencies.
+   - Categorizes pairs into *Corroborated Coupling* (static import/call edge exists) vs *Unexplained / Hidden Coupling* (no static edge, but co-change frequency $> 60\%$).
+   - Alerts developers when a proposed change touches file $A$ but omits historical partner file $B$.
+3. **Guarding Test Reachability & Verification Gaps:**
+   - Static call graph traversal identifies all test suites that exercise modified symbols.
+   - Tests are ordered by *Reach Ranking* (tests reaching the highest count of changed files run first).
+   - Flags *Untested Changes* (modified lines with zero test coverage) and *Stale Test Candidates* (exercised code changed without corresponding test modifications).
 
 The agent is bounded, stateful, read-only, and evidence-driven.
 
 LLMs perform:
-- Intent interpretation
-- Investigation planning
-- Cross-source correlation
-- Reasoning about implications and risks
-- Synthesis into the brief
+- Intent interpretation and query planning
+- Cross-source correlation between historical discussions and current code
+- Reasoning about implications, hidden risks, and edge cases
+- Synthesis into the structured brief
 - Claim classification (fact, inference, unknown)
-- Lightweight verification
+- Verification of claims against cited entity evidence
 
-LLMs do not extract deterministic facts such as symbol locations, imports, commit dates, or dependency edges.
+LLMs do not extract deterministic facts such as symbol locations, imports, commit dates, dependency edges, or risk metric scores.
 
 ## 12. Pre-Change Investigation Brief
 
@@ -310,24 +327,26 @@ The result is structured around the change rather than generic chat:
 - **Change Scope**: Target components and modified surfaces
 - **Affected Components**: Direct and transitive dependencies (blast radius)
 - **Dependency / Call Paths**: Inbound callers and outbound connections
-- **Relevant Tests**: Test suites and verification requirements
+- **Relevant Tests**: Reach-ranked test suites and verification gap alerts
 - **Historical Context**: Why the current code exists and how it evolved
 - **Related PRs / Issues**: Predecessor decisions and discussions
-- **Historical Failures / Reversions**: Prior regressions where discoverable
-- **Hidden Coupling / Co-change Signals**: Files that frequently change together
+- **Historical Failures / Reversions**: Prior defect pressure and fragile file warnings
+- **Hidden Coupling / Co-change Signals**: Partner files frequently changed together
 - **Known Constraints**: ADRs and RFC 2119 design invariants
 - **Important Unknowns**: Explicit gaps, untested areas, ambiguous dependencies
 - **Recommended Areas to Inspect**: Pre-implementation guidance
 - **Evidence / Source Locations**: Line-level citations and Evidence IDs
 
-## 13. Token Efficiency
+## 13. Token Efficiency & Output Distillation
 
 - Index repository facts once deterministically.
-- Resolve entities and blast radius before calling LLMs.
+- Resolve entities, blast radius, and risk scores before calling LLMs.
 - Retrieve only scoped evidence relevant to the change.
-- Avoid full-repository prompts.
-- Use structured tool outputs and compressed context.
-- Keep most investigations to roughly 1–3 model calls.
+- Avoid full-repository prompts (1–3 bounded model calls for normal investigations).
+- **Token Budgeting & Distillation:**
+  - Enforces strict token ceilings per MCP tool and API response.
+  - Sheds low-priority details in deterministic priority order when over budget.
+  - Injects recoverable omission markers (`[ref#<id>]`), enabling AI agents (Claude Code, Cursor, Copilot) to inspect or expand specific subgraphs on demand without context overflow.
 
 ## 14. Incremental Indexing
 
@@ -341,8 +360,9 @@ flowchart LR
     CHECK -->|Yes| PROCESS[Reparse + Re-embed]
 ```
 
-## 15. Security
+## 15. Security & Licensing Boundary
 
+- **Clean-Room Intellectual Property Boundary:** Strict isolation from external copyleft (AGPL-3.0) reference repositories. No source code, database schemas, prompt templates, or test suites are copied or vendored. All implementations are authored independently under the permissive **MIT License**.
 - GitHub App is read-only for MVP.
 - Enforce authorization server-side for repository-scoped operations.
 - Preserve tenant and repository isolation.
