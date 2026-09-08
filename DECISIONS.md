@@ -332,7 +332,7 @@ Non-Git engineering context (`README.md`, `ARCHITECTURE.md`, `docs/`, `DECISIONS
 
 **Decision**
 
-Maintain a strict clean-room intellectual property boundary between Project Archaeologist (licensed under permissive MIT) and external copyleft reference codebases (specifically AGPL-3.0 repositories such as Repowise).
+Maintain a strict clean-room intellectual property boundary between Project Archaeologist (licensed under permissive MIT) and external copyleft reference codebases (specifically AGPL-3.0 repositories).
 
 Under this policy:
 1. **Zero Source Code Contamination:** No functions, classes, database schemas, prompt templates, or tests may be copied, vendored, transliterated, or dynamically imported from AGPL-3.0 repositories.
@@ -341,11 +341,11 @@ Under this policy:
    - Public industry protocols (e.g. Model Context Protocol JSON-RPC 2.0 specifications, standard Git CLI commands).
    - High-level functional requirements and behavioral heuristics (e.g. flagging co-change partners missing from diffs, ordering test suites by changed file reach).
 3. **Independent Clean Implementation:** All features are designed from scratch and authored independently in Python/FastAPI/PostgreSQL adhering to Project Archaeologist's existing schemas and patterns.
-4. **Local Repository Quarantine:** Any external reference repositories used for functional study (e.g. `repowise/`, `_references/`) must remain permanently ignored in `.gitignore`, never committed to git, and never packaged in production container images.
+4. **Local Repository Quarantine:** Any external reference repositories used for functional study (e.g. in `_references/`) must remain permanently ignored in `.gitignore`, never committed to git, and never packaged in production container images.
 
 **Reason**
 
-Repowise is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0). Under AGPL Section 13, linking, importing, or creating a derivative work from AGPL code would contaminate Project Archaeologist, legally requiring the entire codebase and SaaS platform to be open-sourced under AGPL-3.0. A strict clean-room boundary guarantees Project Archaeologist remains 100% MIT permissive, enabling full commercial flexibility for enterprise SaaS and closed-source customer deployments.
+Copyleft network services (such as those under AGPL-3.0) enforce strong reciprocal obligations. Under AGPL Section 13, linking, importing, or creating a derivative work from AGPL code would contaminate Project Archaeologist, legally requiring the entire codebase and SaaS platform to be open-sourced under AGPL-3.0. A strict clean-room boundary guarantees Project Archaeologist remains 100% MIT permissive, enabling full commercial flexibility for enterprise SaaS and closed-source customer deployments.
 
 **Implication**
 
