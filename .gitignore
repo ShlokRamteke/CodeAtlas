@@ -84,3 +84,6 @@ prs/
 # Immpecable
 .impeccable/
 
+# External Reference Repositories (Not committed)
+_references/
+
