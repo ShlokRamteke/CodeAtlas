@@ -27,6 +27,7 @@ from app.schemas.history import (
     HistoricalSearchResponse,
     HistoricalTraceItem,
     HistoricalTraceResponse,
+    HydrateReferencesResponse,
     IngestCommitsRequest,
     IngestCommitsResponse,
     IngestIssuesRequest,
@@ -722,6 +723,40 @@ async def ingest_repository_issues(
         repository_id=repository_id,
         indexed_count=indexed_count,
         message=f"Successfully indexed {indexed_count} issues.",
+    )
+
+
+@router.post("/{repository_id}/references/hydrate", response_model=HydrateReferencesResponse)
+async def hydrate_missing_references(
+    repository_id: uuid.UUID,
+    max_lookups: int = Query(
+        30, ge=1, le=100, description="Max individual reference lookups to perform"
+    ),
+    db: AsyncSession = Depends(get_db),
+) -> HydrateReferencesResponse:
+    """
+    On-demand targeted reference hydration.
+    Identifies unlinked PR/Issue numbers from commits and PRs, and fetches only those entities.
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Repository not found",
+        )
+
+    linker = HistoricalLinker()
+    result = await linker.hydrate_missing_references(
+        repository_id=repository_id,
+        db=db,
+        max_lookups=max_lookups,
+    )
+
+    return HydrateReferencesResponse(
+        repository_id=repository_id,
+        hydrated_prs=result["hydrated_prs"],
+        hydrated_issues=result["hydrated_issues"],
+        message=f"Targeted hydration complete: fetched {result['hydrated_prs']} PRs and {result['hydrated_issues']} issues.",
     )
 
 

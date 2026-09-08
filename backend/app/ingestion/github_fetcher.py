@@ -391,6 +391,38 @@ class GitHubRepoFetcher:
                 )
             )
 
+        # Collect associated PRs from commit nodes into parsed_prs
+        pr_numbers_seen = {p.number for p in parsed_prs}
+        for c_node in commit_nodes:
+            for apr in (c_node.get("associatedPullRequests") or {}).get("nodes", []):
+                p_num = apr.get("number")
+                if p_num and p_num not in pr_numbers_seen:
+                    pr_numbers_seen.add(p_num)
+                    parsed_prs.append(
+                        ParsedPullRequest(
+                            number=p_num,
+                            title=apr.get("title", f"PR #{p_num}"),
+                            state=apr.get("state", "MERGED").lower(),
+                            author="Unknown",
+                        )
+                    )
+
+        # Collect closing issues from PR nodes into parsed_issues
+        issue_numbers_seen = {i.number for i in parsed_issues}
+        for p_node in pr_nodes:
+            for cir in (p_node.get("closingIssuesReferences") or {}).get("nodes", []):
+                i_num = cir.get("number")
+                if i_num and i_num not in issue_numbers_seen:
+                    issue_numbers_seen.add(i_num)
+                    parsed_issues.append(
+                        ParsedIssue(
+                            number=i_num,
+                            title=cir.get("title", f"Issue #{i_num}"),
+                            state=cir.get("state", "CLOSED").lower(),
+                            author="Unknown",
+                        )
+                    )
+
         return parsed_commits, parsed_prs, parsed_issues
 
     async def fetch_public_repo_files(
@@ -750,3 +782,142 @@ class GitHubRepoFetcher:
                 )
 
         return parsed_issues
+
+    async def fetch_single_pull_request(
+        self,
+        owner: str,
+        repo: str,
+        pr_number: int,
+        github_token: Optional[str] = None,
+    ) -> Optional[Any]:
+        """Targeted fetch for a single specific Pull Request by number."""
+        from app.history.historical_linker import ParsedPullRequest
+
+        token = github_token or os.getenv("GITHUB_TOKEN")
+        headers = {
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "Project-Archaeologist",
+        }
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                res = await client.get(
+                    f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}",
+                    headers=headers,
+                )
+                if res.status_code != 200:
+                    return None
+                pr = res.json()
+
+                merged_at = None
+                if pr.get("merged_at"):
+                    try:
+                        merged_at = datetime.fromisoformat(pr["merged_at"].replace("Z", "+00:00"))
+                    except Exception:
+                        merged_at = None
+
+                closed_at = None
+                if pr.get("closed_at"):
+                    try:
+                        closed_at = datetime.fromisoformat(pr["closed_at"].replace("Z", "+00:00"))
+                    except Exception:
+                        closed_at = None
+
+                created_at = None
+                if pr.get("created_at"):
+                    try:
+                        created_at = datetime.fromisoformat(pr["created_at"].replace("Z", "+00:00"))
+                    except Exception:
+                        created_at = None
+
+                state = "merged" if pr.get("merged_at") else pr.get("state", "open").lower()
+                labels = [
+                    lbl["name"] if isinstance(lbl, dict) else str(lbl)
+                    for lbl in pr.get("labels", [])
+                ]
+
+                return ParsedPullRequest(
+                    number=pr.get("number", pr_number),
+                    title=pr.get("title", f"PR #{pr_number}"),
+                    body=pr.get("body"),
+                    state=state,
+                    author=pr.get("user", {}).get("login", "Unknown")
+                    if isinstance(pr.get("user"), dict)
+                    else "Unknown",
+                    merged_at=merged_at,
+                    closed_at=closed_at,
+                    labels=labels,
+                    html_url=pr.get("html_url"),
+                    created_at=created_at,
+                )
+        except Exception as exc:
+            logger.warning("Failed to fetch single PR #%s: %s", pr_number, exc)
+            return None
+
+    async def fetch_single_issue(
+        self,
+        owner: str,
+        repo: str,
+        issue_number: int,
+        github_token: Optional[str] = None,
+    ) -> Optional[Any]:
+        """Targeted fetch for a single specific Issue by number."""
+        from app.history.historical_linker import ParsedIssue
+
+        token = github_token or os.getenv("GITHUB_TOKEN")
+        headers = {
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "Project-Archaeologist",
+        }
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                res = await client.get(
+                    f"https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}",
+                    headers=headers,
+                )
+                if res.status_code != 200:
+                    return None
+                item = res.json()
+
+                closed_at = None
+                if item.get("closed_at"):
+                    try:
+                        closed_at = datetime.fromisoformat(item["closed_at"].replace("Z", "+00:00"))
+                    except Exception:
+                        closed_at = None
+
+                created_at = None
+                if item.get("created_at"):
+                    try:
+                        created_at = datetime.fromisoformat(
+                            item["created_at"].replace("Z", "+00:00")
+                        )
+                    except Exception:
+                        created_at = None
+
+                labels = [
+                    lbl["name"] if isinstance(lbl, dict) else str(lbl)
+                    for lbl in item.get("labels", [])
+                ]
+
+                return ParsedIssue(
+                    number=item.get("number", issue_number),
+                    title=item.get("title", f"Issue #{issue_number}"),
+                    body=item.get("body"),
+                    state=item.get("state", "open").lower(),
+                    author=item.get("user", {}).get("login", "Unknown")
+                    if isinstance(item.get("user"), dict)
+                    else "Unknown",
+                    closed_at=closed_at,
+                    labels=labels,
+                    html_url=item.get("html_url"),
+                    created_at=created_at,
+                )
+        except Exception as exc:
+            logger.warning("Failed to fetch single Issue #%s: %s", issue_number, exc)
+            return None
