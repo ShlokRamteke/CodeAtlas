@@ -12,7 +12,13 @@ from app.context_builder.builder import CurrentSystemContextBuilder
 from app.core.db import get_db
 from app.ingestion.engine import IngestionEngine
 from app.ingestion.github_fetcher import GitHubRepoFetcher
+from app.models.commit import Commit
+from app.models.commit_file_change import ChangeType, CommitFileChange
 from app.models.dependency import CodeDependency
+from app.models.design_constraint import DesignConstraint
+from app.models.engineering_doc import EngineeringDocument
+from app.models.issue import Issue
+from app.models.pull_request import PullRequest
 from app.models.repository import Repository
 from app.models.source_file import SourceFile
 from app.models.symbol import Symbol, SymbolKind
@@ -622,6 +628,11 @@ async def get_repository_context_brief(
         for r in arch.relationships
     ]
 
+    # Fetch Historical & Engineering Enrichments
+    hist_changes, rel_prs, rel_issues, eng_docs, design_constraints = (
+        await _fetch_context_enrichments(db, repository_id, component)
+    )
+
     # Construct Canonical ProjectContext
     target_type = "component" if component else "repository"
     target_name = component if component else repo.full_name
@@ -634,6 +645,11 @@ async def get_repository_context_brief(
         dependencies=deps_dict,
         relationships=rels_dict,
         component_filter=component,
+        historical_changes=hist_changes,
+        related_prs=rel_prs,
+        related_issues=rel_issues,
+        documents=eng_docs,
+        design_constraints=design_constraints,
     )
 
     project_context_read = ProjectContextRead.model_validate(proj_ctx.to_dict())
@@ -671,6 +687,142 @@ async def get_repository_context_brief(
     )
 
 
+async def _fetch_context_enrichments(
+    db: AsyncSession,
+    repository_id: uuid.UUID,
+    component: Optional[str] = None,
+) -> tuple[List[dict], List[dict], List[dict], List[dict], List[dict]]:
+    """Helper to query historical commits, PRs, issues, docs, and constraints for context builder."""
+    # Commits & File Changes
+    commits_stmt = (
+        select(Commit)
+        .where(Commit.repository_id == repository_id)
+        .order_by(Commit.committed_at.desc())
+        .limit(100)
+    )
+    db_commits = list((await db.execute(commits_stmt)).scalars().all())
+    commit_ids = [c.id for c in db_commits]
+
+    db_file_changes: List[CommitFileChange] = []
+    if commit_ids:
+        file_changes_stmt = select(CommitFileChange).where(
+            CommitFileChange.commit_id.in_(commit_ids)
+        )
+        db_file_changes = list((await db.execute(file_changes_stmt)).scalars().all())
+
+    changes_by_commit: dict[uuid.UUID, List[CommitFileChange]] = {}
+    for fc in db_file_changes:
+        changes_by_commit.setdefault(fc.commit_id, []).append(fc)
+
+    historical_changes = []
+    for c in db_commits:
+        fcs = changes_by_commit.get(c.id, [])
+        files_changed = [fc.file_path for fc in fcs]
+        if component and files_changed:
+            if not any(f.startswith(component) for f in files_changed):
+                continue
+        is_intro = any(fc.change_type == ChangeType.ADDED for fc in fcs)
+        historical_changes.append(
+            {
+                "commit_hash": c.commit_hash,
+                "message": c.message,
+                "author": c.author_name,
+                "committed_at": c.committed_at.isoformat() if c.committed_at else "",
+                "change_type": "added" if is_intro else "modified",
+                "files_changed": files_changed,
+                "is_introducing": is_intro,
+            }
+        )
+
+    # PRs
+    prs_stmt = (
+        select(PullRequest)
+        .where(PullRequest.repository_id == repository_id)
+        .order_by(PullRequest.number.desc())
+        .limit(50)
+    )
+    db_prs = list((await db.execute(prs_stmt)).scalars().all())
+    prs = [
+        {
+            "pr_number": p.number,
+            "title": p.title,
+            "state": p.state.value if hasattr(p.state, "value") else str(p.state),
+            "author": p.author,
+            "merged_at": p.merged_at.isoformat() if p.merged_at else None,
+            "url": p.url,
+            "linked_issue_numbers": [],
+        }
+        for p in db_prs
+    ]
+
+    # Issues
+    issues_stmt = (
+        select(Issue)
+        .where(Issue.repository_id == repository_id)
+        .order_by(Issue.number.desc())
+        .limit(50)
+    )
+    db_issues = list((await db.execute(issues_stmt)).scalars().all())
+    issues = [
+        {
+            "issue_number": i.number,
+            "title": i.title,
+            "state": i.state.value if hasattr(i.state, "value") else str(i.state),
+            "author": i.author,
+            "closed_at": i.closed_at.isoformat() if i.closed_at else None,
+            "labels": i.labels or [],
+            "url": i.url,
+        }
+        for i in db_issues
+    ]
+
+    # Documents
+    docs_stmt = (
+        select(EngineeringDocument)
+        .where(EngineeringDocument.repository_id == repository_id)
+        .order_by(EngineeringDocument.title)
+    )
+    db_docs = list((await db.execute(docs_stmt)).scalars().all())
+    docs = [
+        {
+            "id": str(d.id),
+            "path": d.path,
+            "title": d.title,
+            "doc_type": d.doc_type.value if hasattr(d.doc_type, "value") else str(d.doc_type),
+            "status": (
+                d.status.value
+                if (d.status and hasattr(d.status, "value"))
+                else (str(d.status) if d.status else None)
+            ),
+            "deciders": d.deciders,
+            "summary": d.summary,
+        }
+        for d in db_docs
+    ]
+
+    # Constraints
+    constraints_stmt = (
+        select(DesignConstraint)
+        .where(DesignConstraint.repository_id == repository_id)
+        .order_by(DesignConstraint.created_at.desc())
+    )
+    db_constraints = list((await db.execute(constraints_stmt)).scalars().all())
+    constraints = [
+        {
+            "id": str(dc.id),
+            "domain": (
+                dc.category.value if hasattr(dc.category, "value") else str(dc.category)
+            ),
+            "constraint_text": dc.statement,
+            "source_doc_path": dc.source_path,
+            "priority": dc.level.value if hasattr(dc.level, "value") else str(dc.level),
+        }
+        for dc in db_constraints
+    ]
+
+    return historical_changes, prs, issues, docs, constraints
+
+
 @router.get("/{repository_id}/context", response_model=ProjectContextRead)
 async def get_repository_context(
     repository_id: uuid.UUID,
@@ -680,6 +832,7 @@ async def get_repository_context(
     """
     Returns the canonical Unified ProjectContext for a repository or component.
     Single source of truth consumed by Human UI and AI/Agent prompt pipelines.
+    Enriched with AST entities/relationships, Git history, PRs, Issues, ADRs, and Design Constraints.
     """
     repo = await db.get(Repository, repository_id)
     if not repo:
@@ -777,6 +930,11 @@ async def get_repository_context(
         for r in arch.relationships
     ]
 
+    # Fetch Historical & Engineering Context
+    hist_changes, rel_prs, rel_issues, eng_docs, design_constraints = (
+        await _fetch_context_enrichments(db, repository_id, component)
+    )
+
     target_type = "component" if component else "repository"
     target_name = component if component else repo.full_name
     proj_ctx = builder.build_project_context(
@@ -788,6 +946,11 @@ async def get_repository_context(
         dependencies=deps_dict,
         relationships=rels_dict,
         component_filter=component,
+        historical_changes=hist_changes,
+        related_prs=rel_prs,
+        related_issues=rel_issues,
+        documents=eng_docs,
+        design_constraints=design_constraints,
     )
 
     return ProjectContextRead.model_validate(proj_ctx.to_dict())

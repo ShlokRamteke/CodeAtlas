@@ -67,6 +67,13 @@ export interface ContextEntity {
   signature?: string;
   lineStart?: number;
   lineEnd?: number;
+  introducingCommit?: string;
+  introducingDate?: string;
+  lastModifiedCommit?: string;
+  lastModifiedDate?: string;
+  changeCount?: number;
+  activeAuthors?: string[];
+  relatedAdrs?: string[];
 }
 
 export interface ContextRelationship {
@@ -82,7 +89,7 @@ export interface ContextRelationship {
 export interface ContextEvidence {
   id: string;
   sourcePath: string;
-  kind: string; // 'ast_symbol' | 'import_statement' | 'test_binding' | 'file_header'
+  kind: string; // 'ast_symbol' | 'import_statement' | 'test_binding' | 'file_header' | 'git_commit' | 'pull_request' | 'issue' | 'architecture_decision' | 'design_constraint'
   content: string;
   confidence: number;
   provenance: string;
@@ -93,6 +100,55 @@ export interface ContextUnknown {
   target: string;
   description: string;
   severity: 'low' | 'medium' | 'high';
+}
+
+export interface ContextHistoricalChange {
+  commitHash: string;
+  message: string;
+  author: string;
+  committedAt: string;
+  changeType?: 'added' | 'modified' | 'deleted' | 'renamed' | string;
+  filesChanged?: string[];
+  isIntroducing?: boolean;
+  prNumber?: number;
+}
+
+export interface ContextPullRequest {
+  prNumber: number;
+  title: string;
+  state: string;
+  author: string;
+  mergedAt?: string;
+  url?: string;
+  linkedIssueNumbers?: number[];
+}
+
+export interface ContextIssue {
+  issueNumber: number;
+  title: string;
+  state: string;
+  author: string;
+  closedAt?: string;
+  labels?: string[];
+  url?: string;
+}
+
+export interface ContextDocument {
+  id: string;
+  path: string;
+  title: string;
+  docType: string;
+  status?: string;
+  deciders?: string;
+  summary?: string;
+}
+
+export interface ContextDesignConstraint {
+  id: string;
+  domain: string;
+  constraintText: string;
+  sourceDocPath: string;
+  priority?: string;
 }
 
 export interface ProjectContext {
@@ -106,6 +162,11 @@ export interface ProjectContext {
   relationships: ContextRelationship[];
   evidence: ContextEvidence[];
   unknowns: ContextUnknown[];
+  historicalChanges?: ContextHistoricalChange[];
+  relatedPrs?: ContextPullRequest[];
+  relatedIssues?: ContextIssue[];
+  documents?: ContextDocument[];
+  designConstraints?: ContextDesignConstraint[];
   humanMarkdown: string;
   llmPromptContext: string;
 }

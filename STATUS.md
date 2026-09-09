@@ -6,7 +6,7 @@ Phase 3 — Historical + Engineering Context
 
 ## Current Task
 
-PH3-04 Complete &mdash; Next: PH3-05 (Enrich ProjectContext)
+PH3-05 Complete &mdash; Next: PH3-06 (Historical Timeline / Developer View)
 
 ## Status
 
@@ -57,11 +57,17 @@ developer understand a proposed change before implementation.
   - `EngineeringContextIndexer` service ingesting repository documentation, indexing ADRs, querying design constraints, and performing deterministic context searches.
   - REST endpoints: `GET /api/v1/repositories/{id}/engineering/overview`, `GET /docs`, `GET /docs/{doc_id}`, `GET /adrs`, `GET /constraints`, `GET /search`, and `POST /ingest`.
   - Frontend interactive **Engineering Context** tab & `EngineeringContextViewer` component in Next.js UI with ADR cards, design constraints matrix, document catalog, and real-time context search.
-  - 100% automated test pass rate (39/39 pytest tests, clean frontend build & contracts typecheck).
+- **Phase 3 — Task PH3-05 (Enrich ProjectContext)**:
+  - Extended the single canonical `ProjectContext` model with historical changes, PRs, issues, ADR documents, and RFC 2119 design constraints without creating competing context models.
+  - Attached historical origin and evolution metadata directly to code entities (`introducing_commit`, `change_count`, `active_authors`, `related_adrs`).
+  - Integrated multi-source evidence records (`git_commit`, `pull_request`, `architecture_decision`, `design_constraint`) with composite provenance strings (`tree_sitter_ast+git_history+github_provenance+engineering_docs`).
+  - Dual token-budgeted projections: comprehensive human markdown briefing and compact, high-signal LLM prompt briefing under strict token limits.
+  - Enriched `GET /api/v1/repositories/{id}/context` and `GET /api/v1/repositories/{id}/context-brief` endpoints to query and hydrate historical commits, PRs, issues, ADRs, and architectural constraints.
+  - Aligned `@archaeologist/contracts` and frontend API client types with the enriched canonical model.
+  - 100% automated test pass rate across 54 pytest tests (including new unit and integration tests for enriched `ProjectContext`), clean contracts compilation, and clean Next.js frontend production build.
 
 ## Remaining
 
-- **PH3-05**: Enrich ProjectContext (extend canonical ProjectContext with historical changes, PRs, issues, ADRs, and design constraints)
 - **PH3-06**: Historical Timeline / Developer View
 
 ## Blockers
@@ -70,7 +76,7 @@ None known.
 
 ## Next Action
 
-Start Task PH3-05: Enrich ProjectContext (extend canonical ProjectContext with historical changes, PRs, issues, ADRs, and design constraints, preserving provenance for downstream change investigation).
+Start Task PH3-06: Historical Timeline / Developer View (interactive timeline showing component milestones, linking directly to evidence records across commits, PRs, issues, ADRs in Next.js UI).
 
 ## Session Rule
 
@@ -87,4 +93,4 @@ receive scoped views of that model.
 
 ## Last Updated
 
-2026-09-08
+2026-09-09
