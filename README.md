@@ -90,7 +90,7 @@ podman compose -f podman-compose.yml up -d
 - **Adminer DB Manager:** `http://localhost:8080`
 
 ### 4. Verified Automated Test Suite
-- **39 passing automated pytest tests** covering AST parsing, graph traversal, Git history indexing, PR/Issue linking, historical retrieval, and engineering context extraction.
+- **52 passing automated pytest tests** covering AST parsing, graph traversal, Git history indexing, PR/Issue linking, historical retrieval, engineering context extraction, Kamei change risk scoring, co-change hidden coupling detection, and reach-ranked guarding tests.
 - Clean TypeScript contracts typecheck (`packages/contracts`) and Next.js production build (`packages/web` / `frontend`).
 
 ## Development Context

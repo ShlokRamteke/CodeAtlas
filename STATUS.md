@@ -26,7 +26,9 @@ developer understand a proposed change before implementation.
   - Analyzed external reference architecture in an isolated, untracked local quarantine (`_references/` in `.gitignore`).
   - Formulated **ADR-016 (Clean-Room Intellectual Property Boundary & Licensing Policy)**: Enforced strict clean-room isolation against AGPL-3.0 contamination, guaranteeing Project Archaeologist remains 100% MIT permissive with zero code, schema, prompt, or test copying.
   - Formulated **ADR-017 (Quantitative Change Risk, Historical Co-Change, and Guarding Test Reachability)**: Adopted published peer-reviewed algorithms (Kamei et al. Just-in-Time defect prediction with Shannon churn entropy, historical co-change hidden coupling detection, reach-ranked guarding test signals, and token-budgeted output distillation).
-  - Updated live documentation across `ARCHITECTURE.md`, `DECISIONS.md`, and `phases/phase-04-change-investigation.md`.
+  - Implemented and verified clean-room algorithms in `app.history.change_risk`, `app.history.co_change`, and `app.history.guarding_tests`.
+  - 100% automated test pass rate across 52 unit/integration tests (11 new tests added covering Kamei metrics, Shannon entropy, defect pressure decay, co-change partner mining, hidden coupling warnings, reach ranking, untested changes, and stale test detection).
+  - Updated live documentation across `ARCHITECTURE.md`, `DECISIONS.md`, `README.md`, and `phases/phase-04-change-investigation.md`.
 - **Phase 3 — Task PH3-01 (Git History Indexing)**:
   - Database model `CommitFileChange` (`ChangeType`: added, modified, deleted, renamed) and `0003_add_commit_file_changes` migration.
   - `GitHistoryIndexer` service calculating file history and identifying the **introducing commit** (origin commit) for any file or component.
