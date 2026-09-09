@@ -30,12 +30,50 @@ class InvestigationClaimSchema(BaseModel):
     classification: str  # 'fact' | 'inference' | 'unknown'
     statement: str
     evidence_ids: List[str] = Field(default_factory=list)
+    confidence: float = 1.0
+
+
+class NormalizedChangeIntentSchema(BaseModel):
+    raw_query: str
+    action_verbs: List[str] = Field(default_factory=list)
+    target_files: List[str] = Field(default_factory=list)
+    target_symbols: List[str] = Field(default_factory=list)
+    target_components: List[str] = Field(default_factory=list)
+    intent_summary: str = ""
+    is_ambiguous: bool = False
+
+
+class InvestigationPlanSchema(BaseModel):
+    steps: List[str] = Field(default_factory=list)
+    target_files: List[str] = Field(default_factory=list)
+    target_symbols: List[str] = Field(default_factory=list)
+    gather_tasks: List[str] = Field(default_factory=list)
+    reasoning_focus: str = ""
+
+
+class PreChangeBriefSchema(BaseModel):
+    summary: str
+    intent_summary: str
+    target_files: List[str] = Field(default_factory=list)
+    target_symbols: List[str] = Field(default_factory=list)
+    claims: List[InvestigationClaimSchema] = Field(default_factory=list)
+    signals: Dict[str, Any] = Field(default_factory=dict)
+    constraints: List[Dict[str, Any]] = Field(default_factory=list)
+    unknowns: List[str] = Field(default_factory=list)
+    recommended_checks: List[str] = Field(default_factory=list)
+    model_calls_count: int = 0
+    token_usage: Dict[str, int] = Field(default_factory=dict)
 
 
 class InvestigationCreate(BaseModel):
     repository_id: uuid.UUID
     query: str
     type: InvestigationType = InvestigationType.UNDERSTAND
+    target_path: Optional[str] = None
+    target_symbol: Optional[str] = None
+
+
+class InvestigationRunRequest(BaseModel):
     target_path: Optional[str] = None
     target_symbol: Optional[str] = None
 

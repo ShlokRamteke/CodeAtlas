@@ -36,7 +36,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: codeatlas-backend
-    restart: unless-stopped
+    env_file:
+      - .env
     environment:
       DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-codeatlas}"
       PROJECT_NAME: "CodeAtlas API"
@@ -44,6 +45,11 @@ services:
       API_V1_STR: "/api/v1"
       BACKEND_CORS_ORIGINS: '["http://localhost:3000", "http://127.0.0.1:3000"]'
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-anthropic/claude-3.5-sonnet}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
     ports:
       - "8000:8000"
     volumes:

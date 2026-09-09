@@ -75,6 +75,7 @@ import {
 } from "lucide-react";
 import { EngineeringContextViewer } from "./EngineeringContextViewer";
 import { HistoricalTimelineViewer } from "./HistoricalTimelineViewer";
+import { PreChangeInvestigationViewer } from "./PreChangeInvestigationViewer";
 
 
 interface ArchitectureExplorerProps {
@@ -362,7 +363,7 @@ def test_aggregates():
 
 export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) {
   const [activeTab, setActiveTab] = useState<
-    "components" | "symbols" | "relationships" | "git_history" | "engineering" | "project_context" | "ingest"
+    "components" | "symbols" | "relationships" | "git_history" | "engineering" | "project_context" | "investigation" | "ingest"
   >("components");
   const [historySubTab, setHistorySubTab] = useState<
     "timeline" | "commits" | "trace" | "prs" | "issues" | "retrieval"
@@ -765,6 +766,20 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
         >
           <FileText className="w-4 h-4" />
           Unified ProjectContext
+        </button>
+        <button
+          onClick={() => setActiveTab("investigation")}
+          className={`py-3 px-4 border-b-2 flex items-center gap-2 transition whitespace-nowrap ${
+            activeTab === "investigation"
+              ? "border-indigo-500 text-indigo-400 font-semibold"
+              : "border-transparent hover:text-slate-200"
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-indigo-400" />
+          Change Investigation
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-300">
+            Phase 4
+          </span>
         </button>
         <button
           onClick={() => setActiveTab("ingest")}
@@ -1995,6 +2010,8 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
               </div>
             )}
           </div>
+        ) : activeTab === "investigation" ? (
+          <PreChangeInvestigationViewer repository={repository} />
         ) : (
           /* Ingest / Add Code Tab */
           <div className="space-y-8">

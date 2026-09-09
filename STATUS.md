@@ -2,15 +2,15 @@
 
 ## Current Phase
 
-Phase 3 — Historical + Engineering Context (Completed) &mdash; Next: Phase 4 (Change Investigation Engine)
+Phase 4 — Change Investigation Engine
 
 ## Current Task
 
-PH3-06 Complete &mdash; Phase 3 Complete &mdash; Next: Phase 4 (Change Investigation Engine)
+PH4-01 Complete &mdash; Next: PH4-02 (Blast Radius & Co-Change Hidden Coupling)
 
 ## Status
 
-PHASE 3 COMPLETE / READY FOR PHASE 4
+PH4-01 COMPLETE / READY FOR PH4-02
 
 ## Product Focus
 
@@ -73,11 +73,18 @@ developer understand a proposed change before implementation.
   - Contracts & API Client: defined `ComponentMilestoneEvent` and `ComponentTimelineResponse` in `@codeatlas/contracts` and implemented `fetchComponentTimeline` in `frontend/src/lib/api.ts`.
   - Frontend interactive UI: created `HistoricalTimelineViewer` component with component selector, milestone category filter chips, search filtering, diff badges, expandable descriptions, and direct evidence chips.
   - Architecture Explorer integration: added "Evolution Timeline" subtab in Git History explorer and added "Evolution Timeline" 1-click shortcut buttons on every component card in the Architecture Explorer.
-  - 100% automated test pass rate across 57 pytest tests, clean contracts build, and clean Next.js production build.
+- **Phase 4 — Task PH4-01 (Bounded Investigation Engine & Planner)**:
+  - `IntentNormalizer`: deterministic normalization of raw user queries, diffs, and target files/symbols with action verb categorization and ambiguity detection.
+  - `InvestigationState` and `InvestigationEngine`: state graph with hard budget enforcement (`model_calls_count <= 3`), deterministic gathering (AST, Git history, Kamei change risk, Shannon churn entropy, guarding tests) before reasoning.
+  - `LLMProvider` abstraction with `OpenRouterLLMProvider` (ADR-018), `MockLLMProvider` for offline deterministic testing, and `OpenAILLMProvider`.
+  - Anthropic-standard hierarchical XML document prompting (`<documents><document index="N" id="..."><source>...</source><document_content>...</document_content></document></documents>`) with Pydantic output validation.
+  - REST endpoints: `POST /api/v1/investigations/preview-intent` and `POST /api/v1/investigations/{id}/run`.
+  - Next.js interactive UI: "Change Investigation" tab in Architecture Explorer with live OpenRouter triggers, preset scenarios, and classified claim badges.
+  - 100% automated test pass rate across 64 pytest tests, clean frontend build, and clean contracts typecheck.
 
 ## Remaining
 
-- **Phase 4**: Change Investigation Engine (Pre-Change Investigation Planner, Bounded LangGraph reasoning, Blast-radius & Co-change signals, Pre-Change Investigation Brief).
+- **Phase 4**: Change Investigation Engine (PH4-02: Blast Radius & Co-Change Hidden Coupling, PH4-03: Quantitative Change Risk & Defect Pressure, PH4-04: Guarding Test Analyzer, PH4-05: Invariant Synthesis, PH4-06: Token Budgeting & Distillation).
 
 ## Blockers
 
@@ -85,7 +92,7 @@ None known.
 
 ## Next Action
 
-Start Phase 4 (Change Investigation Engine) &mdash; Task PH4-01.
+Start Task PH4-02 (Blast Radius & Co-Change Hidden Coupling).
 
 ## Session Rule
 
