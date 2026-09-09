@@ -672,4 +672,3 @@ class ComponentBrief:
 
 # Canonical Context Builder alias
 ProjectContextBuilder = CurrentSystemContextBuilder
-

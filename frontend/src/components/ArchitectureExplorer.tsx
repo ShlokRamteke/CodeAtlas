@@ -74,6 +74,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import { EngineeringContextViewer } from "./EngineeringContextViewer";
+import { HistoricalTimelineViewer } from "./HistoricalTimelineViewer";
 
 
 interface ArchitectureExplorerProps {
@@ -364,8 +365,9 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
     "components" | "symbols" | "relationships" | "git_history" | "engineering" | "project_context" | "ingest"
   >("components");
   const [historySubTab, setHistorySubTab] = useState<
-    "commits" | "trace" | "prs" | "issues" | "retrieval"
-  >("commits");
+    "timeline" | "commits" | "trace" | "prs" | "issues" | "retrieval"
+  >("timeline");
+  const [selectedTimelineComponent, setSelectedTimelineComponent] = useState<string>("");
   const [architecture, setArchitecture] = useState<ArchitectureOverview | null>(null);
   const [symbols, setSymbols] = useState<SymbolItem[]>([]);
   const [symbolQuery, setSymbolQuery] = useState("");
@@ -858,6 +860,30 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
                         )}
                       </div>
                     )}
+
+                    {/* Direct Links to Timeline and Context */}
+                    <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between">
+                      <button
+                        onClick={() => {
+                          setSelectedTimelineComponent(comp.path);
+                          setHistorySubTab("timeline");
+                          setActiveTab("git_history");
+                        }}
+                        className="inline-flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 font-medium transition"
+                      >
+                        <History className="w-3.5 h-3.5" />
+                        Evolution Timeline &rarr;
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedContextComp(comp.path);
+                          setActiveTab("project_context");
+                        }}
+                        className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-slate-200 transition"
+                      >
+                        Context &rarr;
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -992,6 +1018,17 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
               {/* Sub-tab Navigation */}
               <div className="flex items-center gap-1.5 p-1 bg-slate-900 border border-slate-800 rounded-lg text-xs">
                 <button
+                  onClick={() => setHistorySubTab("timeline")}
+                  className={`px-3 py-1 rounded-md font-medium transition flex items-center gap-1.5 ${
+                    historySubTab === "timeline"
+                      ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <History className="w-3.5 h-3.5 text-indigo-400" />
+                  Evolution Timeline
+                </button>
+                <button
                   onClick={() => setHistorySubTab("commits")}
                   className={`px-3 py-1 rounded-md font-medium transition flex items-center gap-1.5 ${
                     historySubTab === "commits"
@@ -1049,6 +1086,22 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
               </div>
             </div>
 
+
+            {/* Historical Evolution Timeline Sub-Tab */}
+            {historySubTab === "timeline" && architecture && (
+              <HistoricalTimelineViewer
+                repository={repository}
+                architecture={architecture}
+                initialComponentPath={selectedTimelineComponent}
+                onSelectComponent={(p) => setSelectedTimelineComponent(p)}
+                onNavigateToPR={() => {
+                  setHistorySubTab("prs");
+                }}
+                onNavigateToIssue={() => {
+                  setHistorySubTab("issues");
+                }}
+              />
+            )}
 
             {/* Commits Sub-Tab */}
             {historySubTab === "commits" && (
