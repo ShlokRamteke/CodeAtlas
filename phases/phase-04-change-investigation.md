@@ -43,7 +43,7 @@ Pre-Change Investigation Brief
 ## Tasks
 
 ### 1. Investigation Engine
-- [ ] **PH4-01: Bounded Investigation Engine & Planner**
+- [x] **PH4-01: Bounded Investigation Engine & Planner** *(Completed)*
   - Build bounded LangGraph workflow with strict 1–3 model call limits.
   - Parse change intent (natural language query, diff, or file list) into normalized targets.
 - [ ] **PH4-02: Blast Radius & Co-Change Hidden Coupling**

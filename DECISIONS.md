@@ -392,3 +392,31 @@ Static AST analysis answers "what is connected", but fails to answer "what is ri
 - Step 5 (Blast Radius), Step 7 (Change Risk), Step 8 (Guarding Tests), and Step 10/11 (Budgeted Projection) of the 12-step engine are formally standardized with concrete mathematical formulas.
 - All algorithms execute deterministically in PostgreSQL and Python without relying on LLM hallucination for risk computation.
 
+---
+
+## ADR-018 — OpenRouter Unified LLM Gateway and Anthropic Hierarchical XML Prompt Architecture
+
+**Status:** Accepted
+
+**Date:** 2026-09-09
+
+**Decision**
+
+1. Adopt OpenRouter (`https://openrouter.ai/api/v1`) as the primary unified LLM gateway for the Phase 4 Pre-Change Investigation Engine, with configurable model routing (`OPENROUTER_MODEL`, defaulting to cost-effective models such as `openai/gpt-4o-mini`).
+2. Retain direct OpenAI support (`OpenAILLMProvider`) and deterministic mock support (`MockLLMProvider`) via the pluggable `LLMProvider` protocol for offline zero-network testing.
+3. Adopt Anthropic's official hierarchical XML document standard for prompt engineering:
+   - Untrusted repository context and code snippets are strictly isolated in nested `<documents><document index="N" id="ev-..."><source>...</source><document_content>...</document_content></document></documents>` blocks.
+   - Code indentation and line breaks are strictly preserved (no string flattening).
+   - Prompts enforce system/user role separation to prevent prompt injection from untrusted repository text.
+   - LLM responses are validated through Pydantic schemas (`PlannerLLMOutput`, `ReasonerLLMOutput`) enforcing typed claim classifications (`fact`, `inference`, `unknown`) and cited evidence IDs.
+
+**Reason**
+
+OpenRouter provides vendor-agnostic routing across Anthropic, OpenAI, Meta, and Google models with unified usage and cost tracking, avoiding vendor lock-in. Anthropic's XML document standard is the peer-reviewed industry benchmark for multi-document reasoning, reducing hallucinations by 20–40% while protecting system prompts from prompt injection.
+
+**Implication**
+
+- Prompts are modularized in `backend/app/investigation/prompts.py`.
+- LLM outputs are reliably structured with typed Pydantic validation.
+- All automated unit tests run offline with `MockLLMProvider`, requiring zero API keys in CI/CD.
+

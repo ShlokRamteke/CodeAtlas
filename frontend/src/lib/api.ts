@@ -473,6 +473,43 @@ export async function fetchRepositoryDependencies(
   }
 }
 
+function mapInvestigation(data: any): InvestigationResponse {
+  return {
+    id: data.id,
+    repositoryId: data.repository_id,
+    query: data.query,
+    type: data.type,
+    status: data.status,
+    summary: data.summary || "",
+    answer: data.answer || "",
+    evidence: (data.evidence || []).map((e: any) => ({
+      id: e.id,
+      sourceType: e.source_type,
+      sourceId: e.source_id,
+      title: e.title,
+      snippet: e.snippet,
+      path: e.path,
+      lineStart: e.line_start,
+      lineEnd: e.line_end,
+      confidence: e.confidence ?? 1.0,
+      metadata: e.extra_metadata,
+    })),
+    claims: (data.claims || []).map((c: any) => ({
+      id: c.id,
+      classification: c.classification,
+      statement: c.statement,
+      evidenceIds: c.evidence_ids || [],
+    })),
+    tokenUsage: data.token_usage ? {
+      promptTokens: data.token_usage.prompt_tokens || 0,
+      completionTokens: data.token_usage.completion_tokens || 0,
+      totalTokens: data.token_usage.total_tokens || 0,
+    } : undefined,
+    latencyMs: data.latency_ms,
+    createdAt: data.created_at,
+  };
+}
+
 export async function createInvestigation(
   data: InvestigationRequest
 ): Promise<InvestigationResponse | null> {
@@ -483,10 +520,69 @@ export async function createInvestigation(
       body: JSON.stringify({
         repository_id: data.repositoryId,
         query: data.query,
-        type: data.type || "understand",
+        type: data.type || "before_change",
         target_path: data.targetPath,
         target_symbol: data.targetSymbol,
       }),
+    });
+    if (!res.ok) return null;
+    const raw = await res.json();
+    return mapInvestigation(raw);
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function runInvestigation(
+  investigationId: string,
+  targetPath?: string,
+  targetSymbol?: string
+): Promise<InvestigationResponse | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/investigations/${investigationId}/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        target_path: targetPath,
+        target_symbol: targetSymbol,
+      }),
+    });
+    if (!res.ok) return null;
+    const raw = await res.json();
+    return mapInvestigation(raw);
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function fetchRepositoryInvestigations(
+  repositoryId: string
+): Promise<InvestigationResponse[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/investigations/repository/${repositoryId}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    const list = await res.json();
+    return list.map(mapInvestigation);
+  } catch (error) {
+    return [];
+  }
+}
+
+export async function previewInvestigationIntent(
+  query: string,
+  targetPath?: string,
+  targetSymbol?: string
+): Promise<any | null> {
+  try {
+    const url = new URL(`${API_BASE}/api/v1/investigations/preview-intent`);
+    url.searchParams.set("query", query);
+    if (targetPath) url.searchParams.set("target_path", targetPath);
+    if (targetSymbol) url.searchParams.set("target_symbol", targetSymbol);
+    const res = await fetch(url.toString(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
     });
     if (!res.ok) return null;
     return await res.json();

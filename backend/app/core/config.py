@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     GITHUB_TOKEN: str | None = None
     OPENAI_API_KEY: str | None = None
     OPENAI_MODEL: str = "gpt-4o"
+    OPENROUTER_API_KEY: str | None = None
+    OPENROUTER_MODEL: str = "anthropic/claude-3.5-sonnet"
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
 
     # CORS
     BACKEND_CORS_ORIGINS: Any = [
