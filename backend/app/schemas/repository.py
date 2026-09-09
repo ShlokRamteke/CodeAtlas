@@ -112,6 +112,13 @@ class ContextEntitySchema(BaseModel):
     signature: Optional[str] = None
     line_start: Optional[int] = None
     line_end: Optional[int] = None
+    introducing_commit: Optional[str] = None
+    introducing_date: Optional[str] = None
+    last_modified_commit: Optional[str] = None
+    last_modified_date: Optional[str] = None
+    change_count: int = 0
+    active_authors: List[str] = []
+    related_adrs: List[str] = []
 
 
 class ContextRelationshipSchema(BaseModel):
@@ -140,6 +147,55 @@ class ContextUnknownSchema(BaseModel):
     severity: str = "medium"
 
 
+class ContextHistoricalChangeSchema(BaseModel):
+    commit_hash: str
+    message: str
+    author: str
+    committed_at: str
+    change_type: str = "modified"
+    files_changed: List[str] = []
+    is_introducing: bool = False
+    pr_number: Optional[int] = None
+
+
+class ContextPullRequestSchema(BaseModel):
+    pr_number: int
+    title: str
+    state: str
+    author: str
+    merged_at: Optional[str] = None
+    url: Optional[str] = None
+    linked_issue_numbers: List[int] = []
+
+
+class ContextIssueSchema(BaseModel):
+    issue_number: int
+    title: str
+    state: str
+    author: str
+    closed_at: Optional[str] = None
+    labels: List[str] = []
+    url: Optional[str] = None
+
+
+class ContextDocumentSchema(BaseModel):
+    id: str
+    path: str
+    title: str
+    doc_type: str
+    status: Optional[str] = None
+    deciders: Optional[str] = None
+    summary: Optional[str] = None
+
+
+class ContextDesignConstraintSchema(BaseModel):
+    id: str
+    domain: str
+    constraint_text: str
+    source_doc_path: str
+    priority: str = "MUST"
+
+
 class ProjectContextRead(BaseModel):
     target_type: str
     target_id: str
@@ -151,6 +207,11 @@ class ProjectContextRead(BaseModel):
     relationships: List[ContextRelationshipSchema]
     evidence: List[ContextEvidenceSchema]
     unknowns: List[ContextUnknownSchema]
+    historical_changes: List[ContextHistoricalChangeSchema] = []
+    related_prs: List[ContextPullRequestSchema] = []
+    related_issues: List[ContextIssueSchema] = []
+    documents: List[ContextDocumentSchema] = []
+    design_constraints: List[ContextDesignConstraintSchema] = []
     human_markdown: str
     llm_prompt_context: str
 

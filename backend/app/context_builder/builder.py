@@ -8,8 +8,13 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set
 
 from app.context_builder.project_context import (
+    ContextDesignConstraint,
+    ContextDocument,
     ContextEntity,
     ContextEvidence,
+    ContextHistoricalChange,
+    ContextIssue,
+    ContextPullRequest,
     ContextRelationship,
     ContextUnknown,
     ProjectContext,
@@ -104,6 +109,11 @@ class CurrentSystemContextBuilder:
         dependencies: List[dict],
         relationships: List[dict],
         component_filter: Optional[str] = None,
+        historical_changes: Optional[List[dict]] = None,
+        related_prs: Optional[List[dict]] = None,
+        related_issues: Optional[List[dict]] = None,
+        documents: Optional[List[dict]] = None,
+        design_constraints: Optional[List[dict]] = None,
     ) -> ProjectContext:
         # 1. Filter files if scoped to a specific component or path
         if component_filter:
@@ -152,6 +162,130 @@ class CurrentSystemContextBuilder:
                     line_end=s.get("line_end"),
                 )
             )
+
+        # Enrich Entities with Historical Data & parse history
+        file_entity_map = {e.path: e for e in entities if e.kind == "file"}
+        parsed_historical_changes: List[ContextHistoricalChange] = []
+        if historical_changes:
+            sorted_changes = sorted(
+                historical_changes,
+                key=lambda c: str(c.get("committed_at", "")),
+            )
+            for c in sorted_changes:
+                c_hash = str(c.get("commit_hash", ""))
+                c_msg = str(c.get("message", ""))
+                c_author = str(c.get("author", ""))
+                c_date = str(c.get("committed_at", ""))
+                c_type = str(c.get("change_type", "modified"))
+                c_files = c.get("files_changed") or []
+                c_is_intro = bool(c.get("is_introducing", False))
+                c_pr = c.get("pr_number")
+
+                parsed_historical_changes.append(
+                    ContextHistoricalChange(
+                        commit_hash=c_hash,
+                        message=c_msg,
+                        author=c_author,
+                        committed_at=c_date,
+                        change_type=c_type,
+                        files_changed=c_files,
+                        is_introducing=c_is_intro,
+                        pr_number=c_pr,
+                    )
+                )
+
+                for f_path in c_files:
+                    if f_path in file_entity_map:
+                        f_ent = file_entity_map[f_path]
+                        f_ent.change_count += 1
+                        if c_author and c_author not in f_ent.active_authors:
+                            f_ent.active_authors.append(c_author)
+                        if f_ent.introducing_commit is None or c_type == "added" or c_is_intro:
+                            f_ent.introducing_commit = c_hash
+                            f_ent.introducing_date = c_date
+                        f_ent.last_modified_commit = c_hash
+                        f_ent.last_modified_date = c_date
+
+            parsed_historical_changes.reverse()
+
+        parsed_prs: List[ContextPullRequest] = []
+        if related_prs:
+            for p in related_prs:
+                parsed_prs.append(
+                    ContextPullRequest(
+                        pr_number=int(p.get("pr_number", 0)),
+                        title=str(p.get("title", "")),
+                        state=str(p.get("state", "open")),
+                        author=str(p.get("author", "")),
+                        merged_at=p.get("merged_at"),
+                        url=p.get("url"),
+                        linked_issue_numbers=p.get("linked_issue_numbers") or [],
+                    )
+                )
+
+        parsed_issues: List[ContextIssue] = []
+        if related_issues:
+            for i in related_issues:
+                parsed_issues.append(
+                    ContextIssue(
+                        issue_number=int(i.get("issue_number", 0)),
+                        title=str(i.get("title", "")),
+                        state=str(i.get("state", "open")),
+                        author=str(i.get("author", "")),
+                        closed_at=i.get("closed_at"),
+                        labels=i.get("labels") or [],
+                        url=i.get("url"),
+                    )
+                )
+
+        parsed_docs: List[ContextDocument] = []
+        if documents:
+            for d in documents:
+                d_id = str(d.get("id") or uuid.uuid4())
+                d_path = str(d.get("path", ""))
+                d_title = str(d.get("title", ""))
+                d_type = str(d.get("doc_type", "general"))
+                d_status = d.get("status")
+                d_deciders = d.get("deciders")
+                d_summary = d.get("summary")
+
+                parsed_docs.append(
+                    ContextDocument(
+                        id=d_id,
+                        path=d_path,
+                        title=d_title,
+                        doc_type=d_type,
+                        status=d_status,
+                        deciders=d_deciders,
+                        summary=d_summary,
+                    )
+                )
+
+                if d_type == "adr" and d_title:
+                    for f_ent in file_entity_map.values():
+                        stem = Path(f_ent.path).stem.lower()
+                        if (
+                            (len(stem) > 2 and stem in (d_summary or "").lower())
+                            or (len(stem) > 2 and stem in d_title.lower())
+                            or f_ent.name.lower() in (d_summary or "").lower()
+                            or f_ent.path.lower() in (d_summary or "").lower()
+                            or f_ent.name.lower() in d_title.lower()
+                        ):
+                            if d_title not in f_ent.related_adrs:
+                                f_ent.related_adrs.append(d_title)
+
+        parsed_constraints: List[ContextDesignConstraint] = []
+        if design_constraints:
+            for dc in design_constraints:
+                parsed_constraints.append(
+                    ContextDesignConstraint(
+                        id=str(dc.get("id") or uuid.uuid4()),
+                        domain=str(dc.get("domain", "architecture")),
+                        constraint_text=str(dc.get("constraint_text", "")),
+                        source_doc_path=str(dc.get("source_doc_path", "")),
+                        priority=str(dc.get("priority", "MUST")),
+                    )
+                )
 
         # 3. Build Canonical Relationships
         context_relationships: List[ContextRelationship] = []
@@ -214,6 +348,54 @@ class CurrentSystemContextBuilder:
                         provenance=r.resolution_method,
                     )
                 )
+
+        for c in parsed_historical_changes[:6]:
+            evidence.append(
+                ContextEvidence(
+                    id=str(uuid.uuid4()),
+                    source_path=c.files_changed[0] if c.files_changed else target_name,
+                    kind="git_commit",
+                    content=f"Commit {c.commit_hash[:8]}: {c.message.splitlines()[0] if c.message else ''} (by {c.author} on {c.committed_at[:10] if c.committed_at else ''})",
+                    confidence=1.0,
+                    provenance="git_log",
+                )
+            )
+
+        for p in parsed_prs[:4]:
+            evidence.append(
+                ContextEvidence(
+                    id=str(uuid.uuid4()),
+                    source_path=f"PR #{p.pr_number}",
+                    kind="pull_request",
+                    content=f"PR #{p.pr_number} [{p.state.upper()}]: {p.title} (author: {p.author})",
+                    confidence=1.0,
+                    provenance="github_provenance",
+                )
+            )
+
+        for d in parsed_docs[:4]:
+            evidence.append(
+                ContextEvidence(
+                    id=str(uuid.uuid4()),
+                    source_path=d.path,
+                    kind="architecture_decision" if d.doc_type == "adr" else "engineering_doc",
+                    content=f"{d.title} [{d.status or 'active'}] - {d.summary or d.path}",
+                    confidence=1.0,
+                    provenance="engineering_docs",
+                )
+            )
+
+        for dc in parsed_constraints[:6]:
+            evidence.append(
+                ContextEvidence(
+                    id=str(uuid.uuid4()),
+                    source_path=dc.source_doc_path,
+                    kind="design_constraint",
+                    content=f"[{dc.domain.upper()}] {dc.priority}: {dc.constraint_text}",
+                    confidence=1.0,
+                    provenance="rfc2119_parser",
+                )
+            )
 
         # 5. Detect Unknowns & Uncertainties
         unknowns: List[ContextUnknown] = []
@@ -320,11 +502,29 @@ class CurrentSystemContextBuilder:
             avg_rel_conf = 1.0
         overall_confidence = round(avg_rel_conf, 2)
 
-        # 7. Summary
+        # 7. Multi-Source Provenance & Summary
+        prov_sources = ["tree_sitter_ast"]
+        if parsed_historical_changes:
+            prov_sources.append("git_history")
+        if parsed_prs or parsed_issues:
+            prov_sources.append("github_provenance")
+        if parsed_docs or parsed_constraints:
+            prov_sources.append("engineering_docs")
+        provenance_str = "+".join(prov_sources)
+
         if component_filter:
-            summary = f"Deterministic current-system model for component '{component_filter}' with {len(target_symbols)} symbols and {len(context_relationships)} relationships."
+            summary = (
+                f"Deterministic unified model for component '{component_filter}' with "
+                f"{len(target_symbols)} symbols, {len(context_relationships)} relationships, "
+                f"{len(parsed_historical_changes)} historical commits, and {len(parsed_constraints)} architectural constraints."
+            )
         else:
-            summary = f"Deterministic current-system model for repository '{target_name}' across {len(target_files)} files, {len(target_symbols)} symbols, and {len(context_relationships)} relationship edges."
+            summary = (
+                f"Deterministic unified model for repository '{target_name}' across "
+                f"{len(target_files)} files, {len(target_symbols)} symbols, {len(context_relationships)} relationships, "
+                f"{len(parsed_historical_changes)} historical commits, {len(parsed_prs)} PRs, "
+                f"{len(parsed_docs)} engineering docs, and {len(parsed_constraints)} architectural constraints."
+            )
 
         return ProjectContext(
             target_type=target_type,
@@ -336,7 +536,12 @@ class CurrentSystemContextBuilder:
             evidence=evidence,
             unknowns=unknowns,
             confidence=overall_confidence,
-            provenance="tree_sitter_ast",
+            provenance=provenance_str,
+            historical_changes=parsed_historical_changes,
+            related_prs=parsed_prs,
+            related_issues=parsed_issues,
+            documents=parsed_docs,
+            design_constraints=parsed_constraints,
         )
 
     def build_component_brief(
@@ -463,3 +668,8 @@ class ComponentBrief:
     tests: List[str]
     human_summary: str
     llm_context: str
+
+
+# Canonical Context Builder alias
+ProjectContextBuilder = CurrentSystemContextBuilder
+

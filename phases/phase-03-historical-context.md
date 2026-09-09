@@ -79,7 +79,7 @@ Add non-Git engineering context:
 - [x] Frontend interactive **Engineering Context** tab & `EngineeringContextViewer` component.
 - [x] Output: Unified knowledge consisting of Current System + History + Engineering Context.
 
-### PH3-05 — Enrich ProjectContext
+### PH3-05 — Enrich ProjectContext (Completed)
 Key integration task. Extend the single canonical `ProjectContext` with historical and contextual evidence:
 ```text
 ProjectContext
@@ -92,8 +92,10 @@ ProjectContext
 ├── Documentation (Docs, ADRs, Architectural Invariants)
 └── Evidence (Grounded provenance records)
 ```
-- Attach historical and engineering evidence directly to current-system entities.
-- Do not create a separate, competing `HistoricalContext` model.
+- [x] Attach historical and engineering evidence directly to current-system entities (`introducing_commit`, `change_count`, `active_authors`, `related_adrs`).
+- [x] Integrate multi-source evidence (`git_commit`, `pull_request`, `architecture_decision`, `design_constraint`) into canonical `ProjectContext`.
+- [x] Preserve single canonical `ProjectContext` model with dual human and token-budgeted LLM prompt projections without competing context models.
+- [x] Enriched `GET /api/v1/repositories/{id}/context` endpoint returning unified AST + Git history + PRs + Issues + ADRs + Constraints.
 
 ### PH3-06 — Historical Timeline / Developer View
 Expose the result interactively to the developer:

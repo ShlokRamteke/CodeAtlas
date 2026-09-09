@@ -80,9 +80,8 @@ Core question:
 - **PH3-01 — Git History Indexing** *(Completed)*: Commits, file histories, diff stats, author identities, introducing commit origin detection, and interactive evolution viewer.
 - **PH3-02 — Commit → PR → Issue Linking** *(Completed)*: Deterministic regex reference extraction (`Fixes #123`, `Merge pull request #45`), bidirectional linking models, `HistoricalLinker` provenance traces (`Code -> Commit -> PR -> Issue`), and UI chips.
 - **PH3-03 — Historical Retrieval** *(Completed)*: Deterministic multi-attribute historical search (commits, PRs, issues, symbol timeline) and ranked `HistoricalEvidenceRecord` synthesis without LLMs.
-- **PH3-04 — Engineering Context** *(Completed)*: Markdown/ADR parser, RFC 2119 architectural invariants extraction across 5 domains, `EngineeringContextIndexer`, and frontend viewer.
-- **PH3-05 — Enrich ProjectContext** *(Next)*: Extend the single canonical `ProjectContext` with historical changes, PRs, issues, ADRs, and design constraints, attaching historical evidence directly to current entities.
-- **PH3-06 — Historical Timeline / Developer View**: Interactive component evolution timeline linking each event directly to verified evidence.
+- **PH3-05 — Enrich ProjectContext** *(Completed)*: Extend the single canonical `ProjectContext` with historical changes, PRs, issues, ADRs, and design constraints, attaching historical evidence directly to current entities.
+- **PH3-06 — Historical Timeline / Developer View** *(Next)*: Interactive component evolution timeline linking each event directly to verified evidence.
 
 ### Done when
 Relevant code can be traced into its history and supporting engineering evidence with provenance, without requiring an LLM to establish basic historical facts.
