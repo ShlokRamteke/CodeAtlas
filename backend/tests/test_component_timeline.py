@@ -327,5 +327,7 @@ async def test_root_component_timeline_and_no_fake_adrs(db_session: AsyncSession
     assert len(timeline["top_authors"]) == 2
 
     # 2. General docs MUST NOT be counted as ADRs
-    adr_milestones = [m for m in timeline["milestones"] if m["event_type"] == "architectural_decision"]
+    adr_milestones = [
+        m for m in timeline["milestones"] if m["event_type"] == "architectural_decision"
+    ]
     assert len(adr_milestones) == 0  # 0 fake ADRs!

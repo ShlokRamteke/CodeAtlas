@@ -629,9 +629,13 @@ async def get_repository_context_brief(
     ]
 
     # Fetch Historical & Engineering Enrichments
-    hist_changes, rel_prs, rel_issues, eng_docs, design_constraints = (
-        await _fetch_context_enrichments(db, repository_id, component)
-    )
+    (
+        hist_changes,
+        rel_prs,
+        rel_issues,
+        eng_docs,
+        design_constraints,
+    ) = await _fetch_context_enrichments(db, repository_id, component)
 
     # Construct Canonical ProjectContext
     target_type = "component" if component else "repository"
@@ -810,9 +814,7 @@ async def _fetch_context_enrichments(
     constraints = [
         {
             "id": str(dc.id),
-            "domain": (
-                dc.category.value if hasattr(dc.category, "value") else str(dc.category)
-            ),
+            "domain": (dc.category.value if hasattr(dc.category, "value") else str(dc.category)),
             "constraint_text": dc.statement,
             "source_doc_path": dc.source_path,
             "priority": dc.level.value if hasattr(dc.level, "value") else str(dc.level),
@@ -931,9 +933,13 @@ async def get_repository_context(
     ]
 
     # Fetch Historical & Engineering Context
-    hist_changes, rel_prs, rel_issues, eng_docs, design_constraints = (
-        await _fetch_context_enrichments(db, repository_id, component)
-    )
+    (
+        hist_changes,
+        rel_prs,
+        rel_issues,
+        eng_docs,
+        design_constraints,
+    ) = await _fetch_context_enrichments(db, repository_id, component)
 
     target_type = "component" if component else "repository"
     target_name = component if component else repo.full_name

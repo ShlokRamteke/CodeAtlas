@@ -152,7 +152,9 @@ class ProjectContext:
         # File breakdown with provenance
         file_items = []
         for f in file_entities[:10]:
-            intro_str = f" [introduced in `{f.introducing_commit[:8]}`]" if f.introducing_commit else ""
+            intro_str = (
+                f" [introduced in `{f.introducing_commit[:8]}`]" if f.introducing_commit else ""
+            )
             mod_str = f", {f.change_count} revisions" if f.change_count > 0 else ""
             file_items.append(f"- `{f.path}` ({f.language or 'unknown'}){intro_str}{mod_str}")
         files_md = "\n".join(file_items) or "- *No files indexed*"
@@ -195,7 +197,9 @@ class ProjectContext:
             or "- *No historical commits indexed*"
         )
         if len(self.historical_changes) > 8:
-            history_md += f"\n- *... and {len(self.historical_changes) - 8} more historical commits*"
+            history_md += (
+                f"\n- *... and {len(self.historical_changes) - 8} more historical commits*"
+            )
 
         # PRs and Issues breakdown
         prs_md = (

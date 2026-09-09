@@ -21,6 +21,7 @@ from app.schemas.history import (
     CommitFileChangeRead,
     CommitRead,
     ComponentHistoryResponse,
+    ComponentTimelineResponse,
     FileHistoryResponse,
     HistoricalRetrievalRequest,
     HistoricalRetrievalResponse,
@@ -39,8 +40,6 @@ from app.schemas.history import (
     LinkedPullRequestRead,
     PullRequestRead,
     SymbolHistoryResponse,
-    ComponentMilestoneEvent,
-    ComponentTimelineResponse,
 )
 
 router = APIRouter()

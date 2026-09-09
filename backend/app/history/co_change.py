@@ -118,7 +118,10 @@ def detect_hidden_coupling(
             seen_omitted.add(pair_key)
 
             # Check if there is a static relationship between target and omitted
-            has_static = (target, omitted) in known_static_edges or (omitted, target) in known_static_edges
+            has_static = (target, omitted) in known_static_edges or (
+                omitted,
+                target,
+            ) in known_static_edges
 
             pct = int(partner.frequency * 100)
             if not has_static:

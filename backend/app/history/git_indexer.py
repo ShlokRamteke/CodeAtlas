@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import uuid
 import re
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -381,13 +381,44 @@ class GitHistoryIndexer:
 
             if idx == 0 or (entry["has_added"] and idx <= 1):
                 event_type = "introduction"
-            elif any(kw in msg for kw in ["fix", "bug", "patch", "issue", "resolve", "defect", "error", "crash"]):
+            elif any(
+                kw in msg
+                for kw in ["fix", "bug", "patch", "issue", "resolve", "defect", "error", "crash"]
+            ):
                 event_type = "bug_fix"
-            elif any(kw in msg for kw in ["refactor", "cleanup", "clean up", "reorganize", "restructure", "rewrite", "simplify", "consolidate", "modularize"]):
+            elif any(
+                kw in msg
+                for kw in [
+                    "refactor",
+                    "cleanup",
+                    "clean up",
+                    "reorganize",
+                    "restructure",
+                    "rewrite",
+                    "simplify",
+                    "consolidate",
+                    "modularize",
+                ]
+            ):
                 event_type = "refactor"
-            elif any(kw in msg for kw in ["adr", "rfc", "contract", "spec", "architecture", "migration", "schema"]):
+            elif any(
+                kw in msg
+                for kw in ["adr", "rfc", "contract", "spec", "architecture", "migration", "schema"]
+            ):
                 event_type = "architectural_decision"
-            elif any(kw in msg for kw in ["feat", "feature", "add", "implement", "support", "new", "create", "extend"]) or (ins > 50 and ins > 3 * (dels or 1)):
+            elif any(
+                kw in msg
+                for kw in [
+                    "feat",
+                    "feature",
+                    "add",
+                    "implement",
+                    "support",
+                    "new",
+                    "create",
+                    "extend",
+                ]
+            ) or (ins > 50 and ins > 3 * (dels or 1)):
                 event_type = "feature_addition"
             else:
                 event_type = "maintenance"
@@ -441,8 +472,14 @@ class GitHistoryIndexer:
             else:
                 if clean_comp.lower() in doc_path or clean_comp.lower() in doc_title:
                     matches = True
-                elif comp_name and len(comp_name) >= 3 and comp_name not in ("src", "app", "lib", "test"):
-                    if re.search(rf"\b{re.escape(comp_name)}\b", doc_title) or re.search(rf"\b{re.escape(comp_name)}\b", doc_content):
+                elif (
+                    comp_name
+                    and len(comp_name) >= 3
+                    and comp_name not in ("src", "app", "lib", "test")
+                ):
+                    if re.search(rf"\b{re.escape(comp_name)}\b", doc_title) or re.search(
+                        rf"\b{re.escape(comp_name)}\b", doc_content
+                    ):
                         matches = True
 
             if matches:
@@ -460,13 +497,20 @@ class GitHistoryIndexer:
                     else datetime.now(timezone.utc).isoformat()
                 )
                 raw_title = doc.title
-                milestone_title = raw_title if raw_title.lower().startswith("adr") else f"ADR: {raw_title}"
+                milestone_title = (
+                    raw_title if raw_title.lower().startswith("adr") else f"ADR: {raw_title}"
+                )
                 milestones.append(
                     {
                         "id": f"adr-{doc.id}",
                         "event_type": "architectural_decision",
                         "title": milestone_title,
-                        "summary": doc.summary or (doc.raw_content[:250] if doc.raw_content else "Architecture Decision Record"),
+                        "summary": doc.summary
+                        or (
+                            doc.raw_content[:250]
+                            if doc.raw_content
+                            else "Architecture Decision Record"
+                        ),
                         "timestamp": ts,
                         "author": doc.deciders or "Architecture Decision",
                         "commit_hash": None,

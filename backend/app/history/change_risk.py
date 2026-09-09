@@ -217,14 +217,18 @@ def assess_change_risk(
     # 3. Shannon churn entropy
     if kamei.shannon_entropy > 2.0:
         score += 0.20
-        factors.append(f"High churn entropy ({kamei.shannon_entropy}): change is scattered across unrelated files")
+        factors.append(
+            f"High churn entropy ({kamei.shannon_entropy}): change is scattered across unrelated files"
+        )
     elif kamei.shannon_entropy > 1.0:
         score += 0.10
 
     # 4. Historical defect pressure
     if pressure >= 3.0:
         score += 0.30
-        factors.append(f"Severe historical defect pressure ({pressure:.1f}): target files have frequent prior regressions")
+        factors.append(
+            f"Severe historical defect pressure ({pressure:.1f}): target files have frequent prior regressions"
+        )
     elif pressure >= 1.0:
         score += 0.15
         factors.append(f"Moderate historical defect pressure ({pressure:.1f}) on modified files")

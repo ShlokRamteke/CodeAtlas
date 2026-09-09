@@ -507,7 +507,12 @@ async def test_api_get_repository_context_enriched_integration(client: AsyncClie
                     "author_email": "lead@example.com",
                     "committed_at": "2026-03-01T12:00:00Z",
                     "file_changes": [
-                        {"file_path": "src/payment.ts", "change_type": "added", "insertions": 10, "deletions": 0}
+                        {
+                            "file_path": "src/payment.ts",
+                            "change_type": "added",
+                            "insertions": 10,
+                            "deletions": 0,
+                        }
                     ],
                 }
             ]
@@ -558,4 +563,3 @@ The system MUST NOT persist raw credentials in logs.
     assert len(data["documents"]) >= 1
     assert data["documents"][0]["title"] == "ADR-001: Payment Engine Invariants"
     assert len(data["design_constraints"]) >= 2
-

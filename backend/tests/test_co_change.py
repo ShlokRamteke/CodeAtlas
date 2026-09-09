@@ -62,7 +62,9 @@ def test_detect_hidden_coupling_warning() -> None:
     assert len(warnings) == 2
 
     # Verify credentials.yaml is flagged as Hidden Coupling
-    cred_warning = next(w for w in warnings if w.omitted_partner == "config/payment_credentials.yaml")
+    cred_warning = next(
+        w for w in warnings if w.omitted_partner == "config/payment_credentials.yaml"
+    )
     assert cred_warning.has_static_import is False
     assert "Hidden Coupling" in cred_warning.explanation
     assert cred_warning.frequency == 0.80

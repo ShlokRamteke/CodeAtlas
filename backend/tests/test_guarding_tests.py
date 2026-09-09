@@ -12,7 +12,11 @@ def test_rank_tests_by_reach() -> None:
     # Test suite B covers 1 changed file
     # Test suite C covers 2 changed files
     test_to_covered = {
-        "tests/integration/test_checkout_flow.py": {"src/cart.py", "src/checkout.py", "src/payment.py"},
+        "tests/integration/test_checkout_flow.py": {
+            "src/cart.py",
+            "src/checkout.py",
+            "src/payment.py",
+        },
         "tests/unit/test_cart.py": {"src/cart.py"},
         "tests/integration/test_payment_api.py": {"src/checkout.py", "src/payment.py"},
         "tests/unit/test_user.py": {"src/user.py"},  # touches no changed file

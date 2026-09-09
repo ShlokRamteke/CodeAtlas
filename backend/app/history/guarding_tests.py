@@ -137,7 +137,9 @@ def analyze_guarding_tests(
             test_to_targets.setdefault(t, set()).add(src)
 
     ranked = rank_tests_by_reach(test_to_targets, proposed_files)
-    untested, stale = detect_verification_gaps(proposed_files, file_to_covering_tests, files_in_diff)
+    untested, stale = detect_verification_gaps(
+        proposed_files, file_to_covering_tests, files_in_diff
+    )
 
     return GuardingTestReport(
         ranked_tests=ranked,
