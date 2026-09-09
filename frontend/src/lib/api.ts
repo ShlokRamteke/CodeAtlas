@@ -28,7 +28,7 @@ import type {
   EngineeringContextOverviewResponse,
   ComponentMilestoneEvent,
   ComponentTimelineResponse,
-} from "@archaeologist/contracts";
+} from "@codeatlas/contracts";
 
 
 

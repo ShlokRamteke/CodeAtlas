@@ -1,4 +1,4 @@
-# Project Archaeologist — Roadmap
+# CodeAtlas — Roadmap
 
 ## Product Goal
 
@@ -146,7 +146,7 @@ Expose pre-change investigation capabilities to external AI coding assistants vi
 - `why_does_this_exist(symbol_or_path)`
 
 ### Done when
-External coding agents (Cursor, Claude Desktop, Windsurf) can invoke Project Archaeologist to investigate a proposed change or understand code rationale.
+External coding agents (Cursor, Claude Desktop, Windsurf) can invoke CodeAtlas to investigate a proposed change or understand code rationale.
 
 ---
 

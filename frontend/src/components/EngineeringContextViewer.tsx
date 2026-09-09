@@ -10,7 +10,7 @@ import type {
   ConstraintCategory,
   ADRStatus,
   ConstraintLevel,
-} from "@archaeologist/contracts";
+} from "@codeatlas/contracts";
 import {
   fetchEngineeringOverview,
   fetchEngineeringDocs,

@@ -114,7 +114,7 @@ state authoritative.
 
 **Decision**
 
-Position Project Archaeologist around investigating proposed software changes,
+Position CodeAtlas around investigating proposed software changes,
 with code understanding and software archaeology serving as the underlying
 intelligence layers.
 
@@ -332,7 +332,7 @@ Non-Git engineering context (`README.md`, `ARCHITECTURE.md`, `docs/`, `DECISIONS
 
 **Decision**
 
-Maintain a strict clean-room intellectual property boundary between Project Archaeologist (licensed under permissive MIT) and external copyleft reference codebases (specifically AGPL-3.0 repositories).
+Maintain a strict clean-room intellectual property boundary between CodeAtlas (licensed under permissive MIT) and external copyleft reference codebases (specifically AGPL-3.0 repositories).
 
 Under this policy:
 1. **Zero Source Code Contamination:** No functions, classes, database schemas, prompt templates, or tests may be copied, vendored, transliterated, or dynamically imported from AGPL-3.0 repositories.
@@ -340,16 +340,16 @@ Under this policy:
    - Published peer-reviewed academic algorithms (e.g. Kamei et al. Just-in-Time defect prediction, Shannon entropy of code churn, Louvain/Leiden graph clustering, exponential recency decay).
    - Public industry protocols (e.g. Model Context Protocol JSON-RPC 2.0 specifications, standard Git CLI commands).
    - High-level functional requirements and behavioral heuristics (e.g. flagging co-change partners missing from diffs, ordering test suites by changed file reach).
-3. **Independent Clean Implementation:** All features are designed from scratch and authored independently in Python/FastAPI/PostgreSQL adhering to Project Archaeologist's existing schemas and patterns.
+3. **Independent Clean Implementation:** All features are designed from scratch and authored independently in Python/FastAPI/PostgreSQL adhering to CodeAtlas's existing schemas and patterns.
 4. **Local Repository Quarantine:** Any external reference repositories used for functional study (e.g. in `_references/`) must remain permanently ignored in `.gitignore`, never committed to git, and never packaged in production container images.
 
 **Reason**
 
-Copyleft network services (such as those under AGPL-3.0) enforce strong reciprocal obligations. Under AGPL Section 13, linking, importing, or creating a derivative work from AGPL code would contaminate Project Archaeologist, legally requiring the entire codebase and SaaS platform to be open-sourced under AGPL-3.0. A strict clean-room boundary guarantees Project Archaeologist remains 100% MIT permissive, enabling full commercial flexibility for enterprise SaaS and closed-source customer deployments.
+Copyleft network services (such as those under AGPL-3.0) enforce strong reciprocal obligations. Under AGPL Section 13, linking, importing, or creating a derivative work from AGPL code would contaminate CodeAtlas, legally requiring the entire codebase and SaaS platform to be open-sourced under AGPL-3.0. A strict clean-room boundary guarantees CodeAtlas remains 100% MIT permissive, enabling full commercial flexibility for enterprise SaaS and closed-source customer deployments.
 
 **Implication**
 
-- Project Archaeologist retains its MIT license with zero legal risk.
+- CodeAtlas retains its MIT license with zero legal risk.
 - Algorithmic models are implemented from primary literature (citing academic papers in code docstrings).
 - External clones remain strictly local reference tools on developer workstations.
 

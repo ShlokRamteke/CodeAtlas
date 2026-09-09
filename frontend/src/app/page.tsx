@@ -15,7 +15,7 @@ import {
   CheckCircle2,
   RefreshCw,
 } from "lucide-react";
-import type { HealthResponse, Repository } from "@archaeologist/contracts";
+import type { HealthResponse, Repository } from "@codeatlas/contracts";
 import { fetchHealth, fetchRepositories, connectGitHubRepository, reindexRepository } from "@/lib/api";
 import { ArchitectureExplorer } from "@/components/ArchitectureExplorer";
 
@@ -27,7 +27,7 @@ export default function Home() {
   const [reindexing, setReindexing] = useState(false);
 
   // GitHub Connect state
-  const [githubInput, setGithubInput] = useState("https://github.com/ShlokRamteke/archlogist-prg");
+  const [githubInput, setGithubInput] = useState("https://github.com/ShlokRamteke/CodeAtlas");
   const [connecting, setConnecting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -110,10 +110,10 @@ export default function Home() {
             </div>
             <div>
               <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-                Project Archaeologist
+                CodeAtlas
               </span>
               <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                Phase 2 — Repository Understanding
+                Phase 3 — Historical Context & Evolution
               </span>
             </div>
           </div>
@@ -301,7 +301,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="border-t border-border/60 py-6 text-center text-xs text-muted-foreground">
-        <p>Project Archaeologist &mdash; Architecture, History, Engineering Context, and Bounded Reasoning</p>
+        <p>CodeAtlas &mdash; Architecture, History, Engineering Context, and Bounded Reasoning</p>
       </footer>
     </div>
   );

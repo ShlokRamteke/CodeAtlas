@@ -146,7 +146,7 @@ class GitHubRepoFetcher:
 
         headers = {
             "Authorization": f"Bearer {token}",
-            "User-Agent": "Project-Archaeologist",
+            "User-Agent": "CodeAtlas",
             "Content-Type": "application/json",
         }
 
@@ -252,7 +252,7 @@ class GitHubRepoFetcher:
         # Concurrently fetch commit file changes via GitHub REST
         rest_headers = {
             "Accept": "application/vnd.github+json",
-            "User-Agent": "Project-Archaeologist-Agent",
+            "User-Agent": "CodeAtlas-Agent",
         }
         active_token = github_token or os.getenv("GITHUB_TOKEN")
         if active_token:
@@ -438,7 +438,7 @@ class GitHubRepoFetcher:
         """
         headers = {
             "Accept": "application/vnd.github.v3+json",
-            "User-Agent": "Project-Archaeologist",
+            "User-Agent": "CodeAtlas",
         }
         token = github_token or os.getenv("GITHUB_TOKEN")
         if token:
@@ -529,7 +529,7 @@ class GitHubRepoFetcher:
         # 2. Fallback to GitHub REST API
         headers = {
             "Accept": "application/vnd.github.v3+json",
-            "User-Agent": "Project-Archaeologist",
+            "User-Agent": "CodeAtlas",
         }
         if token:
             headers["Authorization"] = f"Bearer {token}"
@@ -636,7 +636,7 @@ class GitHubRepoFetcher:
 
         headers = {
             "Accept": "application/vnd.github.v3+json",
-            "User-Agent": "Project-Archaeologist",
+            "User-Agent": "CodeAtlas",
         }
         if token:
             headers["Authorization"] = f"Bearer {token}"
@@ -723,7 +723,7 @@ class GitHubRepoFetcher:
 
         headers = {
             "Accept": "application/vnd.github.v3+json",
-            "User-Agent": "Project-Archaeologist",
+            "User-Agent": "CodeAtlas",
         }
         if token:
             headers["Authorization"] = f"Bearer {token}"
@@ -796,7 +796,7 @@ class GitHubRepoFetcher:
         token = github_token or os.getenv("GITHUB_TOKEN")
         headers = {
             "Accept": "application/vnd.github.v3+json",
-            "User-Agent": "Project-Archaeologist",
+            "User-Agent": "CodeAtlas",
         }
         if token:
             headers["Authorization"] = f"Bearer {token}"
@@ -869,7 +869,7 @@ class GitHubRepoFetcher:
         token = github_token or os.getenv("GITHUB_TOKEN")
         headers = {
             "Accept": "application/vnd.github.v3+json",
-            "User-Agent": "Project-Archaeologist",
+            "User-Agent": "CodeAtlas",
         }
         if token:
             headers["Authorization"] = f"Bearer {token}"

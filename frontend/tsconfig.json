@@ -21,7 +21,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@archaeologist/contracts": ["../packages/contracts/src/index.ts"]
+      "@codeatlas/contracts": ["../packages/contracts/src/index.ts"]
     }
 
   },

@@ -12,11 +12,11 @@ web
 - Senior engineers and developers preparing for refactors or modifications who need reliable context on why implementations exist before changing them.
 
 ## Product Purpose
-Project Archaeologist is an AI-powered software intelligence platform that helps developers understand why software became what it is. It reconstructs deep codebase context by uniting current structural architecture (AST, symbols, dependency graphs) with historical provenance (commits, PRs, issues) and engineering context (design decisions, tests). Success means a developer can explore any repository, trace any component back to its origins and driving decisions, and prepare changes with total confidence.
+CodeAtlas is an AI-powered software intelligence platform that helps developers understand why software became what it is. It reconstructs deep codebase context by uniting current structural architecture (AST, symbols, dependency graphs) with historical provenance (commits, PRs, issues) and engineering context (design decisions, tests). Success means a developer can explore any repository, trace any component back to its origins and driving decisions, and prepare changes with total confidence.
 
 ## Positioning
 "Your code tells you what. We tell you why."
-Unlike generic codebase chat, code search tools, or basic Git history viewers, Project Archaeologist deterministically connects current system structure to the historical and engineering context that explains why it was built that way.
+Unlike generic codebase chat, code search tools, or basic Git history viewers, CodeAtlas deterministically connects current system structure to the historical and engineering context that explains why it was built that way.
 
 ## Operating Context
 - Web dashboard and interactive visual explorer connected to GitHub repositories.
@@ -27,7 +27,7 @@ Unlike generic codebase chat, code search tools, or basic Git history viewers, P
 - Capabilities:
   - Architecture Explorer: AST parsing, symbol extraction, dependency graph, and uncertainty detection.
   - Historical Traceability: Commit, PR, and Issue cross-referencing, origin commit discovery, and multi-tier provenance traces.
-  - Ask the Archaeologist & Why Does This Exist?: Evidence-backed answers to architectural and historical questions.
+  - Change Investigation & Why Does This Exist?: Evidence-backed answers to architectural and historical questions.
   - Unified Context: Deterministic ProjectContext shared across human visualization and AI reasoning pipelines.
 - Constraints:
   - Read-only GitHub access for MVP (no autonomous code modification or PR generation).
@@ -35,7 +35,7 @@ Unlike generic codebase chat, code search tools, or basic Git history viewers, P
   - Secret scanning and repository tenant isolation.
 
 ## Brand Commitments
-- Name: Project Archaeologist / Archaeologist
+- Name: CodeAtlas
 - Brand Personality & Visual Tone: Modern enterprise SaaS — clean, minimal, polished dashboard with high-density data visualization and refined analytics aesthetic.
 - Narrative Hook: "Your code tells you what. We tell you why."
 

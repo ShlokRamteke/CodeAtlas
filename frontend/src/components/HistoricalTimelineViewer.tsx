@@ -30,7 +30,7 @@ import type {
   ArchitectureOverview,
   ComponentMilestoneEvent,
   ComponentTimelineResponse,
-} from "@archaeologist/contracts";
+} from "@codeatlas/contracts";
 import { fetchComponentTimeline } from "@/lib/api";
 
 interface HistoricalTimelineViewerProps {

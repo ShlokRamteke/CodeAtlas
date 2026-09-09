@@ -14,7 +14,7 @@ import type {
   HistoricalTraceResponse,
   HistoricalEvidenceRecord,
   SymbolHistoryResponse,
-} from "@archaeologist/contracts";
+} from "@codeatlas/contracts";
 import {
   fetchRepositoryArchitecture,
   fetchRepositorySymbols,

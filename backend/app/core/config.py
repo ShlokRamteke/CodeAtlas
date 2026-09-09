@@ -13,7 +13,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    PROJECT_NAME: str = "Project Archaeologist"
+    PROJECT_NAME: str = "CodeAtlas"
     VERSION: str = "0.1.0"
     API_V1_STR: str = "/api/v1"
     ENVIRONMENT: str = "development"
@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = "postgres"
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
-    POSTGRES_DB: str = "archaeologist"
+    POSTGRES_DB: str = "codeatlas"
     DATABASE_URL: str | None = None
 
     # External APIs & Authentication

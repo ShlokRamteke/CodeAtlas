@@ -1,27 +1,27 @@
 services:
   postgres:
     image: docker.io/pgvector/pgvector:pg16
-    container_name: archaeologist-postgres
+    container_name: codeatlas-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-archaeologist}
+      POSTGRES_DB: ${POSTGRES_DB:-codeatlas}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data:Z
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-archaeologist}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-codeatlas}"]
       interval: 5s
       timeout: 5s
       retries: 5
     networks:
-      - archaeologist-network
+      - codeatlas-network
 
   adminer:
     image: docker.io/library/adminer:latest
-    container_name: archaeologist-adminer
+    container_name: codeatlas-adminer
     restart: unless-stopped
     ports:
       - "8080:8080"
@@ -29,17 +29,17 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - archaeologist-network
+      - codeatlas-network
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: archaeologist-backend
+    container_name: codeatlas-backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-archaeologist}"
-      PROJECT_NAME: "Project Archaeologist API"
+      DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-codeatlas}"
+      PROJECT_NAME: "CodeAtlas API"
       VERSION: "0.1.0"
       API_V1_STR: "/api/v1"
       BACKEND_CORS_ORIGINS: '["http://localhost:3000", "http://127.0.0.1:3000"]'
@@ -53,13 +53,13 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - archaeologist-network
+      - codeatlas-network
 
   frontend:
     build:
       context: .
       dockerfile: frontend/Dockerfile
-    container_name: archaeologist-frontend
+    container_name: codeatlas-frontend
     restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_URL: "http://localhost:8000"
@@ -78,11 +78,11 @@ services:
 
       - backend
     networks:
-      - archaeologist-network
+      - codeatlas-network
 
 volumes:
   postgres_data:
 
 networks:
-  archaeologist-network:
+  codeatlas-network:
     driver: bridge

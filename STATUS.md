@@ -14,7 +14,7 @@ PHASE 3 COMPLETE / READY FOR PHASE 4
 
 ## Product Focus
 
-Project Archaeologist is centered on **Pre-Change Investigation**. The product
+CodeAtlas is centered on **Pre-Change Investigation**. The product
 uses current code, relationships, history, and engineering evidence to help a
 developer understand a proposed change before implementation.
 
@@ -24,7 +24,7 @@ developer understand a proposed change before implementation.
 - **Phase 2 — Repository Understanding**: Complete current-system layer (Tree-sitter AST, relationships, Context Builder, canonical `ProjectContext`).
 - **Clean-Room Reference Architecture & Licensing Assessment**:
   - Analyzed external reference architecture in an isolated, untracked local quarantine (`_references/` in `.gitignore`).
-  - Formulated **ADR-016 (Clean-Room Intellectual Property Boundary & Licensing Policy)**: Enforced strict clean-room isolation against AGPL-3.0 contamination, guaranteeing Project Archaeologist remains 100% MIT permissive with zero code, schema, prompt, or test copying.
+  - Formulated **ADR-016 (Clean-Room Intellectual Property Boundary & Licensing Policy)**: Enforced strict clean-room isolation against AGPL-3.0 contamination, guaranteeing CodeAtlas remains 100% MIT permissive with zero code, schema, prompt, or test copying.
   - Formulated **ADR-017 (Quantitative Change Risk, Historical Co-Change, and Guarding Test Reachability)**: Adopted published peer-reviewed algorithms (Kamei et al. Just-in-Time defect prediction with Shannon churn entropy, historical co-change hidden coupling detection, reach-ranked guarding test signals, and token-budgeted output distillation).
   - Implemented and verified clean-room algorithms in `app.history.change_risk`, `app.history.co_change`, and `app.history.guarding_tests`.
   - 100% automated test pass rate across 52 unit/integration tests (11 new tests added covering Kamei metrics, Shannon entropy, defect pressure decay, co-change partner mining, hidden coupling warnings, reach ranking, untested changes, and stale test detection).
@@ -63,17 +63,17 @@ developer understand a proposed change before implementation.
   - Integrated multi-source evidence records (`git_commit`, `pull_request`, `architecture_decision`, `design_constraint`) with composite provenance strings (`tree_sitter_ast+git_history+github_provenance+engineering_docs`).
   - Dual token-budgeted projections: comprehensive human markdown briefing and compact, high-signal LLM prompt briefing under strict token limits.
   - Enriched `GET /api/v1/repositories/{id}/context` and `GET /api/v1/repositories/{id}/context-brief` endpoints to query and hydrate historical commits, PRs, issues, ADRs, and architectural constraints.
-  - Aligned `@archaeologist/contracts` and frontend API client types with the enriched canonical model.
+  - Aligned `@codeatlas/contracts` and frontend API client types with the enriched canonical model.
   - 100% automated test pass rate across 54 pytest tests (including new unit and integration tests for enriched `ProjectContext`), clean contracts compilation, and clean Next.js frontend production build.
 - **Phase 3 — Task PH3-06 (Historical Timeline / Developer View)**:
   - Implemented component evolution milestone classifier in `GitHistoryIndexer.get_component_timeline`: categorizes component changes into `introduction`, `feature_addition`, `refactor`, `bug_fix`, `architectural_decision`, and `maintenance`.
   - Connected engineering context: automatically discovers and weaves relevant ADRs (`EngineeringDocument`) into the component timeline alongside Git commits.
   - Traceability linkage: populated linked PRs (`pull_request_links`), linked Issues (`issue_links`), and verified citation strings for every milestone event.
   - REST endpoint: `GET /api/v1/repositories/{repository_id}/components/{component_path:path}/timeline` returning structured `ComponentTimelineResponse`.
-  - Contracts & API Client: defined `ComponentMilestoneEvent` and `ComponentTimelineResponse` in `@archaeologist/contracts` and implemented `fetchComponentTimeline` in `frontend/src/lib/api.ts`.
+  - Contracts & API Client: defined `ComponentMilestoneEvent` and `ComponentTimelineResponse` in `@codeatlas/contracts` and implemented `fetchComponentTimeline` in `frontend/src/lib/api.ts`.
   - Frontend interactive UI: created `HistoricalTimelineViewer` component with component selector, milestone category filter chips, search filtering, diff badges, expandable descriptions, and direct evidence chips.
   - Architecture Explorer integration: added "Evolution Timeline" subtab in Git History explorer and added "Evolution Timeline" 1-click shortcut buttons on every component card in the Architecture Explorer.
-  - 100% automated test pass rate across 56 pytest tests, clean contracts build, and clean Next.js production build.
+  - 100% automated test pass rate across 57 pytest tests, clean contracts build, and clean Next.js production build.
 
 ## Remaining
 
