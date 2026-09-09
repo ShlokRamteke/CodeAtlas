@@ -97,11 +97,11 @@ ProjectContext
 - [x] Preserve single canonical `ProjectContext` model with dual human and token-budgeted LLM prompt projections without competing context models.
 - [x] Enriched `GET /api/v1/repositories/{id}/context` endpoint returning unified AST + Git history + PRs + Issues + ADRs + Constraints.
 
-### PH3-06 — Historical Timeline / Developer View
+### PH3-06 — Historical Timeline / Developer View (Completed)
 Expose the result interactively to the developer:
-- Interactive timeline showing component milestones (e.g. Introduction &rarr; Feature additions &rarr; Refactors).
-- Every event links directly to evidence (commits, PRs, issues, ADRs).
-- Full interactive UI view on Next.js frontend.
+- [x] Interactive timeline showing component milestones (e.g. Introduction &rarr; Feature additions &rarr; Refactors &rarr; Bug fixes &rarr; Architecture Decisions).
+- [x] Every event links directly to evidence (commits, PRs, issues, ADRs) with verified citations.
+- [x] Full interactive UI view on Next.js frontend (`HistoricalTimelineViewer`) integrated into Architecture Explorer and Git History.
 
 ---
 

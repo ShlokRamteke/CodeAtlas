@@ -237,3 +237,30 @@ class SymbolHistoryResponse(BaseModel):
     linked_pull_requests: List[Dict[str, Any]] = []
     linked_issues: List[Dict[str, Any]] = []
     evolution_timeline: List[Dict[str, Any]] = []
+
+
+class ComponentMilestoneEvent(BaseModel):
+    id: str
+    event_type: str  # 'introduction' | 'feature_addition' | 'refactor' | 'bug_fix' | 'architectural_decision' | 'maintenance'
+    title: str
+    summary: str
+    timestamp: str
+    author: Optional[str] = None
+    commit_hash: Optional[str] = None
+    insertions: Optional[int] = None
+    deletions: Optional[int] = None
+    files_changed: Optional[int] = None
+    linked_pull_requests: List[Dict[str, Any]] = []
+    linked_issues: List[Dict[str, Any]] = []
+    linked_adrs: List[Dict[str, Any]] = []
+    citations: List[str] = []
+
+
+class ComponentTimelineResponse(BaseModel):
+    repository_id: uuid.UUID
+    component_path: str
+    total_events: int
+    introducing_event: Optional[ComponentMilestoneEvent] = None
+    milestones: List[ComponentMilestoneEvent] = []
+    summary: str
+    top_authors: List[Dict[str, Any]] = []

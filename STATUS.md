@@ -2,15 +2,15 @@
 
 ## Current Phase
 
-Phase 3 — Historical + Engineering Context
+Phase 3 — Historical + Engineering Context (Completed) &mdash; Next: Phase 4 (Change Investigation Engine)
 
 ## Current Task
 
-PH3-05 Complete &mdash; Next: PH3-06 (Historical Timeline / Developer View)
+PH3-06 Complete &mdash; Phase 3 Complete &mdash; Next: Phase 4 (Change Investigation Engine)
 
 ## Status
 
-IN PROGRESS
+PHASE 3 COMPLETE / READY FOR PHASE 4
 
 ## Product Focus
 
@@ -65,10 +65,19 @@ developer understand a proposed change before implementation.
   - Enriched `GET /api/v1/repositories/{id}/context` and `GET /api/v1/repositories/{id}/context-brief` endpoints to query and hydrate historical commits, PRs, issues, ADRs, and architectural constraints.
   - Aligned `@archaeologist/contracts` and frontend API client types with the enriched canonical model.
   - 100% automated test pass rate across 54 pytest tests (including new unit and integration tests for enriched `ProjectContext`), clean contracts compilation, and clean Next.js frontend production build.
+- **Phase 3 — Task PH3-06 (Historical Timeline / Developer View)**:
+  - Implemented component evolution milestone classifier in `GitHistoryIndexer.get_component_timeline`: categorizes component changes into `introduction`, `feature_addition`, `refactor`, `bug_fix`, `architectural_decision`, and `maintenance`.
+  - Connected engineering context: automatically discovers and weaves relevant ADRs (`EngineeringDocument`) into the component timeline alongside Git commits.
+  - Traceability linkage: populated linked PRs (`pull_request_links`), linked Issues (`issue_links`), and verified citation strings for every milestone event.
+  - REST endpoint: `GET /api/v1/repositories/{repository_id}/components/{component_path:path}/timeline` returning structured `ComponentTimelineResponse`.
+  - Contracts & API Client: defined `ComponentMilestoneEvent` and `ComponentTimelineResponse` in `@archaeologist/contracts` and implemented `fetchComponentTimeline` in `frontend/src/lib/api.ts`.
+  - Frontend interactive UI: created `HistoricalTimelineViewer` component with component selector, milestone category filter chips, search filtering, diff badges, expandable descriptions, and direct evidence chips.
+  - Architecture Explorer integration: added "Evolution Timeline" subtab in Git History explorer and added "Evolution Timeline" 1-click shortcut buttons on every component card in the Architecture Explorer.
+  - 100% automated test pass rate across 56 pytest tests, clean contracts build, and clean Next.js production build.
 
 ## Remaining
 
-- **PH3-06**: Historical Timeline / Developer View
+- **Phase 4**: Change Investigation Engine (Pre-Change Investigation Planner, Bounded LangGraph reasoning, Blast-radius & Co-change signals, Pre-Change Investigation Brief).
 
 ## Blockers
 
@@ -76,7 +85,7 @@ None known.
 
 ## Next Action
 
-Start Task PH3-06: Historical Timeline / Developer View (interactive timeline showing component milestones, linking directly to evidence records across commits, PRs, issues, ADRs in Next.js UI).
+Start Phase 4 (Change Investigation Engine) &mdash; Task PH4-01.
 
 ## Session Rule
 

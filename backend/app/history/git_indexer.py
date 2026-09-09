@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import uuid
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.commit import Commit
 from app.models.commit_file_change import ChangeType, CommitFileChange
+from app.models.engineering_doc import EngineeringDocType, EngineeringDocument
 
 
 @dataclass
@@ -209,6 +211,22 @@ class GitHistoryIndexer:
             authors=authors_list,
         )
 
+    @staticmethod
+    def _build_component_file_clause(component_path: str):
+        """Construct SQL filter matching files in the given component path, handling 'root' correctly."""
+        clean = (component_path or "").strip()
+        if clean in ("root", "root/", ".", "./", ""):
+            return or_(
+                CommitFileChange.file_path.notlike("%/%"),
+                CommitFileChange.file_path.startswith("root/"),
+            )
+        norm = clean.rstrip("/")
+        return or_(
+            CommitFileChange.file_path == norm,
+            CommitFileChange.file_path.startswith(norm + "/"),
+            CommitFileChange.file_path.startswith(clean),
+        )
+
     async def get_component_history(
         self,
         repository_id: uuid.UUID,
@@ -216,12 +234,13 @@ class GitHistoryIndexer:
         db: AsyncSession,
     ) -> Dict[str, Any]:
         """Retrieve aggregated commit history touching any file in component_path."""
+        file_clause = self._build_component_file_clause(component_path)
         stmt = (
             select(Commit, CommitFileChange)
             .join(CommitFileChange, Commit.id == CommitFileChange.commit_id)
             .where(
                 Commit.repository_id == repository_id,
-                CommitFileChange.file_path.startswith(component_path),
+                file_clause,
             )
             .order_by(Commit.committed_at.desc())
         )
@@ -284,6 +303,205 @@ class GitHistoryIndexer:
                 {"path": k, "modifications": v}
                 for k, v in sorted(files_touched.items(), key=lambda x: x[1], reverse=True)
             ],
+        }
+
+    async def get_component_timeline(
+        self,
+        repository_id: uuid.UUID,
+        component_path: str,
+        db: AsyncSession,
+    ) -> Dict[str, Any]:
+        """
+        Build an interactive component evolution timeline with classified milestones
+        (introduction, feature_addition, refactor, bug_fix, architectural_decision, maintenance)
+        and linked evidence across commits, PRs, issues, and ADRs.
+        """
+        file_clause = self._build_component_file_clause(component_path)
+        stmt = (
+            select(Commit, CommitFileChange)
+            .join(CommitFileChange, Commit.id == CommitFileChange.commit_id)
+            .where(
+                Commit.repository_id == repository_id,
+                file_clause,
+            )
+            .order_by(Commit.committed_at.asc())
+        )
+        rows = (await db.execute(stmt)).all()
+
+        # Group file changes by commit
+        commits_map: Dict[uuid.UUID, Dict[str, Any]] = {}
+        for commit, change in rows:
+            if commit.id not in commits_map:
+                linked_prs = [
+                    {
+                        "pr_number": pl.pr_number,
+                        "link_type": pl.link_type,
+                        "raw_reference": pl.raw_reference,
+                    }
+                    for pl in getattr(commit, "pull_request_links", [])
+                ]
+                linked_issues = [
+                    {
+                        "issue_number": il.issue_number,
+                        "link_type": il.link_type,
+                        "raw_reference": il.raw_reference,
+                    }
+                    for il in getattr(commit, "issue_links", [])
+                ]
+                commits_map[commit.id] = {
+                    "commit": commit,
+                    "insertions": 0,
+                    "deletions": 0,
+                    "files_changed": 0,
+                    "has_added": False,
+                    "linked_prs": linked_prs,
+                    "linked_issues": linked_issues,
+                }
+
+            commits_map[commit.id]["insertions"] += change.insertions or 0
+            commits_map[commit.id]["deletions"] += change.deletions or 0
+            commits_map[commit.id]["files_changed"] += 1
+            if change.change_type == ChangeType.ADDED:
+                commits_map[commit.id]["has_added"] = True
+
+        authors_map: Dict[str, int] = {}
+        milestones: List[Dict[str, Any]] = []
+
+        # Classify commit milestones
+        sorted_commits = list(commits_map.values())
+        for idx, entry in enumerate(sorted_commits):
+            c: Commit = entry["commit"]
+            msg = (c.message or "").lower()
+            first_line = c.message.splitlines()[0] if c.message else "Commit"
+            ins = entry["insertions"]
+            dels = entry["deletions"]
+
+            author_name = c.author_name or "Unknown"
+            authors_map[author_name] = authors_map.get(author_name, 0) + 1
+
+            if idx == 0 or (entry["has_added"] and idx <= 1):
+                event_type = "introduction"
+            elif any(kw in msg for kw in ["fix", "bug", "patch", "issue", "resolve", "defect", "error", "crash"]):
+                event_type = "bug_fix"
+            elif any(kw in msg for kw in ["refactor", "cleanup", "clean up", "reorganize", "restructure", "rewrite", "simplify", "consolidate", "modularize"]):
+                event_type = "refactor"
+            elif any(kw in msg for kw in ["adr", "rfc", "contract", "spec", "architecture", "migration", "schema"]):
+                event_type = "architectural_decision"
+            elif any(kw in msg for kw in ["feat", "feature", "add", "implement", "support", "new", "create", "extend"]) or (ins > 50 and ins > 3 * (dels or 1)):
+                event_type = "feature_addition"
+            else:
+                event_type = "maintenance"
+
+            citations = [f"git:commit:{c.commit_hash[:7]}"]
+            for pr in entry["linked_prs"]:
+                citations.append(f"github:pr:{pr['pr_number']}")
+            for iss in entry["linked_issues"]:
+                citations.append(f"github:issue:{iss['issue_number']}")
+
+            milestones.append(
+                {
+                    "id": c.commit_hash,
+                    "event_type": event_type,
+                    "title": first_line,
+                    "summary": c.message or "",
+                    "timestamp": c.committed_at.isoformat(),
+                    "author": author_name,
+                    "commit_hash": c.commit_hash,
+                    "insertions": ins,
+                    "deletions": dels,
+                    "files_changed": entry["files_changed"],
+                    "linked_pull_requests": entry["linked_prs"],
+                    "linked_issues": entry["linked_issues"],
+                    "linked_adrs": [],
+                    "citations": citations,
+                }
+            )
+
+        # Query ONLY actual Architecture Decision Records (ADRs) to avoid false categorization of general markdown docs
+        doc_stmt = select(EngineeringDocument).where(
+            EngineeringDocument.repository_id == repository_id,
+            EngineeringDocument.doc_type == EngineeringDocType.ADR,
+        )
+        docs = (await db.execute(doc_stmt)).scalars().all()
+
+        linked_adrs_count = 0
+        clean_comp = (component_path or "").strip().rstrip("/")
+        is_root = clean_comp in ("root", ".", "")
+        comp_name = clean_comp.split("/")[-1].lower() if clean_comp else ""
+
+        for doc in docs:
+            doc_content = (doc.raw_content or "").lower()
+            doc_title = (doc.title or "").lower()
+            doc_path = (doc.path or "").lower()
+
+            matches = False
+            if is_root:
+                # For root, include repo-level architectural decisions
+                matches = True
+            else:
+                if clean_comp.lower() in doc_path or clean_comp.lower() in doc_title:
+                    matches = True
+                elif comp_name and len(comp_name) >= 3 and comp_name not in ("src", "app", "lib", "test"):
+                    if re.search(rf"\b{re.escape(comp_name)}\b", doc_title) or re.search(rf"\b{re.escape(comp_name)}\b", doc_content):
+                        matches = True
+
+            if matches:
+                linked_adrs_count += 1
+                adr_dict = {
+                    "id": str(doc.id),
+                    "title": doc.title,
+                    "path": doc.path,
+                    "status": doc.status.value if hasattr(doc.status, "value") else str(doc.status),
+                    "deciders": doc.deciders,
+                }
+                ts = (
+                    doc.created_at.isoformat()
+                    if doc.created_at
+                    else datetime.now(timezone.utc).isoformat()
+                )
+                raw_title = doc.title
+                milestone_title = raw_title if raw_title.lower().startswith("adr") else f"ADR: {raw_title}"
+                milestones.append(
+                    {
+                        "id": f"adr-{doc.id}",
+                        "event_type": "architectural_decision",
+                        "title": milestone_title,
+                        "summary": doc.summary or (doc.raw_content[:250] if doc.raw_content else "Architecture Decision Record"),
+                        "timestamp": ts,
+                        "author": doc.deciders or "Architecture Decision",
+                        "commit_hash": None,
+                        "insertions": None,
+                        "deletions": None,
+                        "files_changed": None,
+                        "linked_pull_requests": [],
+                        "linked_issues": [],
+                        "linked_adrs": [adr_dict],
+                        "citations": [f"doc:adr:{doc.path}"],
+                    }
+                )
+
+        # Sort combined milestones chronologically by timestamp
+        milestones.sort(key=lambda m: m["timestamp"])
+
+        introducing_event = milestones[0] if milestones else None
+        top_authors = [
+            {"name": k, "commits": v}
+            for k, v in sorted(authors_map.items(), key=lambda x: x[1], reverse=True)
+        ]
+
+        summary = (
+            f"Component '{component_path}' evolution timeline with {len(milestones)} milestones "
+            f"across {len(sorted_commits)} commits and {linked_adrs_count} ADRs by {len(top_authors)} authors."
+        )
+
+        return {
+            "repository_id": repository_id,
+            "component_path": component_path,
+            "total_events": len(milestones),
+            "introducing_event": introducing_event,
+            "milestones": milestones,
+            "summary": summary,
+            "top_authors": top_authors,
         }
 
     @staticmethod

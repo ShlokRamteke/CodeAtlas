@@ -39,6 +39,8 @@ from app.schemas.history import (
     LinkedPullRequestRead,
     PullRequestRead,
     SymbolHistoryResponse,
+    ComponentMilestoneEvent,
+    ComponentTimelineResponse,
 )
 
 router = APIRouter()
@@ -344,6 +346,36 @@ async def get_component_history(
         commits=result["commits"],
         top_authors=result["top_authors"],
         files_touched=result["files_touched"],
+    )
+
+
+@router.get(
+    "/{repository_id}/components/{component_path:path}/timeline",
+    response_model=ComponentTimelineResponse,
+)
+async def get_component_timeline(
+    repository_id: uuid.UUID,
+    component_path: str,
+    db: AsyncSession = Depends(get_db),
+) -> ComponentTimelineResponse:
+    """Retrieve structured chronological evolution timeline with classified milestones and evidence for a component."""
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Repository not found",
+        )
+
+    indexer = GitHistoryIndexer()
+    result = await indexer.get_component_timeline(repository_id, component_path, db)
+    return ComponentTimelineResponse(
+        repository_id=result["repository_id"],
+        component_path=result["component_path"],
+        total_events=result["total_events"],
+        introducing_event=result["introducing_event"],
+        milestones=result["milestones"],
+        summary=result["summary"],
+        top_authors=result["top_authors"],
     )
 
 

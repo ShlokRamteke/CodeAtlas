@@ -326,6 +326,48 @@ export interface ComponentHistoryResponse {
   commits: Array<Record<string, any>>;
   topAuthors: Array<{ name: string; commits: number }>;
   filesTouched: Array<{ path: string; modifications: number }>;
+  evolutionTimeline?: ComponentMilestoneEvent[];
+}
+
+export interface ComponentMilestoneEvent {
+  id: string;
+  eventType: 'introduction' | 'feature_addition' | 'refactor' | 'bug_fix' | 'architectural_decision' | 'maintenance';
+  title: string;
+  summary: string;
+  timestamp: string;
+  author?: string | null;
+  commitHash?: string | null;
+  insertions?: number | null;
+  deletions?: number | null;
+  filesChanged?: number | null;
+  linkedPullRequests?: Array<{
+    pr_number: number;
+    link_type: string;
+    raw_reference?: string;
+  }>;
+  linkedIssues?: Array<{
+    issue_number: number;
+    link_type: string;
+    raw_reference?: string;
+  }>;
+  linkedAdrs?: Array<{
+    id: string;
+    title: string;
+    path: string;
+    status: string;
+    deciders?: string | null;
+  }>;
+  citations?: string[];
+}
+
+export interface ComponentTimelineResponse {
+  repositoryId: string;
+  componentPath: string;
+  totalEvents: number;
+  introducingEvent?: ComponentMilestoneEvent | null;
+  milestones: ComponentMilestoneEvent[];
+  summary: string;
+  topAuthors: Array<{ name: string; commits: number }>;
 }
 
 export interface HistoricalTraceItem {

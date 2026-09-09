@@ -26,6 +26,8 @@ import type {
   ADRItem,
   EngineeringSearchResponse,
   EngineeringContextOverviewResponse,
+  ComponentMilestoneEvent,
+  ComponentTimelineResponse,
 } from "@archaeologist/contracts";
 
 
@@ -700,6 +702,53 @@ export async function fetchComponentHistory(
     );
     if (!res.ok) return null;
     return await res.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+function mapMilestoneEvent(m: any): ComponentMilestoneEvent {
+  return {
+    id: m.id,
+    eventType: m.event_type || m.eventType,
+    title: m.title,
+    summary: m.summary,
+    timestamp: m.timestamp,
+    author: m.author,
+    commitHash: m.commit_hash || m.commitHash,
+    insertions: m.insertions,
+    deletions: m.deletions,
+    filesChanged: m.files_changed || m.filesChanged,
+    linkedPullRequests: m.linked_pull_requests || m.linkedPullRequests || [],
+    linkedIssues: m.linked_issues || m.linkedIssues || [],
+    linkedAdrs: m.linked_adrs || m.linkedAdrs || [],
+    citations: m.citations || [],
+  };
+}
+
+export async function fetchComponentTimeline(
+  repositoryId: string,
+  componentPath: string
+): Promise<ComponentTimelineResponse | null> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/v1/repositories/${repositoryId}/components/${encodeURIComponent(componentPath)}/timeline`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      repositoryId: data.repository_id || data.repositoryId,
+      componentPath: data.component_path || data.componentPath,
+      totalEvents: data.total_events || data.totalEvents || 0,
+      introducingEvent: data.introducing_event ? mapMilestoneEvent(data.introducing_event) : null,
+      milestones: (data.milestones || []).map(mapMilestoneEvent),
+      summary: data.summary || "",
+      topAuthors: (data.top_authors || data.topAuthors || []).map((a: any) => ({
+        name: a.name,
+        commits: a.commits,
+      })),
+    };
   } catch (error) {
     return null;
   }
