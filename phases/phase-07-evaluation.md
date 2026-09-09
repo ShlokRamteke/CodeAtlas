@@ -2,7 +2,7 @@
 
 ## Goal
 
-Measure whether Project Archaeologist reliably improves pre-change understanding, validate investigation accuracy and groundedness, and harden the system for production use.
+Measure whether CodeAtlas reliably improves pre-change understanding, validate investigation accuracy and groundedness, and harden the system for production use.
 
 ## Prerequisites
 

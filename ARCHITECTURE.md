@@ -1,4 +1,4 @@
-# Project Archaeologist — Architecture
+# CodeAtlas — Architecture
 
 ## 1. System Goal
 
@@ -442,22 +442,22 @@ Measure whether the system improves pre-change understanding:
 
 ## 20. Containerization & Deployment Stack
 
-Project Archaeologist runs as an orchestrated multi-container architecture via Podman / Docker Compose (`compose.yaml` / `podman-compose.yml`):
+CodeAtlas runs as an orchestrated multi-container architecture via Podman / Docker Compose (`compose.yaml` / `podman-compose.yml`):
 
 ```text
 podman compose up -d (or make up)
        │
-       ├── archaeologist-postgres  (Port 5432: PostgreSQL 16 + pgvector, persistent volume)
+       ├── codeatlas-postgres  (Port 5432: PostgreSQL 16 + pgvector, persistent volume)
        │      ▲
-       │      │ Internal Bridge Network (archaeologist-network)
+       │      │ Internal Bridge Network (codeatlas-network)
        │      ▼
-       ├── archaeologist-backend   (Port 8000: FastAPI + Tree-sitter, auto-Alembic migration entrypoint)
+       ├── codeatlas-backend   (Port 8000: FastAPI + Tree-sitter, auto-Alembic migration entrypoint)
        │      ▲
        │      │ CORS HTTP
        │      ▼
-       ├── archaeologist-frontend  (Port 3000: Next.js 14 App Router + Bun)
+       ├── codeatlas-frontend  (Port 3000: Next.js 14 App Router + Bun)
        │
-       └── archaeologist-adminer   (Port 8080: Database Admin Web UI)
+       └── codeatlas-adminer   (Port 8080: Database Admin Web UI)
 ```
 
 ### Storage Persistence & Live Development

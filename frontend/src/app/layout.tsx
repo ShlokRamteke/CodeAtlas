@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Project Archaeologist — AI Software Understanding",
+  title: "CodeAtlas — AI Software Understanding & Pre-Change Investigation",
   description:
     "Understand unfamiliar software before you change it. Combines current architecture, historical context, and bounded AI reasoning.",
 };

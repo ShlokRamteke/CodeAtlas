@@ -1,8 +1,8 @@
-# Project Archaeologist
+# CodeAtlas
 
 > **Investigate software before you change it.**
 
-Project Archaeologist is an AI-powered software change-investigation system.
+CodeAtlas is an AI-powered software change-investigation system.
 It reconstructs the current codebase, its relationships, and its history so
 developers can understand the consequences and constraints of a proposed
 change before implementation.
@@ -13,7 +13,7 @@ When you inherit unfamiliar software, the important context is rarely in one
 place. It is spread across source code, dependencies, tests, Git history, PRs,
 issues, documentation, and architectural decisions.
 
-Project Archaeologist connects these sources and turns them into a grounded
+CodeAtlas connects these sources and turns them into a grounded
 investigation.
 
 ## Core Workflow
@@ -90,7 +90,7 @@ podman compose -f podman-compose.yml up -d
 - **Adminer DB Manager:** `http://localhost:8080`
 
 ### 4. Verified Automated Test Suite
-- **52 passing automated pytest tests** covering AST parsing, graph traversal, Git history indexing, PR/Issue linking, historical retrieval, engineering context extraction, Kamei change risk scoring, co-change hidden coupling detection, and reach-ranked guarding tests.
+- **57 passing automated pytest tests** covering AST parsing, graph traversal, Git history indexing, PR/Issue linking, historical retrieval, engineering context extraction, Kamei change risk scoring, co-change hidden coupling detection, component milestone timeline, and reach-ranked guarding tests.
 - Clean TypeScript contracts typecheck (`packages/contracts`) and Next.js production build (`packages/web` / `frontend`).
 
 ## Development Context

@@ -1,4 +1,4 @@
-# Project Archaeologist
+# CodeAtlas
 
 ## Goal
 
@@ -13,7 +13,7 @@ constraints should be considered before implementation.
 
 ## Product Positioning
 
-Project Archaeologist is an **AI change-investigation system**, not a generic
+CodeAtlas is an **AI change-investigation system**, not a generic
 codebase chat product. Its primary job is to assemble evidence about a
 proposed change and turn that evidence into a grounded investigation brief.
 
@@ -45,7 +45,7 @@ A developer provides a target and a proposed change, for example:
 
 > Replace the Stripe integration with another payment provider.
 
-Project Archaeologist investigates the repository and produces a **Change
+CodeAtlas investigates the repository and produces a **Change
 Investigation Brief** covering:
 
 - change scope,

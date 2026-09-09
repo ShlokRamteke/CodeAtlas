@@ -1,7 +1,7 @@
 {
-  "name": "@archaeologist/contracts",
+  "name": "@codeatlas/contracts",
   "version": "0.1.0",
-  "description": "Shared schema contracts and TypeScript types for Project Archaeologist",
+  "description": "Shared schema contracts and TypeScript types for CodeAtlas",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

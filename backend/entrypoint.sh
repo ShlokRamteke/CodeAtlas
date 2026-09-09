@@ -8,7 +8,7 @@ import time
 import socket
 from urllib.parse import urlparse
 
-db_url = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@postgres:5432/archaeologist")
+db_url = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@postgres:5432/codeatlas")
 # Normalize scheme for parsing
 clean_url = db_url.replace("postgresql+asyncpg://", "http://").replace("postgresql://", "http://")
 parsed = urlparse(clean_url)

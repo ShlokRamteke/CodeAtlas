@@ -1,7 +1,7 @@
 [project]
-name = "archaeologist-backend"
+name = "codeatlas-backend"
 version = "0.1.0"
-description = "Project Archaeologist Backend API & Ingestion Engine"
+description = "CodeAtlas Backend API & Ingestion Engine"
 readme = "README.md"
 requires-python = ">=3.9"
 
