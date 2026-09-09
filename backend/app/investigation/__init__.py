@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from app.investigation.blast_radius import BlastRadiusAnalyzer, BlastRadiusResult
 from app.investigation.intent import IntentNormalizer, NormalizedChangeIntent
 from app.investigation.llm import (
     LLMProvider,
@@ -19,6 +20,8 @@ from app.investigation.state import (
 )
 
 __all__ = [
+    "BlastRadiusAnalyzer",
+    "BlastRadiusResult",
     "IntentNormalizer",
     "NormalizedChangeIntent",
     "InvestigationStep",
@@ -34,3 +37,4 @@ __all__ = [
     "get_default_llm_provider",
     "InvestigationEngine",
 ]
+

@@ -46,10 +46,11 @@ Pre-Change Investigation Brief
 - [x] **PH4-01: Bounded Investigation Engine & Planner** *(Completed)*
   - Build bounded LangGraph workflow with strict 1–3 model call limits.
   - Parse change intent (natural language query, diff, or file list) into normalized targets.
-- [ ] **PH4-02: Blast Radius & Co-Change Hidden Coupling**
+- [x] **PH4-02: Blast Radius & Co-Change Hidden Coupling** *(Completed)*
   - Compute static upstream and downstream call graph reachability.
   - Mine Git commit diff co-changes to identify hidden coupling partners (frequency $> 60\%$, $\tau = 180\text{d}$ half-life decay).
   - Flag unexplained coupling warnings when proposed changes omit historical partner files.
+
 - [ ] **PH4-03: Quantitative Change Risk & Defect Pressure**
   - Compute Kamei empirical metrics ($LA, LD, NF, ND, NS$).
   - Calculate Shannon churn entropy ($H(P)$) to score dispersion vs focus.

@@ -114,6 +114,70 @@ async def test_investigation_engine_end_to_end(db_session: AsyncSession):
     await db_session.commit()
     await db_session.refresh(inv)
 
+    # Add SourceFile and CodeDependency
+    from app.models.source_file import SourceFile
+    from app.models.dependency import CodeDependency
+    from app.models.commit import Commit
+    from app.models.commit_file_change import CommitFileChange, ChangeType
+    from datetime import datetime, timezone
+
+    src_file = SourceFile(
+        repository_id=repo.id,
+        path="payments/gateway.py",
+        language="python",
+        content_hash="h1",
+        size_bytes=100,
+    )
+    caller_file = SourceFile(
+        repository_id=repo.id,
+        path="orders/service.py",
+        language="python",
+        content_hash="h2",
+        size_bytes=100,
+    )
+
+    db_session.add_all([src_file, caller_file])
+    await db_session.commit()
+    await db_session.refresh(src_file)
+    await db_session.refresh(caller_file)
+
+    dep = CodeDependency(
+        repository_id=repo.id,
+        source_file_id=caller_file.id,
+        source_path="orders/service.py",
+        target_path="payments/gateway.py",
+    )
+    db_session.add(dep)
+
+    # Add historical commits with co-changes: gateway.py & config/payments.yaml
+    c1 = Commit(
+        repository_id=repo.id,
+        commit_hash="c111111111111111111111111111111111111111",
+        author_name="dev",
+        author_email="dev@example.com",
+        committed_at=datetime.now(timezone.utc),
+        message="feat: payment gateway and config",
+    )
+    c2 = Commit(
+        repository_id=repo.id,
+        commit_hash="c222222222222222222222222222222222222222",
+        author_name="dev",
+        author_email="dev@example.com",
+        committed_at=datetime.now(timezone.utc),
+        message="fix: payment retry and config",
+    )
+    db_session.add_all([c1, c2])
+    await db_session.commit()
+    await db_session.refresh(c1)
+    await db_session.refresh(c2)
+
+    fc1 = CommitFileChange(commit_id=c1.id, file_path="payments/gateway.py", change_type=ChangeType.MODIFIED)
+    fc2 = CommitFileChange(commit_id=c1.id, file_path="config/payments.yaml", change_type=ChangeType.MODIFIED)
+    fc3 = CommitFileChange(commit_id=c2.id, file_path="payments/gateway.py", change_type=ChangeType.MODIFIED)
+    fc4 = CommitFileChange(commit_id=c2.id, file_path="config/payments.yaml", change_type=ChangeType.MODIFIED)
+    db_session.add_all([fc1, fc2, fc3, fc4])
+    await db_session.commit()
+
     mock_llm = MockLLMProvider()
     engine = InvestigationEngine(llm_provider=mock_llm)
 
@@ -130,14 +194,8 @@ async def test_investigation_engine_end_to_end(db_session: AsyncSession):
                 "line_end": 2,
             }
         ],
-        file_commits=[
-            {
-                "hash": "abc12345",
-                "message": "Add PaymentHandler initial implementation",
-                "author": "dev@codeatlas.dev",
-            }
-        ],
     )
+
 
     assert state.step == InvestigationStep.COMPLETED
     assert state.brief is not None
@@ -146,12 +204,30 @@ async def test_investigation_engine_end_to_end(db_session: AsyncSession):
     assert state.model_calls_count <= 3
     assert state.latency_ms >= 0
 
+    # Verify blast radius signal
+    assert "blast_radius" in state.gathered_signals
+    blast_sig = state.gathered_signals["blast_radius"]
+    assert "orders/service.py" in [n["path"] for n in blast_sig["upstream_callers"]]
+    assert "orders" in blast_sig["affected_components"]
+
+    # Verify co-change signal & hidden coupling warning
+    assert "co_change" in state.gathered_signals
+    co_sig = state.gathered_signals["co_change"]
+    assert co_sig["has_hidden_coupling"] is True
+    omitted = [w["omitted_partner"] for w in co_sig["hidden_coupling_warnings"]]
+    assert "config/payments.yaml" in omitted
+
+    # Verify recommendations & unknowns captured in brief
+    assert any("config/payments.yaml" in r for r in state.brief.recommended_checks)
+    assert any("config/payments.yaml" in u for u in state.brief.unknowns)
+
     # Verify persisted DB entity
     await db_session.refresh(inv, attribute_names=["evidence"])
     assert inv.status == InvestigationStatus.COMPLETED
     assert inv.summary is not None
     assert len(inv.claims) > 0
     assert len(inv.evidence) >= 2
+
 
 
 @pytest.mark.asyncio
