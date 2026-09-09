@@ -749,7 +749,7 @@ async def _fetch_context_enrichments(
             "state": p.state.value if hasattr(p.state, "value") else str(p.state),
             "author": p.author,
             "merged_at": p.merged_at.isoformat() if p.merged_at else None,
-            "url": p.url,
+            "url": getattr(p, "html_url", None),
             "linked_issue_numbers": [],
         }
         for p in db_prs
@@ -771,7 +771,7 @@ async def _fetch_context_enrichments(
             "author": i.author,
             "closed_at": i.closed_at.isoformat() if i.closed_at else None,
             "labels": i.labels or [],
-            "url": i.url,
+            "url": getattr(i, "html_url", None),
         }
         for i in db_issues
     ]
