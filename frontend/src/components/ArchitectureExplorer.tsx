@@ -71,7 +71,9 @@ import {
   Filter,
   Target,
   Clock,
+  BookOpen,
 } from "lucide-react";
+import { EngineeringContextViewer } from "./EngineeringContextViewer";
 
 
 interface ArchitectureExplorerProps {
@@ -359,7 +361,7 @@ def test_aggregates():
 
 export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) {
   const [activeTab, setActiveTab] = useState<
-    "components" | "symbols" | "relationships" | "project_context" | "git_history" | "ingest"
+    "components" | "symbols" | "relationships" | "git_history" | "engineering" | "project_context" | "ingest"
   >("components");
   const [historySubTab, setHistorySubTab] = useState<
     "commits" | "trace" | "prs" | "issues" | "retrieval"
@@ -739,6 +741,17 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
         >
           <GitCommit className="w-4 h-4" />
           Git History ({commits.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("engineering")}
+          className={`py-3 px-4 border-b-2 flex items-center gap-2 transition whitespace-nowrap ${
+            activeTab === "engineering"
+              ? "border-emerald-500 text-emerald-400 font-semibold"
+              : "border-transparent hover:text-slate-200"
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          Engineering Context
         </button>
         <button
           onClick={() => setActiveTab("project_context")}
@@ -1751,6 +1764,8 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
               </div>
             )}
           </div>
+        ) : activeTab === "engineering" ? (
+          <EngineeringContextViewer repositoryId={repository.id} />
         ) : activeTab === "project_context" ? (
 
           /* Canonical Unified ProjectContext Tab */

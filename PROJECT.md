@@ -1,121 +1,122 @@
 # Project Archaeologist
 
-## Product Goal
+## Goal
 
-Build an AI-powered SaaS that helps developers **understand unfamiliar software before they change it**.
+Build an AI-powered SaaS for **pre-change software investigation**: help
+developers understand what they are about to change, why the relevant code
+exists, how it evolved, what depends on it, and what consequences or hidden
+constraints should be considered before implementation.
 
-The product combines the current structure of a software system with the history and engineering context that explain how it became what it is.
+## Core Promise
 
-### Core Promise
+> Investigate software before you change it.
 
-> Understand why your software became what it is.
+## Product Positioning
 
-### Marketing Hook
+Project Archaeologist is an **AI change-investigation system**, not a generic
+codebase chat product. Its primary job is to assemble evidence about a
+proposed change and turn that evidence into a grounded investigation brief.
 
-> Your code tells you what. We tell you why.
-
-The "why" is not limited to Git history. It is reconstructed from code, relationships, commits, pull requests, issues, documentation, tests, and other engineering evidence.
+The product uses software archaeology as its underlying intelligence: current
+code + relationships + history + engineering evidence.
 
 ## Problem
 
-A developer joining or inheriting a software project can often determine what the code does, but not why it has its current shape.
+When developers modify unfamiliar software, the important context is usually
+distributed across:
 
-Important context is distributed across source code, dependencies, APIs, tests, Git history, pull requests, issues, documentation, and architectural decisions.
+- source code,
+- dependencies and call relationships,
+- tests,
+- Git history,
+- pull requests,
+- issues,
+- documentation,
+- architectural decisions,
+- patterns of related change.
 
-## Product Understanding Model
+Code search can usually explain what exists. The harder problem is determining
+what will be affected by a change, why the current implementation exists, and
+which historical or engineering constraints are easy to miss.
 
-Project Archaeologist builds Project Intelligence in three layers:
+## Core Experience
 
-### 1. Current System
+A developer provides a target and a proposed change, for example:
 
-What exists today:
-- architecture
-- components
-- APIs
-- dependencies
-- data flows
-- tests
-- symbols and relationships
-- confidence/provenance for inferred relationships
+> Replace the Stripe integration with another payment provider.
 
-The first implementation goal is not perfect code understanding. It is a reliable current-system context layer that can support humans, retrieval, and later AI reasoning.
+Project Archaeologist investigates the repository and produces a **Change
+Investigation Brief** covering:
 
-### 2. Historical Context
+- change scope,
+- affected components,
+- dependency and call paths,
+- relevant tests,
+- historical context,
+- related PRs/issues,
+- historical failures or reversions where discoverable,
+- hidden coupling or co-change signals,
+- known constraints,
+- important unknowns,
+- evidence and source locations,
+- recommended areas to inspect before implementation.
 
-How did it get here:
-- commits
-- pull requests
-- issues
-- migrations
-- major refactors
-- feature evolution
+## Core Questions
 
-### 3. Engineering Context
+- What will this change touch?
+- What depends on the code I am changing?
+- Why is the current implementation this way?
+- How did this component evolve?
+- What constraints were introduced by earlier changes?
+- What should I inspect before implementing the change?
 
-What surrounding information explains it:
-- documentation
-- architecture decisions
-- tests
-- known issues
-- constraints
-- related engineering artifacts
+## Intelligence Model
 
-## Core User Questions
+The system has one canonical `ProjectContext`. It is enriched over time:
 
-### Understand
-- How does checkout work?
-- Which services handle authentication?
-- What depends on PaymentService?
+1. **Current System Context** — what the code is and how it is connected today.
+2. **Historical Context** — how the relevant code and relationships evolved.
+3. **Engineering Context** — tests, docs, issues, decisions, and other evidence.
 
-### Why
-- Why does this workaround exist?
-- Why was Redis introduced?
-- Why is this API designed this way?
+The Investigation Engine reasons over a scoped slice of this same context.
+There is no separate human-context and LLM-context knowledge base.
 
-### History
-- How did authentication evolve?
-- What changed this service?
-- Which PR introduced this behavior?
+## Core Product Experiences
 
-### Before Change
-- What should I know before modifying PaymentService?
-- What historical decisions could affect this change?
-- Which tests, services, and previous issues should I inspect?
+1. Repository Overview
+2. Component / Architecture Exploration
+3. Historical Timeline
+4. Change Investigation
+5. Pre-Change Investigation Brief
+6. Why Does This Exist?
+7. Evidence-backed investigation
+8. MCP access for coding agents
 
-## Core User Experience
-
-- Repository Overview
-- Architecture Explorer
-- Historical Timeline
-- Ask the Archaeologist
-- Why Does This Exist?
-- Feature Archaeology
-- Pre-Change Brief
-- Evidence-backed answers
+General repository Q&A may exist as supporting functionality, but it is not
+the primary product experience.
 
 ## MVP
 
 - GitHub repository connection
-- TypeScript/JavaScript support initially
-- deterministic code/dependency indexing
-- current-system context
+- TypeScript/JavaScript and Python support
+- deterministic current-system/code analysis
+- Project Graph backed by PostgreSQL relationship tables
 - Git history
-- pull requests/issues/docs
+- pull requests/issues/docs where accessible
 - hybrid retrieval
-- architecture overview
-- historical timeline
-- Ask the Archaeologist
-- Why Does This Exist?
+- historical and relationship retrieval
+- bounded Investigation Engine
+- Pre-Change Investigation Brief
 - evidence citations
 - basic MCP server
-- evaluation benchmark
-- token/cost tracking
+- evaluation benchmark for change-investigation tasks
+- token/cost and latency tracking
 
 ## Non-Goals for MVP
 
 - autonomous code changes
 - automatic PR creation
-- generic coding agent
+- generic coding-agent replacement
 - Slack/Jira integrations
 - production monitoring
 - broad multi-language support
@@ -123,16 +124,12 @@ What surrounding information explains it:
 - large autonomous agent swarms
 - repository code execution
 
-## Differentiation
+## Differentiation Principle
 
-The product is not:
-- generic codebase chat
-- generic code search
-- generic Git history viewer
-- generic RAG
+Do not compete on generic repository chat, code search, graph visualization,
+Git analytics, or MCP availability. These are enabling capabilities.
 
-Its differentiator is:
+The product is differentiated by the **workflow**:
 
-> It connects what the software is today with the history and engineering context that explain why it became that way.
-
-History is a major capability and marketing hook; AI software understanding is the broader product category.
+> Given a proposed software change, investigate the current system, its
+> evolution, and its evidence before a developer touches the code.

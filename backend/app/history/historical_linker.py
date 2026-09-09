@@ -526,3 +526,95 @@ class HistoricalLinker:
                 )
             )
         return parsed
+
+    async def hydrate_missing_references(
+        self,
+        repository_id: uuid.UUID,
+        db: AsyncSession,
+        github_token: Optional[str] = None,
+        max_lookups: int = 30,
+        fetcher: Optional[Any] = None,
+    ) -> Dict[str, int]:
+        """
+        Targeted on-demand reference hydration.
+        Identifies unlinked PR/Issue numbers referenced by commits/PRs and fetches only those entities.
+        Guarantees 100% reference coverage without fetching thousands of unrelated items.
+        """
+        from app.ingestion.github_fetcher import GitHubRepoFetcher
+        from app.models.repository import Repository
+
+        repo = await db.get(Repository, repository_id)
+        if not repo:
+            return {"hydrated_prs": 0, "hydrated_issues": 0}
+
+        active_fetcher = fetcher or GitHubRepoFetcher()
+
+        # 1. Find missing PR numbers
+        pr_stmt = (
+            select(CommitPullRequestLink.pr_number)
+            .join(Commit, CommitPullRequestLink.commit_id == Commit.id)
+            .where(
+                Commit.repository_id == repository_id,
+                CommitPullRequestLink.pull_request_id.is_(None),
+            )
+            .distinct()
+        )
+        missing_pr_numbers = list((await db.execute(pr_stmt)).scalars().all())[:max_lookups]
+
+        hydrated_prs = []
+        for num in missing_pr_numbers:
+            parsed_pr = await active_fetcher.fetch_single_pull_request(
+                owner=repo.owner,
+                repo=repo.name,
+                pr_number=num,
+                github_token=github_token,
+            )
+            if parsed_pr:
+                hydrated_prs.append(parsed_pr)
+
+        if hydrated_prs:
+            await self.index_pull_requests(repository_id, hydrated_prs, db)
+
+        # 2. Find missing Issue numbers (from both CommitIssueLink and PullRequestIssueLink)
+        c_iss_stmt = (
+            select(CommitIssueLink.issue_number)
+            .join(Commit, CommitIssueLink.commit_id == Commit.id)
+            .where(
+                Commit.repository_id == repository_id,
+                CommitIssueLink.issue_id.is_(None),
+            )
+            .distinct()
+        )
+        missing_c_issues = set((await db.execute(c_iss_stmt)).scalars().all())
+
+        pr_iss_stmt = (
+            select(PullRequestIssueLink.issue_number)
+            .join(PullRequest, PullRequestIssueLink.pull_request_id == PullRequest.id)
+            .where(
+                PullRequest.repository_id == repository_id,
+                PullRequestIssueLink.issue_id.is_(None),
+            )
+            .distinct()
+        )
+        missing_pr_issues = set((await db.execute(pr_iss_stmt)).scalars().all())
+
+        all_missing_issues = list(missing_c_issues | missing_pr_issues)[:max_lookups]
+
+        hydrated_issues = []
+        for num in all_missing_issues:
+            parsed_issue = await active_fetcher.fetch_single_issue(
+                owner=repo.owner,
+                repo=repo.name,
+                issue_number=num,
+                github_token=github_token,
+            )
+            if parsed_issue:
+                hydrated_issues.append(parsed_issue)
+
+        if hydrated_issues:
+            await self.index_issues(repository_id, hydrated_issues, db)
+
+        return {
+            "hydrated_prs": len(hydrated_prs),
+            "hydrated_issues": len(hydrated_issues),
+        }

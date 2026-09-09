@@ -1,7 +1,6 @@
 # Architecture Decisions
 
-This file records significant technical and architectural decisions.
-
+This file records significant technical and product-architecture decisions.
 Keep entries short and factual. Do not record routine implementation choices.
 
 ---
@@ -82,8 +81,7 @@ autonomous multi-agent swarm.
 
 **Reason**
 
-Project Archaeologist needs reliable, explainable investigations with low
-token usage.
+The product needs reliable, explainable investigations with low token usage.
 
 **Target**
 
@@ -110,7 +108,68 @@ state authoritative.
 
 ---
 
-## ADR-006 — Living Project Documentation
+## ADR-006 — Pre-Change Investigation as the Primary Product Workflow
+
+**Status:** Accepted
+
+**Decision**
+
+Position Project Archaeologist around investigating proposed software changes,
+with code understanding and software archaeology serving as the underlying
+intelligence layers.
+
+**Reason**
+
+Generic codebase intelligence, code search, history analysis, graphs, and MCP
+are increasingly commoditized or offered by established products. A focused
+pre-change investigation workflow provides a clearer product job and a more
+specific user outcome.
+
+**Trade-off**
+
+The system should prioritize change-investigation quality over breadth of
+generic repository features.
+
+---
+
+## ADR-007 — One Canonical ProjectContext
+
+**Status:** Accepted
+
+**Decision**
+
+Use a single canonical `ProjectContext` enriched by current-system, historical,
+and engineering evidence. Human UI and AI/agent consumers use scoped views of
+the same model.
+
+**Reason**
+
+Avoids duplicate knowledge pipelines and prevents divergence between what the
+UI shows and what the agent reasons over.
+
+---
+
+## ADR-008 — Project Graph Abstraction, PostgreSQL Implementation
+
+**Status:** Accepted
+
+**Decision**
+
+Define a Project Graph abstraction in application code, backed initially by
+PostgreSQL relationship tables.
+
+**Reason**
+
+The product requires graph traversal for dependencies, callers, history, and
+impact analysis, but a dedicated graph database is not yet justified.
+
+**Trade-off**
+
+Complex graph workloads may require a dedicated graph store later.
+
+---
+
+## ADR-009 — Living Project Documentation
 
 **Status:** Accepted
 
@@ -130,96 +189,6 @@ Static documentation drifts as implementation evolves.
 
 Automatic updates must be limited to substantive changes to avoid documentation
 noise.
-
----
-
-## ADR-007 — History Is a Core Intelligence Layer, Not the Entire Product
-
-**Status:** Accepted
-
-**Date:** 2026-08-22
-
-**Decision**
-
-Position Project Archaeologist as AI software understanding. Historical analysis is
-a major differentiator and marketing hook, but the system also understands the
-current architecture and surrounding engineering context.
-
-**Reason**
-
-Pure Git-history analysis is narrower and increasingly crowded. The product is
-more valuable when it answers the broader developer question:
-
-> What do I need to know about this software before I change it?
-
-**Implication**
-
-The architecture and roadmap should treat:
-- current system understanding,
-- historical context,
-- engineering context
-
-as first-class inputs to the same investigation engine.
-
----
-
-## ADR-008 — Current-System Context Before AI Reasoning
-
-**Status:** Accepted
-
-**Decision**
-
-Build a deterministic/language-aware Current System Context layer before introducing historical AI investigation.
-
-**Reason**
-
-Humans and LLMs do not need the entire codebase. They need a compact, trustworthy representation of the relevant part of the current system.
-
-This reduces token usage, improves grounding, and avoids turning the project into a full compiler or autonomous code-understanding system.
-
-**Implication**
-
-Phase 2 focuses on:
-- structural parsing,
-- semantic resolution where useful,
-- relationships,
-- tests,
-- current-system Context Builder.
-
-Historical reasoning is added on top in later phases.
-
----
-
-## ADR-009 — Unified Project Context
-
-**Status:** Accepted
-
-**Date:** 2026-08-25
-
-**Decision**
-
-Use a single canonical `ProjectContext` model as the authoritative shared context layer for both the human UI and AI/Agent prompt pipelines.
-
-Do not maintain separate Human Context and LLM Context knowledge extraction pipelines.
-
-```text
-Project Knowledge
-      ↓
-Context Builder
-      ↓
-Project Context
-   ├── Human UI (Markdown / Visual graph)
-   └── AI / Agent (Token-efficient prompt serialization)
-```
-
-**Reason**
-
-Maintaining divergent data structures or extraction logic for human exploration versus AI prompts introduces drift, inconsistent grounding, and duplicated indexing pipelines.
-
-A single canonical `ProjectContext` model guarantees that:
-1. Both human users and AI agents reason over the identical set of entities, relationship edges, evidence, confidence scores, and identified unknowns/gaps.
-2. Serialization methods (`to_human_markdown()` and `to_llm_prompt()`) are deterministic projections of the same underlying data structure.
-3. Unknowns (e.g. untested code, unresolved external dependencies, ambiguous types) are explicitly preserved and visible to both humans and LLMs.
 
 ---
 
@@ -331,5 +300,95 @@ Answering historical questions such as "When was symbol X added?", "Which PRs to
 - Evidence records conform to structured `HistoricalEvidenceRecord` interfaces with confidence scores, query matching scores, and provenance citations.
 - Downstream AI reasoning in Phase 4 can consume these pre-filtered, structured evidence records directly in prompt context without performing brute-force repository searches.
 
+---
 
+## ADR-015 — Deterministic Engineering Context Indexing & Architectural Invariants
+
+**Status:** Accepted
+
+**Date:** 2026-09-08
+
+**Decision**
+
+Deterministically index engineering documentation, Architecture Decision Records (ADRs), and extract design constraints/invariants (RFC 2119 directives categorized into Security, Architecture, Performance, Testing, and Data Integrity) without LLM calls during indexing.
+
+**Reason**
+
+Non-Git engineering context (`README.md`, `ARCHITECTURE.md`, `docs/`, `DECISIONS.md`, ADRs) holds the design intent and constraints behind why code exists. Parsing document structure, ADR statuses, and RFC 2119 imperative statements (`MUST`, `MUST NOT`, `SHALL`, `NEVER`, `INVARIANT`) deterministically ensures high performance, zero API costs during ingestion, and absolute groundedness without hallucinations.
+
+**Implication**
+
+- `EngineeringContextParser` and `EngineeringContextIndexer` extract structured `EngineeringDocument` and `DesignConstraint` models into Postgres.
+- Design constraints are linked directly to source documents with line-level citations.
+- REST endpoints and frontend visualizers allow both human inspection and downstream LLM agents in Phase 4 to reference verified architectural constraints.
+
+---
+
+## ADR-016 — Clean-Room Intellectual Property Boundary & Licensing Policy
+
+**Status:** Accepted
+
+**Date:** 2026-09-08
+
+**Decision**
+
+Maintain a strict clean-room intellectual property boundary between Project Archaeologist (licensed under permissive MIT) and external copyleft reference codebases (specifically AGPL-3.0 repositories).
+
+Under this policy:
+1. **Zero Source Code Contamination:** No functions, classes, database schemas, prompt templates, or tests may be copied, vendored, transliterated, or dynamically imported from AGPL-3.0 repositories.
+2. **Permitted Borrowing (Ideas & Standards Only):** We borrow only non-copyrightable elements:
+   - Published peer-reviewed academic algorithms (e.g. Kamei et al. Just-in-Time defect prediction, Shannon entropy of code churn, Louvain/Leiden graph clustering, exponential recency decay).
+   - Public industry protocols (e.g. Model Context Protocol JSON-RPC 2.0 specifications, standard Git CLI commands).
+   - High-level functional requirements and behavioral heuristics (e.g. flagging co-change partners missing from diffs, ordering test suites by changed file reach).
+3. **Independent Clean Implementation:** All features are designed from scratch and authored independently in Python/FastAPI/PostgreSQL adhering to Project Archaeologist's existing schemas and patterns.
+4. **Local Repository Quarantine:** Any external reference repositories used for functional study (e.g. in `_references/`) must remain permanently ignored in `.gitignore`, never committed to git, and never packaged in production container images.
+
+**Reason**
+
+Copyleft network services (such as those under AGPL-3.0) enforce strong reciprocal obligations. Under AGPL Section 13, linking, importing, or creating a derivative work from AGPL code would contaminate Project Archaeologist, legally requiring the entire codebase and SaaS platform to be open-sourced under AGPL-3.0. A strict clean-room boundary guarantees Project Archaeologist remains 100% MIT permissive, enabling full commercial flexibility for enterprise SaaS and closed-source customer deployments.
+
+**Implication**
+
+- Project Archaeologist retains its MIT license with zero legal risk.
+- Algorithmic models are implemented from primary literature (citing academic papers in code docstrings).
+- External clones remain strictly local reference tools on developer workstations.
+
+---
+
+## ADR-017 — Quantitative Change Risk, Historical Co-Change, and Guarding Test Reachability
+
+**Status:** Accepted
+
+**Date:** 2026-09-08
+
+**Decision**
+
+Incorporate quantitative change risk metrics, historical co-change mining, and reach-ranked guarding test signals into the Phase 4 Change Investigation Engine and canonical `ProjectContext`:
+
+1. **Quantitative Change Risk Scoring (Kamei Model + Defect History):**
+   - Adopt the empirical software engineering model by Kamei et al. (IEEE TSE 2013) for Just-in-Time defect risk.
+   - Compute churn shape: lines added ($LA$), lines deleted ($LD$), files touched ($NF$), distinct directories ($ND$), distinct subsystems ($NS$).
+   - Compute Shannon churn entropy: $H(P) = -\sum p_i \log_2 p_i$, measuring the diffusion and scatter of the proposed change across modules.
+   - Compute historical defect pressure: Mine past bug-fix commits touching target files using a deep git log walk (up to 20,000 commits) discounted by exponential recency decay ($\tau = 365\text{d}$).
+2. **Historical Co-Change & Hidden Coupling Warnings:**
+   - Mine commit diff history to identify files that frequently change together ($\text{co-change frequency} > 60\%$).
+   - Classify coupling into *corroborated* (static import/call edge exists) and *unexplained / hidden coupling* (no static edge, but historical co-change is high).
+   - Emit pre-change alerts if a proposed change modifies file $A$ but omits historical co-change partner file $B$.
+3. **Guarding Test Reachability & Stale Test Detection:**
+   - Trace static AST call graphs to identify test suites that transitively exercise modified functions.
+   - Rank guarding tests by *reach* (prioritizing test files that cover the greatest number of touched components so developers/agents run the highest-impact tests first).
+   - Flag *Untested Changes* (modified lines/symbols with zero covering tests) and *Stale Test Candidates* (exercised code modified without corresponding updates to its guarding test files).
+4. **Token-Budgeted Output & Omission Markers:**
+   - Enforce strict token ceilings for pre-change investigation payloads.
+   - If evidence exceeds the budget, shed lower-priority details and attach recoverable omission markers (`[ref#<id>]`), allowing AI agents (Claude Code, Cursor, Copilot) to selectively expand context on demand without overflowing context windows.
+
+**Reason**
+
+Static AST analysis answers "what is connected", but fails to answer "what is risky", "what usually breaks", or "what files are implicitly coupled without an import". Combining static graph reachability with deterministic Git churn metrics, defect histories, and co-change patterns creates an industrial-strength pre-change investigation brief that prevents regressions before code is written.
+
+**Implication**
+
+- `CanonicalProjectContext` is enriched with co-change partners, defect pressure scores, and guarding test rankings.
+- Step 5 (Blast Radius), Step 7 (Change Risk), Step 8 (Guarding Tests), and Step 10/11 (Budgeted Projection) of the 12-step engine are formally standardized with concrete mathematical formulas.
+- All algorithms execute deterministically in PostgreSQL and Python without relying on LLM hallucination for risk computation.
 

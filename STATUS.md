@@ -6,25 +6,29 @@ Phase 3 — Historical + Engineering Context
 
 ## Current Task
 
-PH3-03 Complete &mdash; Next: PH3-04 (Engineering Context)
+PH3-04 Complete &mdash; Next: PH3-05 (Enrich ProjectContext)
 
 ## Status
-
 
 IN PROGRESS
 
 ## Product Focus
 
-The product goal is to help developers understand unfamiliar software.
-
-History is a major differentiator and marketing hook, but not the entire
-product. The core system combines current architecture, historical context,
-engineering context, and AI reasoning.
+Project Archaeologist is centered on **Pre-Change Investigation**. The product
+uses current code, relationships, history, and engineering evidence to help a
+developer understand a proposed change before implementation.
 
 ## Completed
 
 - **Phase 1 — Foundation**: Complete foundation (Postgres, Alembic, FastAPI, Contracts, Next.js).
-- **Phase 2 — Repository Understanding**: Complete current-system layer (Tree-sitter AST, relationships, Context Builder, unified `ProjectContext`).
+- **Phase 2 — Repository Understanding**: Complete current-system layer (Tree-sitter AST, relationships, Context Builder, canonical `ProjectContext`).
+- **Clean-Room Reference Architecture & Licensing Assessment**:
+  - Analyzed external reference architecture in an isolated, untracked local quarantine (`_references/` in `.gitignore`).
+  - Formulated **ADR-016 (Clean-Room Intellectual Property Boundary & Licensing Policy)**: Enforced strict clean-room isolation against AGPL-3.0 contamination, guaranteeing Project Archaeologist remains 100% MIT permissive with zero code, schema, prompt, or test copying.
+  - Formulated **ADR-017 (Quantitative Change Risk, Historical Co-Change, and Guarding Test Reachability)**: Adopted published peer-reviewed algorithms (Kamei et al. Just-in-Time defect prediction with Shannon churn entropy, historical co-change hidden coupling detection, reach-ranked guarding test signals, and token-budgeted output distillation).
+  - Implemented and verified clean-room algorithms in `app.history.change_risk`, `app.history.co_change`, and `app.history.guarding_tests`.
+  - 100% automated test pass rate across 52 unit/integration tests (11 new tests added covering Kamei metrics, Shannon entropy, defect pressure decay, co-change partner mining, hidden coupling warnings, reach ranking, untested changes, and stale test detection).
+  - Updated live documentation across `ARCHITECTURE.md`, `DECISIONS.md`, `README.md`, and `phases/phase-04-change-investigation.md`.
 - **Phase 3 — Task PH3-01 (Git History Indexing)**:
   - Database model `CommitFileChange` (`ChangeType`: added, modified, deleted, renamed) and `0003_add_commit_file_changes` migration.
   - `GitHistoryIndexer` service calculating file history and identifying the **introducing commit** (origin commit) for any file or component.
@@ -47,35 +51,40 @@ engineering context, and AI reasoning.
   - REST endpoints: `GET /api/v1/repositories/{id}/history/search`, `POST /api/v1/repositories/{id}/history/retrieve`, and `GET /api/v1/repositories/{id}/symbols/{name}/history`.
   - Frontend interactive **Deterministic Search & Evidence** explorer in Next.js UI with live keyword querying, multi-attribute filter chips, symbol evolution timeline inspector, and ranked evidence cards.
   - 100% automated test pass rate (32/32 pytest tests, clean frontend build & contracts typecheck).
+- **Phase 3 — Task PH3-04 (Engineering Context)**:
+  - `EngineeringContextParser` parsing Markdown headings, sections, ADR statuses/deciders, and extracting RFC 2119 design constraints and architectural invariants into Security, Architecture, Performance, Testing, and Data Integrity domains without LLM calls.
+  - Database models `EngineeringDocument` and `DesignConstraint` with Alembic migration `0005_add_engineering_context`.
+  - `EngineeringContextIndexer` service ingesting repository documentation, indexing ADRs, querying design constraints, and performing deterministic context searches.
+  - REST endpoints: `GET /api/v1/repositories/{id}/engineering/overview`, `GET /docs`, `GET /docs/{doc_id}`, `GET /adrs`, `GET /constraints`, `GET /search`, and `POST /ingest`.
+  - Frontend interactive **Engineering Context** tab & `EngineeringContextViewer` component in Next.js UI with ADR cards, design constraints matrix, document catalog, and real-time context search.
+  - 100% automated test pass rate (39/39 pytest tests, clean frontend build & contracts typecheck).
 
 ## Remaining
 
-- **PH3-04**: Engineering Context
-- **PH3-05**: Enrich ProjectContext
+- **PH3-05**: Enrich ProjectContext (extend canonical ProjectContext with historical changes, PRs, issues, ADRs, and design constraints)
 - **PH3-06**: Historical Timeline / Developer View
 
 ## Blockers
 
-None
+None known.
 
 ## Next Action
 
-Start Task PH3-04: Implement Engineering Context indexing (parse README.md, docs/, architecture docs, ADRs, and extract design constraints).
-
-
+Start Task PH3-05: Enrich ProjectContext (extend canonical ProjectContext with historical changes, PRs, issues, ADRs, and design constraints, preserving provenance for downstream change investigation).
 
 ## Session Rule
 
-Update this file after meaningful development sessions.
-
-If work is incomplete:
-- keep the task in progress,
-- list remaining work,
-- record blockers,
-- set the next actionable step.
+Update this file after meaningful development sessions. If work is incomplete,
+keep the task in progress, record blockers, and set the next actionable step.
 
 Do not advance phases until the current phase definition of done is satisfied.
 
+## Architecture Principle
+
+There is one canonical `ProjectContext`. Current-system, historical, and
+engineering evidence enrich the same model. Human UI and AI/agent consumers
+receive scoped views of that model.
+
 ## Last Updated
 
-2026-08-28
+2026-09-08

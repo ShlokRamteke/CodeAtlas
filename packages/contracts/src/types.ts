@@ -479,3 +479,98 @@ export interface SymbolHistoryResponse {
   }>;
 }
 
+export type EngineeringDocType =
+  | 'readme'
+  | 'architecture'
+  | 'adr'
+  | 'design_doc'
+  | 'testing_guide'
+  | 'general_doc';
+
+export type ADRStatus =
+  | 'accepted'
+  | 'superseded'
+  | 'proposed'
+  | 'deprecated'
+  | 'draft'
+  | 'n/a';
+
+export type ConstraintCategory =
+  | 'security'
+  | 'performance'
+  | 'architecture'
+  | 'testing'
+  | 'data_integrity'
+  | 'general';
+
+export type ConstraintLevel = 'must' | 'should' | 'must_not';
+
+export interface DesignConstraintItem {
+  id: string;
+  repositoryId: string;
+  documentId?: string | null;
+  category: ConstraintCategory;
+  level: ConstraintLevel;
+  title: string;
+  statement: string;
+  sourcePath: string;
+  lineStart?: number | null;
+  lineEnd?: number | null;
+  confidence: number;
+  extraMetadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface EngineeringDocumentItem {
+  id: string;
+  repositoryId: string;
+  path: string;
+  docType: EngineeringDocType;
+  title: string;
+  format: string;
+  contentHash: string;
+  status: ADRStatus;
+  deciders?: string | null;
+  summary?: string | null;
+  extraMetadata?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EngineeringDocumentDetailItem extends EngineeringDocumentItem {
+  rawContent: string;
+  constraints: DesignConstraintItem[];
+}
+
+export interface ADRItem {
+  id: string;
+  repositoryId: string;
+  path: string;
+  title: string;
+  status: ADRStatus;
+  deciders?: string | null;
+  summary?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EngineeringSearchResponse {
+  repositoryId: string;
+  query: string;
+  totalMatches: number;
+  docs: Array<Record<string, unknown>>;
+  constraints: Array<Record<string, unknown>>;
+}
+
+export interface EngineeringContextOverviewResponse {
+  repositoryId: string;
+  totalDocs: number;
+  totalAdrs: number;
+  totalConstraints: number;
+  docsByType: Record<string, number>;
+  constraintsByCategory: Record<string, number>;
+  adrs: ADRItem[];
+  topConstraints: DesignConstraintItem[];
+}
+
+

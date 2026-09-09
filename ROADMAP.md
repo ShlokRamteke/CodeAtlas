@@ -1,190 +1,184 @@
-# Roadmap
+# Project Archaeologist — Roadmap
 
-## Overall Goal
+## Product Goal
 
-Build a SaaS that helps developers **understand unfamiliar software before they change it**.
+Build an AI-powered SaaS that investigates a **proposed software change** by
+connecting current code, relationships, history, and engineering evidence.
 
-The product combines:
-
-```text
-Current System
-      +
-Historical Context
-      +
-Engineering Context
-      ↓
-Evidence-backed Understanding
-```
-
-History is a major differentiator and marketing hook, but the product is broader than Git-history analysis.
+The primary deliverable is a grounded **Pre-Change Investigation Brief**.
 
 ## End-to-End MVP
 
 ```text
 GitHub
-→ deterministic analysis
-→ current + historical + engineering context
-→ retrieval
-→ context building
-→ agentic investigation
-→ answer + cited evidence
-→ web UI / MCP
+→ deterministic code/history/doc analysis
+→ Project Knowledge
+→ canonical ProjectContext + Project Graph (PostgreSQL)
+→ scoped retrieval
+→ bounded investigation (LangGraph)
+→ evidence verification
+→ Pre-Change Investigation Brief
+→ SaaS UI / MCP
+→ evaluation
 ```
 
 ## Guiding Principles
 
-1. Build only what is needed for the current phase.
-2. Index deterministically where possible; use AI for synthesis and reasoning.
-3. Keep the agent workflow bounded.
-4. Keep the context minimal.
-5. Ground every non-trivial claim in evidence.
-6. Support both human understanding and agent reasoning.
+1. Development is phase-based, not deadline-based.
+2. Build vertical slices; do not start a dependent phase before prerequisites are satisfied.
+3. Index deterministically where possible; use AI for synthesis and reasoning.
+4. Keep the agent workflow bounded (typically 1–3 model calls per investigation).
+5. Ground every non-trivial claim in verified evidence.
+6. Support both human understanding and agent reasoning through scoped views of one canonical `ProjectContext`.
+7. Treat the proposed change as the investigation task boundary; do not build generic codebase chat.
+8. Do not build future-phase functionality early.
 
 ---
 
-## Phase 1 — Foundation
+## Phase 1 — Foundation (Completed)
 
 ### Goal
-Create the application, database, contracts, and development workflow.
-
-### Outcome
-A stable foundation for all later product work.
+Create the application skeleton, database baseline, contracts, and development workflow.
 
 ### Done when
-- frontend runs
-- backend runs
-- database migrations work
-- shared contracts exist
-- CI works
+- [x] frontend runs
+- [x] backend runs
+- [x] database migrations work
+- [x] shared contracts exist
+- [x] CI works
 
 ---
 
-## Phase 2 — Repository Understanding
+## Phase 2 — Repository Understanding (Completed)
 
 ### Goal
-Build the current-system model of a repository.
+Build the deterministic **Current System Context**: a reliable structured representation of what the repository is and how its code is connected today.
 
-This phase answers:
-
-> **What is this software and how does it work today?**
-
-### Includes
-- GitHub connection
-- repository ingestion
-- AST/code analysis
-- symbols
-- dependencies
-- tests
-- APIs
-- architecture relationships
-- current-system Context Builder
-
-### Done when
-A repository can be indexed and its current structure can be queried and summarized for humans and LLMs.
+### Core Work Completed
+- [x] GitHub connection and repository ingestion
+- [x] Tree-sitter AST parsing (TypeScript/JavaScript, Python)
+- [x] Symbol extraction and source locations
+- [x] File-level imports and exports
+- [x] Call and reference relationships
+- [x] Manifest-aware dependency resolution
+- [x] Test and API mapping
+- [x] Context Builder producing canonical `ProjectContext`
+- [x] Storage in PostgreSQL relationship models
 
 ---
 
-## Phase 3 — Historical + Engineering Context
+## Phase 3 — Historical + Engineering Context (In Progress)
 
 ### Goal
-Build the context that explains how the current system became what it is.
+Enrich the canonical `ProjectContext` with evidence explaining how the current system evolved and what engineering context surrounds it.
 
-This phase answers:
+Core question:
 
-> **How did it get here?**
+> **How did this software/component get here?**
 
 ### Structured Tasks
-- **PH3-01 — Git History Indexing** *(Completed)*: Commits, file histories, authors, introducing commits, and evolution viewer.
-- **PH3-02 — Commit → PR → Issue Linking** *(Completed)*: Code &rarr; Commit &rarr; PR &rarr; Issue traceability and cross-reference extraction.
-- **PH3-03 — Historical Retrieval**: Deterministic component/query historical search without LLMs.
-- **PH3-04 — Engineering Context**: Documentation, READMEs, ADRs, design constraints.
-- **PH3-05 — Enrich ProjectContext**: Single unified canonical model enriched with history and engineering context.
-- **PH3-06 — Historical Timeline / Developer View**: Interactive component evolution timeline linking each event to evidence.
-
+- **PH3-01 — Git History Indexing** *(Completed)*: Commits, file histories, diff stats, author identities, introducing commit origin detection, and interactive evolution viewer.
+- **PH3-02 — Commit → PR → Issue Linking** *(Completed)*: Deterministic regex reference extraction (`Fixes #123`, `Merge pull request #45`), bidirectional linking models, `HistoricalLinker` provenance traces (`Code -> Commit -> PR -> Issue`), and UI chips.
+- **PH3-03 — Historical Retrieval** *(Completed)*: Deterministic multi-attribute historical search (commits, PRs, issues, symbol timeline) and ranked `HistoricalEvidenceRecord` synthesis without LLMs.
+- **PH3-04 — Engineering Context** *(Completed)*: Markdown/ADR parser, RFC 2119 architectural invariants extraction across 5 domains, `EngineeringContextIndexer`, and frontend viewer.
+- **PH3-05 — Enrich ProjectContext** *(Next)*: Extend the single canonical `ProjectContext` with historical changes, PRs, issues, ADRs, and design constraints, attaching historical evidence directly to current entities.
+- **PH3-06 — Historical Timeline / Developer View**: Interactive component evolution timeline linking each event directly to verified evidence.
 
 ### Done when
-A developer or agent can trace how a component, symbol, or behavior evolved over time without requiring an LLM.
+Relevant code can be traced into its history and supporting engineering evidence with provenance, without requiring an LLM to establish basic historical facts.
 
 ---
 
-
-## Phase 4 — Archaeology & Investigation
+## Phase 4 — Change Investigation Engine
 
 ### Goal
-Build the AI investigation engine.
+Turn current-system, historical, and engineering context into the core **Pre-Change Investigation** workflow.
 
-This phase answers:
-
-> **Why is the software like this, and what should I know before changing it?**
-
-### Includes
-- bounded LangGraph workflow
-- read-only investigation tools
-- Context Builder
-- evidence extraction
-- claim classification
-- confidence scoring
-- Pre-Change Briefs
-- "Why does this exist?"
+Core work:
+- Change-intent input and target identification
+- Bounded investigation planner
+- Dependency / impact tracing (blast radius)
+- Historical correlation and co-change signals
+- Evidence ranking
+- Bounded LangGraph reasoning (1–3 model calls)
+- Claim / citation generation (fact, inference, unknown)
+- Lightweight verification
+- Pre-Change Investigation Brief generation
+- "Why Does This Exist?" as a focused workflow
 
 ### Done when
-The system can reliably investigate an unfamiliar component or question and return a grounded answer with evidence citations.
+A developer can provide a proposed change and receive a grounded, evidence-backed investigation brief covering scope, historical context, constraints, risks/signals, and important unknowns.
 
 ---
 
-## Phase 5 — SaaS Core
+## Phase 5 — SaaS Experience & Core
 
 ### Goal
-Make the product a usable, secure multi-tenant application.
+Turn the change-investigation engine into a clear developer-facing web experience and secure multi-tenant SaaS product.
 
-### Includes
-- GitHub App onboarding
-- auth / orgs / teams
-- repository permissions
-- async indexing pipeline
-- caching
-- rate limiting / token tracking
-- audit logging
-- settings
+### Core Work
+- Repository overview and health indicators
+- Architecture / component explorer
+- Historical timeline and evolution view
+- Change-investigation entry flow (target + proposed change)
+- Pre-Change Investigation Brief interactive UI
+- GitHub App integration and multi-tenant isolation
+- Asynchronous indexing workers (Inngest)
+- Rate limiting, token tracking, and cost controls
 
 ### Done when
-A user can log in, install the GitHub App, select repositories, and use the product securely.
+A developer can select a target, describe a proposed change, run an investigation, and inspect the resulting evidence-backed brief through the web UI.
 
 ---
 
 ## Phase 6 — MCP Integration
 
 ### Goal
-Allow external AI coding assistants to query Project Archaeologist.
+Expose pre-change investigation capabilities to external AI coding assistants via Model Context Protocol (MCP).
 
-### Includes
-- MCP server
-- read-only tools
-- authentication / tenant checks
-- structured investigation summaries
+### Tools
+- `investigate_change(target, proposed_change)`
+- `get_change_context(target)`
+- `get_dependencies(entity_id)`
+- `trace_feature(feature_name)`
+- `search_history(query)`
+- `get_related_issues(symbol_or_path)`
+- `why_does_this_exist(symbol_or_path)`
 
 ### Done when
-Cursor/Claude Desktop/Windsurf can invoke Project Archaeologist to understand a component or design reason.
+External coding agents (Cursor, Claude Desktop, Windsurf) can invoke Project Archaeologist to investigate a proposed change or understand code rationale.
 
 ---
 
 ## Phase 7 — Evaluation & Production Hardening
 
 ### Goal
-Validate quality, speed, safety, and reliability.
+Measure whether the system reliably improves pre-change understanding and harden the system for real production use.
 
-### Includes
-- evaluation benchmark
-- groundedness testing
-- historical accuracy
-- latency/cost tracking
-- security audit
-- performance tuning
+### Core Work
+- Golden benchmark repositories and versioned change-investigation test questions
+- Affected-component recall evaluation (blast-radius detection)
+- Dependency and impact recall evaluation
+- Historical retrieval and evidence accuracy evaluation
+- Citation accuracy and groundedness testing (>95% verified citations)
+- Token usage and cost tracking (<$0.05 per standard investigation)
+- Latency optimization (<5s standard investigation)
+- Observability and security audit
 
 ### Done when
-The product meets quality, security, and cost targets.
+The benchmark is repeatable, investigation quality is measurable, model usage is tracked, security boundaries are tested, and the core workflow is stable.
 
 ---
+
+## Phase Documents
+
+- `phases/phase-01-foundation.md`
+- `phases/phase-02-repository-understanding.md`
+- `phases/phase-03-historical-context.md`
+- `phases/phase-04-change-investigation.md`
+- `phases/phase-05-saas.md`
+- `phases/phase-06-mcp.md`
+- `phases/phase-07-evaluation.md`
 
 ## Current Status
 

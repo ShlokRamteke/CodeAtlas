@@ -231,10 +231,16 @@ class IngestionEngine:
                 )
                 self.session.add(dep_record)
 
-        # 5. Compute Architecture Graph
+        # 5. Index Engineering Context (docs, ADRs, design constraints)
+        from app.history.engineering_indexer import EngineeringContextIndexer
+
+        doc_indexer = EngineeringContextIndexer(self.session)
+        await doc_indexer.index_repository_docs(repository_id, files)
+
+        # 6. Compute Architecture Graph
         arch_graph = self.analyzer.analyze_repository(parsed_results)
 
-        # 6. Update Repository stats
+        # 7. Update Repository stats
         repo.file_count = len(files)
         repo.symbol_count = total_symbols
         repo.status = RepositoryStatus.READY

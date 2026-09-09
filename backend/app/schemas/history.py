@@ -173,6 +173,13 @@ class IngestIssuesResponse(BaseModel):
     message: str
 
 
+class HydrateReferencesResponse(BaseModel):
+    repository_id: uuid.UUID
+    hydrated_prs: int
+    hydrated_issues: int
+    message: str
+
+
 class HistoricalEvidenceItem(BaseModel):
     id: str
     source_type: str  # 'commit' | 'pull_request' | 'issue'

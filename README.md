@@ -1,144 +1,115 @@
 # Project Archaeologist
 
-> **Understand why your software became what it is.**
+> **Investigate software before you change it.**
 
-Your code tells you **what** the system does.  
-Your Git history tells you **what changed**.  
-**Project Archaeologist helps explain why.**
+Project Archaeologist is an AI-powered software change-investigation system.
+It reconstructs the current codebase, its relationships, and its history so
+developers can understand the consequences and constraints of a proposed
+change before implementation.
 
-Project Archaeologist is an AI-powered SaaS for understanding unfamiliar
-software by combining the system's current architecture with its historical and
-engineering context.
+## The Problem
 
-## What It Understands
+When you inherit unfamiliar software, the important context is rarely in one
+place. It is spread across source code, dependencies, tests, Git history, PRs,
+issues, documentation, and architectural decisions.
 
-```text
-Current System
-├── Code
-├── Components
-├── APIs
-├── Dependencies
-└── Tests
-
-Historical Context
-├── Commits
-├── Pull Requests
-├── Issues
-└── Evolution
-
-Engineering Context
-├── Documentation
-├── Decisions
-└── Constraints
-```
-
-The system connects these sources and uses AI to investigate questions such as:
-
-- How does checkout work across the system?
-- Why does this workaround exist?
-- How did authentication evolve?
-- What historical context should I know before changing this service?
-- Which previous decisions or issues explain this architecture?
-
-## Core Experience
-
-### Understand
-See how the system works today.
-
-### History
-See how the system became what it is.
-
-### Explain
-Use AI to connect current behavior with historical evidence and explain why.
-
-### Before You Change
-Get a compact engineering brief before modifying unfamiliar code.
+Project Archaeologist connects these sources and turns them into a grounded
+investigation.
 
 ## Core Workflow
 
 ```text
 GitHub Repository
       ↓
-Deterministic Analysis
+Deterministic Code + History Analysis
       ↓
-Project Intelligence
-      ├── Current System
-      ├── Historical Context
-      └── Engineering Context
+Project Knowledge
       ↓
-Hybrid Retrieval
+Canonical ProjectContext + Project Graph (PostgreSQL)
       ↓
-Archaeological Investigation
+Change Investigation
       ↓
-Evidence Verification
+Evidence + Reasoning + Verification
       ↓
-Answer + Sources
+Pre-Change Investigation Brief
 ```
 
-## Initial Stack
+## Example
 
-- Next.js + TypeScript
-- Python + FastAPI
-- LangGraph
-- PostgreSQL + pgvector
-- Tree-sitter
-- GitHub App
-- MCP
-- OpenTelemetry / Langfuse
+> “I want to replace Stripe in the payment service. What should I know before
+> changing it?”
 
-## Main Features
+The system investigates affected code, callers, dependencies, tests, related
+historical changes, PRs/issues, and other relevant evidence, then presents a
+scoped brief with sources and unknowns.
 
-- Repository Overview
-- Architecture Explorer
-- Historical Timeline
-- Ask the Archaeologist
-- Why Does This Exist?
-- Feature Archaeology
-- Pre-Change Brief
-- Evidence-backed answers
-- MCP integration
+## What It Understands
 
-## Product Positioning
+- current code structure and symbols
+- imports, calls, dependencies, and relationships
+- APIs and tests where detectable
+- Git history and file evolution
+- pull requests and issues
+- documentation and engineering decisions
+- historical and change-related evidence
 
-Project Archaeologist is **not** a generic "chat with your codebase" product.
+## Current Functioning & Live Capabilities
 
-It combines:
+The system currently has a fully operational foundation (Phase 1), repository understanding layer (Phase 2), and deep historical & engineering context layer (Phase 3 tasks PH3-01 to PH3-04) running locally across a multi-container stack:
 
-> **Current system understanding + history + engineering context + AI reasoning**
+### 1. Interactive Web Application (Next.js 14)
+- **Repository Ingestion & Management:** Ingest local codebases or remote GitHub repositories using the GraphQL v4 & REST v3 protocols.
+- **Component & Architecture Explorer:** Interactive breakdown of modules, directories, files, and Tree-sitter AST symbols with line spans and confidence ratings.
+- **Project Graph & Dependency Visualizer:** Visualizes static call graphs, import graphs, and dependency relationships with manifest-aware gap demarcation (flags actual ghost imports while treating declared packages and stdlib as resolved).
+- **Git History & Origin Commit Inspector:** File-by-file evolution view identifying the exact introducing commit (origin commit), author, line delta, and commit message.
+- **Artifact Traceability Sub-Views:** Interactive cross-referencing between Commits, Pull Requests, and Issues (`Code -> Commit -> PR -> Issue`) with direct GitHub links and resolution keywords (`Fixes #123`, `Merged in PR #45`).
+- **Deterministic Historical Search & Symbol Evolution:** Sub-second searching across commits, PRs, and issues by keyword, author, path, state, and dates, plus symbol evolution timelines with ranked evidence cards.
+- **Engineering Context Viewer:** Architecture Decision Records (ADRs) catalog, RFC 2119 architectural invariants matrix (categorized into Security, Architecture, Performance, Testing, and Data Integrity), and documentation search.
 
-History is a key differentiator, but the product goal is broader:
+### 2. Backend Engines & Services (FastAPI + PostgreSQL)
+- **Tree-sitter Structural AST Parsing:** Deterministic extraction of functions, classes, interfaces, imports, and exports for TypeScript/JavaScript and Python.
+- **Git History Indexing (`GitHistoryIndexer`):** Git log extraction and diff tracking with `CommitFileChange` relational mapping (`added`, `modified`, `deleted`, `renamed`).
+- **Artifact Traceability (`HistoricalLinker` & `ReferenceExtractor`):** Single-pass deterministic regex link discovery reconciling commits, PRs, and issues without LLM hallucination.
+- **Deterministic Historical Retrieval (`HistoricalRetriever`):** Multi-attribute search, symbol milestone extraction, and score-ranked `HistoricalEvidenceRecord` generation.
+- **Engineering Context Engine (`EngineeringContextIndexer` & `EngineeringContextParser`):** Markdown parsing, ADR status/decider indexing, and RFC 2119 imperative directive extraction with line-level citations.
 
-> **Help developers understand unfamiliar software before they change it.**
+### 3. Quickstart & Local Execution
+
+The entire stack is containerized with automatic database migrations and persistent storage volumes:
+
+```bash
+# Start all services (PostgreSQL + pgvector, FastAPI backend, Next.js frontend, Adminer DB UI)
+make up
+# Or using Podman / Docker directly:
+podman compose -f podman-compose.yml up -d
+# docker compose -f compose.yaml up -d
+```
+
+- **Frontend UI:** `http://localhost:3000`
+- **FastAPI Documentation (Swagger):** `http://localhost:8000/docs`
+- **Adminer DB Manager:** `http://localhost:8080`
+
+### 4. Verified Automated Test Suite
+- **52 passing automated pytest tests** covering AST parsing, graph traversal, Git history indexing, PR/Issue linking, historical retrieval, engineering context extraction, Kamei change risk scoring, co-change hidden coupling detection, and reach-ranked guarding tests.
+- Clean TypeScript contracts typecheck (`packages/contracts`) and Next.js production build (`packages/web` / `frontend`).
 
 ## Development Context
 
-- `AGENTS.md` — how coding agents should work
+- `AGENTS.md` — coding-agent development rules
 - `PROJECT.md` — product intent and scope
-- `ARCHITECTURE.md` — current technical design
-- `ROADMAP.md` — phase-level development plan
+- `ARCHITECTURE.md` — technical design
+- `ROADMAP.md` — phase plan
 - `STATUS.md` — current implementation state
-- `DECISIONS.md` — significant technical decisions
-- `phases/` — phase goals and acceptance criteria
-- `.agents/workflows/` — optional Antigravity workflows
+- `DECISIONS.md` — significant decisions
+- `phases/` — phase-specific goals and acceptance criteria
 
 For coding-agent work, start with `AGENTS.md` and `STATUS.md`.
 
 ## Current Status
 
-See `STATUS.md`.
+See [`STATUS.md`](file:///Users/shlok/Projects/Archelogiest/STATUS.md).
 
 ## License
 
-TBD.
+[MIT License](file:///Users/shlok/Projects/Archelogiest/LICENSE) — Copyright (c) 2026 Shlok Prashant Ramteke.
 
-
-## Development Workflows
-
-For Antigravity, optional workflows can live under `.agents/workflows/`.
-These workflows operate on the same project source of truth and should not
-duplicate product or architecture documentation.
-
-Suggested workflows:
-- `start-task`
-- `finish-task`
-- `architecture-change`

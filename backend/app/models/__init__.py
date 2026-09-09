@@ -2,6 +2,16 @@ from app.models.base import Base
 from app.models.commit import Commit
 from app.models.commit_file_change import ChangeType, CommitFileChange
 from app.models.dependency import CodeDependency, DependencyKind
+from app.models.design_constraint import (
+    ConstraintCategory,
+    ConstraintLevel,
+    DesignConstraint,
+)
+from app.models.engineering_doc import (
+    ADRStatus,
+    EngineeringDocType,
+    EngineeringDocument,
+)
 from app.models.evidence import Evidence, EvidenceSourceType
 from app.models.historical_link import (
     CommitIssueLink,
@@ -37,4 +47,10 @@ __all__ = [
     "EvidenceSourceType",
     "Investigation",
     "InvestigationStatus",
+    "EngineeringDocument",
+    "EngineeringDocType",
+    "ADRStatus",
+    "DesignConstraint",
+    "ConstraintCategory",
+    "ConstraintLevel",
 ]
