@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pytest
 from app.history.co_change import (
     CoChangePartner,
     detect_hidden_coupling,

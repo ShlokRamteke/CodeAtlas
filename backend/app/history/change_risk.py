@@ -9,7 +9,7 @@ Implements empirical software engineering defect prediction models:
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
 from typing import Sequence

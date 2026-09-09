@@ -8,9 +8,8 @@ changed files, and detects verification gaps:
 
 from __future__ import annotations
 
-from collections import Counter
 from dataclasses import dataclass
-from typing import Mapping, Sequence, Set
+from typing import Mapping, Set
 
 
 @dataclass(frozen=True)

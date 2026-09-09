@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pytest
 from app.history.guarding_tests import (
     analyze_guarding_tests,
     detect_verification_gaps,
