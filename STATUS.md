@@ -6,11 +6,11 @@ Phase 4 — Change Investigation Engine
 
 ## Current Task
 
-PH4-02 Complete &mdash; Next: PH4-03 (Quantitative Change Risk & Defect Pressure)
+PH4-03 Complete &mdash; Next: PH4-04 (Guarding Test & Verification Gap Analyzer)
 
 ## Status
 
-PH4-02 COMPLETE / READY FOR PH4-03
+PH4-03 COMPLETE / READY FOR PH4-04
 
 
 ## Product Focus
@@ -88,20 +88,25 @@ developer understand a proposed change before implementation.
   - `detect_hidden_coupling`: flags omitted partner files and differentiates corroborated static dependencies from hidden coupling alerts.
   - Integrated directly into deterministic `InvestigationEngine.gather` and brief recommendation synthesis.
   - 100% automated test pass rate across 67 pytest tests, clean frontend build, and clean contracts typecheck.
+- **Phase 4 — Task PH4-03 (Quantitative Change Risk & Defect Pressure)**:
+  - Unified diff parsing (`parse_unified_diff`): extracts lines added, lines deleted, and touched file paths from standard Git patches.
+  - Kamei empirical change risk metrics ($LA, LD, NF, ND, NS$) combined with Shannon churn entropy $H(P)$ to measure change dispersion vs focus.
+  - Deep commit walk defect pressure mining (`mine_defect_pressure_from_db`): scans up to 20,000 repository commits with half-life exponential recency decay ($\tau = 365\text{d}$), detecting prior regressions touching target files.
+  - Integrated into `InvestigationEngine.gather()` with synthesized `ev-risk` evidence records and signal payloads.
+  - Next.js UI interactive card with Kamei metric pills ($LA, LD, NF, ND, NS, H(P)$, defect pressure), risk level badges, and driver alert chips.
+  - 100% automated test pass rate across 70 pytest tests, clean frontend build, and clean contracts typecheck.
 
 ## Remaining
 
-- **Phase 4**: Change Investigation Engine (PH4-03: Quantitative Change Risk & Defect Pressure, PH4-04: Guarding Test Analyzer, PH4-05: Invariant Synthesis, PH4-06: Token Budgeting & Distillation, PH4-07: Concurrent Branch Overlap & Merge Conflict Detector, PH4-08: Independent Change Decomposition, PH4-09: Code Ownership & Reviewer Recommender, PH4-10: C4 Architecture & Dependency Export).
+- **Phase 4**: Change Investigation Engine (PH4-04: Guarding Test Analyzer, PH4-05: Invariant Synthesis, PH4-06: Token Budgeting & Distillation, PH4-07: Concurrent Branch Overlap & Merge Conflict Detector, PH4-08: Independent Change Decomposition, PH4-09: Code Ownership & Reviewer Recommender, PH4-10: C4 Architecture & Dependency Export).
 
 ## Blockers
-
 
 None known.
 
 ## Next Action
 
-Start Task PH4-03 (Quantitative Change Risk & Defect Pressure).
-
+Start Task PH4-04 (Guarding Test & Verification Gap Analyzer).
 
 ## Session Rule
 
@@ -118,4 +123,4 @@ receive scoped views of that model.
 
 ## Last Updated
 
-2026-09-09
+2026-09-10

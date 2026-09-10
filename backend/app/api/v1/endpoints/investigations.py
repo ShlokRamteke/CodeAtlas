@@ -130,12 +130,14 @@ async def run_investigation(
     engine = InvestigationEngine()
     target_path = run_req.target_path if run_req else None
     target_symbol = run_req.target_symbol if run_req else None
+    diff = run_req.diff if run_req else None
 
     await engine.run(
         investigation_id=inv.id,
         db=db,
         target_path=target_path,
         target_symbol=target_symbol,
+        diff=diff,
     )
 
     # Refresh with evidence

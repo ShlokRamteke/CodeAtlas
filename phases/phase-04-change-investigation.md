@@ -51,7 +51,7 @@ Pre-Change Investigation Brief
   - Mine Git commit diff co-changes to identify hidden coupling partners (frequency $> 60\%$, $\tau = 180\text{d}$ half-life decay).
   - Flag unexplained coupling warnings when proposed changes omit historical partner files.
 
-- [ ] **PH4-03: Quantitative Change Risk & Defect Pressure**
+- [x] **PH4-03: Quantitative Change Risk & Defect Pressure** *(Completed)*
   - Compute Kamei empirical metrics ($LA, LD, NF, ND, NS$).
   - Calculate Shannon churn entropy ($H(P)$) to score dispersion vs focus.
   - Mine historical defect pressure (20,000-commit deep walk with exponential recency decay $\tau = 365\text{d}$).

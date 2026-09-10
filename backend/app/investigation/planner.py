@@ -12,7 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.history.change_risk import (
     FileChangeStat,
+    HistoricalCommitInfo,
     assess_change_risk,
+    compute_defect_pressure,
+    is_fix_commit,
+    mine_defect_pressure_from_db,
+    parse_unified_diff,
 )
 from app.history.co_change import (
     detect_hidden_coupling,
@@ -56,6 +61,7 @@ class InvestigationEngine:
         query: str,
         target_path: Optional[str] = None,
         target_symbol: Optional[str] = None,
+        diff: Optional[str] = None,
         known_files: Optional[List[str]] = None,
         known_symbols: Optional[List[str]] = None,
     ) -> InvestigationState:
@@ -68,10 +74,17 @@ class InvestigationEngine:
             known_symbols=known_symbols,
         )
 
+        if diff:
+            parsed = parse_unified_diff(diff)
+            for ps in parsed:
+                if ps.path not in intent.target_files:
+                    intent.target_files.append(ps.path)
+
         return InvestigationState(
             investigation_id=investigation_id,
             repository_id=repository_id,
             query=query,
+            diff=diff,
             step=InvestigationStep.INTAKE,
             intent=intent,
         )
@@ -305,20 +318,128 @@ class InvestigationEngine:
                 }
                 evidence_items.append(ev)
 
-            # Quantitative Change Risk calculation
-            file_stats = [
-                FileChangeStat(path=tf, lines_added=50, lines_deleted=10) for tf in target_files
-            ]
-            risk_report = assess_change_risk(file_stats)
+            # Quantitative Change Risk & Defect Pressure calculation
+            file_stats: list[FileChangeStat] = []
+            if state.diff:
+                parsed_stats = parse_unified_diff(state.diff)
+                if parsed_stats:
+                    file_stats = parsed_stats
+
+            if not file_stats and target_files:
+                # Query historical average insertions/deletions from CommitFileChange if available
+                clean_target_set = {f.lstrip("/") for f in target_files}
+                cfc_stats_query = (
+                    select(
+                        CommitFileChange.file_path,
+                        CommitFileChange.insertions,
+                        CommitFileChange.deletions,
+                    )
+                    .join(Commit, CommitFileChange.commit_id == Commit.id)
+                    .where(
+                        Commit.repository_id == state.repository_id,
+                        CommitFileChange.file_path.in_(clean_target_set),
+                    )
+                )
+                cfc_stats_res = await db.execute(cfc_stats_query)
+                cfc_stat_rows = cfc_stats_res.all()
+
+                per_file_avg: dict[str, list[tuple[int, int]]] = defaultdict(list)
+                for f_path, ins, dels in cfc_stat_rows:
+                    per_file_avg[f_path].append((ins, dels))
+
+                for tf in target_files:
+                    clean_tf = tf.lstrip("/")
+                    if clean_tf in per_file_avg and per_file_avg[clean_tf]:
+                        entries = per_file_avg[clean_tf]
+                        avg_ins = max(1, sum(x[0] for x in entries) // len(entries))
+                        avg_del = max(0, sum(x[1] for x in entries) // len(entries))
+                        file_stats.append(
+                            FileChangeStat(
+                                path=clean_tf, lines_added=avg_ins, lines_deleted=avg_del
+                            )
+                        )
+                    else:
+                        file_stats.append(
+                            FileChangeStat(path=clean_tf, lines_added=50, lines_deleted=10)
+                        )
+
+            # Mine historical defect pressure (deep walk up to 20,000 commits with half-life = 365d)
+            if file_commits:
+                mock_historical_commits = [
+                    HistoricalCommitInfo(
+                        hash=fc.get("hash", f"c{i}"),
+                        message=fc.get("message", ""),
+                        timestamp=fc.get("timestamp", datetime.now()),
+                        touched_files=tuple(fc.get("touched_files", ())),
+                        is_fix=fc.get("is_fix", False),
+                    )
+                    for i, fc in enumerate(file_commits)
+                ]
+                clean_targets = {f.lstrip("/") for f in target_files}
+                defect_pressure = compute_defect_pressure(mock_historical_commits, clean_targets)
+                fix_commits = [
+                    c
+                    for c in mock_historical_commits
+                    if (c.is_fix or is_fix_commit(c.message))
+                    and any(f in clean_targets for f in c.touched_files)
+                ]
+            else:
+                defect_pressure, fix_commits = await mine_defect_pressure_from_db(
+                    db=db,
+                    repository_id=state.repository_id,
+                    target_files=set(target_files),
+                    limit=20000,
+                    half_life_days=365.0,
+                )
+
+            risk_report = assess_change_risk(
+                changes=file_stats,
+                commits=fix_commits,
+            )
+
             signals["change_risk"] = {
                 "risk_score": risk_report.risk_score,
                 "risk_level": risk_report.risk_level,
                 "lines_added": risk_report.kamei_metrics.lines_added,
                 "lines_deleted": risk_report.kamei_metrics.lines_deleted,
                 "file_count": risk_report.kamei_metrics.files_touched,
+                "distinct_directories": risk_report.kamei_metrics.distinct_directories,
+                "distinct_subsystems": risk_report.kamei_metrics.distinct_subsystems,
                 "shannon_entropy": risk_report.kamei_metrics.shannon_entropy,
+                "defect_pressure": risk_report.defect_pressure,
+                "fix_commit_count": risk_report.fix_commit_count,
                 "explanatory_factors": risk_report.explanatory_factors,
             }
+
+            ev_risk = {
+                "id": f"ev-risk-{len(evidence_items) + 1}",
+                "source_type": EvidenceSourceType.COMMIT,
+                "source_id": "kamei-change-risk",
+                "title": f"Quantitative Change Risk: {risk_report.risk_level} ({risk_report.risk_score:.2f})",
+                "snippet": (
+                    f"Kamei Churn: +{risk_report.kamei_metrics.lines_added}/-{risk_report.kamei_metrics.lines_deleted} lines "
+                    f"across {risk_report.kamei_metrics.files_touched} files in {risk_report.kamei_metrics.distinct_subsystems} subsystems. "
+                    f"Shannon entropy: {risk_report.kamei_metrics.shannon_entropy}. "
+                    f"Defect pressure: {risk_report.defect_pressure:.2f} ({risk_report.fix_commit_count} prior fix commits)."
+                ),
+                "confidence": 1.0,
+                "extra_metadata": {
+                    "risk_score": risk_report.risk_score,
+                    "risk_level": risk_report.risk_level,
+                    "kamei_metrics": {
+                        "lines_added": risk_report.kamei_metrics.lines_added,
+                        "lines_deleted": risk_report.kamei_metrics.lines_deleted,
+                        "files_touched": risk_report.kamei_metrics.files_touched,
+                        "distinct_directories": risk_report.kamei_metrics.distinct_directories,
+                        "distinct_subsystems": risk_report.kamei_metrics.distinct_subsystems,
+                        "shannon_entropy": risk_report.kamei_metrics.shannon_entropy,
+                    },
+                    "defect_pressure": risk_report.defect_pressure,
+                    "fix_commit_count": risk_report.fix_commit_count,
+                    "explanatory_factors": risk_report.explanatory_factors,
+                },
+            }
+            evidence_items.append(ev_risk)
 
             # Guarding tests check
             untested_warns, stale_warns = detect_verification_gaps(
@@ -515,6 +636,7 @@ class InvestigationEngine:
         db: AsyncSession,
         target_path: Optional[str] = None,
         target_symbol: Optional[str] = None,
+        diff: Optional[str] = None,
         code_snippets: Optional[List[Dict[str, Any]]] = None,
         file_commits: Optional[List[Dict[str, Any]]] = None,
         engineering_docs: Optional[List[Dict[str, Any]]] = None,
@@ -535,6 +657,7 @@ class InvestigationEngine:
             query=inv.query,
             target_path=target_path,
             target_symbol=target_symbol,
+            diff=diff,
         )
 
         try:

@@ -63,6 +63,8 @@ class InvestigationState:
     investigation_id: uuid.UUID
     repository_id: uuid.UUID
     query: str
+    diff: Optional[str] = None
+    file_stats: Optional[List[Dict[str, Any]]] = None
     step: InvestigationStep = InvestigationStep.INTAKE
     intent: Optional[NormalizedChangeIntent] = None
     plan: Optional[InvestigationPlan] = None

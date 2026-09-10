@@ -305,3 +305,71 @@ def test_openrouter_provider_configuration():
 
     default_provider = get_default_llm_provider()
     assert default_provider is not None
+
+
+@pytest.mark.asyncio
+async def test_investigation_engine_with_diff_input(db_session: AsyncSession):
+    repo = Repository(
+        owner="testorg",
+        name="riskengine",
+        full_name="testorg/riskengine",
+        default_branch="main",
+    )
+    db_session.add(repo)
+    await db_session.commit()
+    await db_session.refresh(repo)
+
+    inv = Investigation(
+        repository_id=repo.id,
+        query="Refactor database schema across auth and billing",
+    )
+    db_session.add(inv)
+    await db_session.commit()
+    await db_session.refresh(inv)
+
+    sample_diff = """diff --git a/backend/app/auth/service.py b/backend/app/auth/service.py
+index 0000000..1111111 100644
+--- a/backend/app/auth/service.py
++++ b/backend/app/auth/service.py
+@@ -1,5 +1,15 @@
++import hashlib
++def hash_token(): pass
++def verify_token(): pass
+-def old_auth(): pass
+diff --git a/backend/app/billing/charge.py b/backend/app/billing/charge.py
+--- a/backend/app/billing/charge.py
++++ b/backend/app/billing/charge.py
+@@ -10,3 +10,12 @@
++def process_charge(): pass
++def refund(): pass
+"""
+
+    mock_llm = MockLLMProvider()
+    engine = InvestigationEngine(llm_provider=mock_llm)
+
+    state = await engine.run(
+        investigation_id=inv.id,
+        db=db_session,
+        diff=sample_diff,
+    )
+
+    assert state.step == InvestigationStep.COMPLETED
+    assert "change_risk" in state.gathered_signals
+
+    risk_sig = state.gathered_signals["change_risk"]
+    assert risk_sig["lines_added"] == 5
+    assert risk_sig["lines_deleted"] == 1
+    assert risk_sig["file_count"] == 2
+    assert risk_sig["shannon_entropy"] > 0.0
+    assert risk_sig["risk_score"] >= 0.0
+    assert risk_sig["risk_level"] in ("LOW", "MEDIUM", "HIGH", "CRITICAL")
+
+    # Check evidence records
+    risk_ev = next(
+        (ev for ev in state.gathered_evidence if ev.get("source_id") == "kamei-change-risk"),
+        None,
+    )
+    assert risk_ev is not None
+    assert "Quantitative Change Risk" in risk_ev["title"]
+    assert risk_ev["extra_metadata"]["kamei_metrics"]["lines_added"] == 5
+    assert risk_ev["extra_metadata"]["kamei_metrics"]["lines_deleted"] == 1
