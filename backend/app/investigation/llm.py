@@ -314,7 +314,9 @@ class OpenRouterLLMProvider:
                     classification=c.classification,
                     statement=c.statement,
                     evidence_ids=grounded_citations,
-                    confidence=c.confidence if grounded_citations or c.classification != ClaimClassification.FACT else 0.5,
+                    confidence=c.confidence
+                    if grounded_citations or c.classification != ClaimClassification.FACT
+                    else 0.5,
                 )
             )
         return verified, {"prompt_tokens": 0, "completion_tokens": 0}

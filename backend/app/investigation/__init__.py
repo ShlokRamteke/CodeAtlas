@@ -37,4 +37,3 @@ __all__ = [
     "get_default_llm_provider",
     "InvestigationEngine",
 ]
-

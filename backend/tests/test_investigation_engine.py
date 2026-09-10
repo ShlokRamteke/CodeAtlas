@@ -115,11 +115,12 @@ async def test_investigation_engine_end_to_end(db_session: AsyncSession):
     await db_session.refresh(inv)
 
     # Add SourceFile and CodeDependency
-    from app.models.source_file import SourceFile
-    from app.models.dependency import CodeDependency
-    from app.models.commit import Commit
-    from app.models.commit_file_change import CommitFileChange, ChangeType
     from datetime import datetime, timezone
+
+    from app.models.commit import Commit
+    from app.models.commit_file_change import ChangeType, CommitFileChange
+    from app.models.dependency import CodeDependency
+    from app.models.source_file import SourceFile
 
     src_file = SourceFile(
         repository_id=repo.id,
@@ -171,10 +172,18 @@ async def test_investigation_engine_end_to_end(db_session: AsyncSession):
     await db_session.refresh(c1)
     await db_session.refresh(c2)
 
-    fc1 = CommitFileChange(commit_id=c1.id, file_path="payments/gateway.py", change_type=ChangeType.MODIFIED)
-    fc2 = CommitFileChange(commit_id=c1.id, file_path="config/payments.yaml", change_type=ChangeType.MODIFIED)
-    fc3 = CommitFileChange(commit_id=c2.id, file_path="payments/gateway.py", change_type=ChangeType.MODIFIED)
-    fc4 = CommitFileChange(commit_id=c2.id, file_path="config/payments.yaml", change_type=ChangeType.MODIFIED)
+    fc1 = CommitFileChange(
+        commit_id=c1.id, file_path="payments/gateway.py", change_type=ChangeType.MODIFIED
+    )
+    fc2 = CommitFileChange(
+        commit_id=c1.id, file_path="config/payments.yaml", change_type=ChangeType.MODIFIED
+    )
+    fc3 = CommitFileChange(
+        commit_id=c2.id, file_path="payments/gateway.py", change_type=ChangeType.MODIFIED
+    )
+    fc4 = CommitFileChange(
+        commit_id=c2.id, file_path="config/payments.yaml", change_type=ChangeType.MODIFIED
+    )
     db_session.add_all([fc1, fc2, fc3, fc4])
     await db_session.commit()
 
@@ -195,7 +204,6 @@ async def test_investigation_engine_end_to_end(db_session: AsyncSession):
             }
         ],
     )
-
 
     assert state.step == InvestigationStep.COMPLETED
     assert state.brief is not None
@@ -227,7 +235,6 @@ async def test_investigation_engine_end_to_end(db_session: AsyncSession):
     assert inv.summary is not None
     assert len(inv.claims) > 0
     assert len(inv.evidence) >= 2
-
 
 
 @pytest.mark.asyncio

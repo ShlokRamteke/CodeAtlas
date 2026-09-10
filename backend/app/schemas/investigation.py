@@ -70,7 +70,6 @@ class NormalizedChangeIntentSchema(BaseModel):
     is_ambiguous: bool = False
 
 
-
 class InvestigationPlanSchema(BaseModel):
     steps: List[str] = Field(default_factory=list)
     target_files: List[str] = Field(default_factory=list)

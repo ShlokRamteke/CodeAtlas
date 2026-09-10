@@ -35,7 +35,9 @@ def test_blast_radius_direct_reachability():
     assert order_node.depth == 1
     assert order_node.direction == "upstream"
 
-    ctrl_node = next(n for n in res.upstream_callers if n.path == "src/controllers/orderController.ts")
+    ctrl_node = next(
+        n for n in res.upstream_callers if n.path == "src/controllers/orderController.ts"
+    )
     assert ctrl_node.depth == 2
     assert ctrl_node.via == "src/services/order.ts"
 

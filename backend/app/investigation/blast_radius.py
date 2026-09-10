@@ -41,7 +41,9 @@ class BlastRadiusAnalyzer:
     def compute_blast_radius(
         cls,
         target_files: List[str],
-        dependency_edges: List[Tuple[str, str]],  # (source_path, target_path) where source imports target
+        dependency_edges: List[
+            Tuple[str, str]
+        ],  # (source_path, target_path) where source imports target
         max_depth: int = 3,
     ) -> BlastRadiusResult:
         """Calculate transitive blast radius for given target files.

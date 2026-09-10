@@ -9,8 +9,6 @@ from typing import Any, Dict, List, Optional, Set
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-
 
 from app.history.change_risk import (
     FileChangeStat,
@@ -37,7 +35,6 @@ from app.models.commit_file_change import CommitFileChange
 from app.models.dependency import CodeDependency
 from app.models.evidence import Evidence, EvidenceSourceType
 from app.models.investigation import Investigation, InvestigationStatus
-
 
 logger = logging.getLogger(__name__)
 
@@ -260,8 +257,7 @@ class InvestigationEngine:
                     commit_time_map[c_id] = c_time
 
             commit_diff_tuples = [
-                (files, commit_time_map[c_id])
-                for c_id, files in commit_files_map.items()
+                (files, commit_time_map[c_id]) for c_id, files in commit_files_map.items()
             ]
 
             co_change_matrix = mine_co_change_partners(
@@ -277,8 +273,6 @@ class InvestigationEngine:
                 co_change_matrix=co_change_matrix,
                 known_static_edges=known_static_set,
             )
-
-
 
             signals["co_change"] = {
                 "hidden_coupling_warnings": [
@@ -313,8 +307,7 @@ class InvestigationEngine:
 
             # Quantitative Change Risk calculation
             file_stats = [
-                FileChangeStat(path=tf, lines_added=50, lines_deleted=10)
-                for tf in target_files
+                FileChangeStat(path=tf, lines_added=50, lines_deleted=10) for tf in target_files
             ]
             risk_report = assess_change_risk(file_stats)
             signals["change_risk"] = {
@@ -345,7 +338,6 @@ class InvestigationEngine:
             "evidence_count": len(evidence_items),
         }
         return signals
-
 
     async def reason(self, state: InvestigationState) -> List[InvestigationClaim]:
         """Step 4: Bounded Reasoning & Claim Generation."""
@@ -457,7 +449,6 @@ class InvestigationEngine:
 
         if state.gathered_signals.get("change_risk", {}).get("shannon_entropy", 0) > 1.5:
             recommended_checks.append("High churn entropy detected: ensure changes remain modular.")
-
 
         brief = PreChangeBrief(
             summary=(

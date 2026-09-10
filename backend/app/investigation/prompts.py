@@ -11,6 +11,7 @@ from app.investigation.intent import NormalizedChangeIntent
 # Structured Output Schemas (Validated against LLM JSON responses)
 # ---------------------------------------------------------------------------
 
+
 class PlannerLLMOutput(BaseModel):
     steps: List[str] = Field(
         default_factory=list,
@@ -138,6 +139,7 @@ Respond with a single valid JSON object matching this schema:
 # Prompt Formatters with XML Semantic Delimiters
 # ---------------------------------------------------------------------------
 
+
 def build_planner_prompt(
     intent: NormalizedChangeIntent,
     context_preview: str,
@@ -180,15 +182,15 @@ def build_reasoner_prompt(
         path = ev.get("path") or title or "source"
         doc_blocks.append(
             f'  <document index="{idx}" id="{ev_id}">\n'
-            f'    <source>{path}</source>\n'
-            f'    <document_content>\n{snippet}\n    </document_content>\n'
-            f'  </document>'
+            f"    <source>{path}</source>\n"
+            f"    <document_content>\n{snippet}\n    </document_content>\n"
+            f"  </document>"
         )
 
     evidence_xml = (
         "<documents>\n" + "\n".join(doc_blocks) + "\n</documents>"
         if doc_blocks
-        else "<documents>\n  <document index=\"0\" id=\"none\">\n    <document_content>No specific evidence items recorded.</document_content>\n  </document>\n</documents>"
+        else '<documents>\n  <document index="0" id="none">\n    <document_content>No specific evidence items recorded.</document_content>\n  </document>\n</documents>'
     )
 
     user_message = f"""{evidence_xml}

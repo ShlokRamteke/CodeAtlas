@@ -7,11 +7,11 @@ frequently despite having no static import or dependency edge.
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from dataclasses import dataclass
-import math
 from datetime import datetime, timezone
-from typing import Sequence, Set, Tuple, Union
+from typing import Sequence, Set, Tuple
 
 
 @dataclass(frozen=True)
@@ -39,7 +39,7 @@ class HiddenCouplingWarning:
 
 
 def mine_co_change_partners(
-    commit_file_sets: Sequence[Union[Set[str], Tuple[Set[str], datetime]]],
+    commit_file_sets: Sequence[Set[str] | Tuple[Set[str], datetime]],
     min_co_changes: int = 2,
     min_frequency: float = 0.5,
     half_life_days: float = 180.0,
@@ -90,7 +90,6 @@ def mine_co_change_partners(
         if co_count < min_co_changes:
             continue
         total_a = file_change_counts[fa]
-        weight_a = file_change_weights[fa]
         if total_a <= 0:
             continue
 
@@ -111,10 +110,11 @@ def mine_co_change_partners(
 
     # Sort each list by frequency descending, then decayed_weight descending
     for fa in partners:
-        partners[fa].sort(key=lambda p: (-p.frequency, -p.decayed_weight, -p.co_change_count, p.partner_file))
+        partners[fa].sort(
+            key=lambda p: (-p.frequency, -p.decayed_weight, -p.co_change_count, p.partner_file)
+        )
 
     return dict(partners)
-
 
 
 def detect_hidden_coupling(
