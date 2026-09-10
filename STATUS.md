@@ -91,9 +91,10 @@ developer understand a proposed change before implementation.
 
 ## Remaining
 
-- **Phase 4**: Change Investigation Engine (PH4-03: Quantitative Change Risk & Defect Pressure, PH4-04: Guarding Test Analyzer, PH4-05: Invariant Synthesis, PH4-06: Token Budgeting & Distillation).
+- **Phase 4**: Change Investigation Engine (PH4-03: Quantitative Change Risk & Defect Pressure, PH4-04: Guarding Test Analyzer, PH4-05: Invariant Synthesis, PH4-06: Token Budgeting & Distillation, PH4-07: Concurrent Branch Overlap & Merge Conflict Detector, PH4-08: Independent Change Decomposition, PH4-09: Code Ownership & Reviewer Recommender, PH4-10: C4 Architecture & Dependency Export).
 
 ## Blockers
+
 
 None known.
 

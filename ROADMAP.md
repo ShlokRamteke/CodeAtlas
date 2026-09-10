@@ -99,12 +99,21 @@ Core work:
 - Bounded investigation planner
 - Dependency / impact tracing (blast radius)
 - Historical correlation and co-change signals
+- Concurrent branch overlap & merge conflict alerts
+- Independent change decomposition (connected components)
+- Authorship concentration & reviewer recommendations
+- Quantitative change risk & defect pressure (Kamei metrics + Shannon entropy)
+- Guarding test reachability & verification gap analyzer
+- Intent archaeology & invariant synthesis
+- C4 architecture & dependency export
+- Token budgeting & dual-format projection (Markdown & dense JSON)
 - Evidence ranking
 - Bounded LangGraph reasoning (1–3 model calls)
 - Claim / citation generation (fact, inference, unknown)
 - Lightweight verification
 - Pre-Change Investigation Brief generation
 - "Why Does This Exist?" as a focused workflow
+
 
 ### Done when
 A developer can provide a proposed change and receive a grounded, evidence-backed investigation brief covering scope, historical context, constraints, risks/signals, and important unknowns.
