@@ -7,9 +7,11 @@ frequently despite having no static import or dependency edge.
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Sequence, Set
+from datetime import datetime, timezone
+from typing import Sequence, Set, Tuple
 
 
 @dataclass(frozen=True)
@@ -21,6 +23,7 @@ class CoChangePartner:
     co_change_count: int
     total_target_changes: int
     frequency: float  # co_change_count / total_target_changes
+    decayed_weight: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -36,26 +39,50 @@ class HiddenCouplingWarning:
 
 
 def mine_co_change_partners(
-    commit_file_sets: Sequence[Set[str]],
+    commit_file_sets: Sequence[Set[str] | Tuple[Set[str], datetime]],
     min_co_changes: int = 2,
     min_frequency: float = 0.5,
+    half_life_days: float = 180.0,
+    reference_time: datetime | None = None,
 ) -> dict[str, list[CoChangePartner]]:
     """Mine co-occurring file changes across commit diffs.
 
-    Returns mapping of file_path -> list of co-change partners sorted by frequency.
+    Supports optional commit timestamps for exponential recency decay (half_life_days = 180.0).
+    Formula: weight = 2^(-age_in_days / half_life_days).
+
+    Returns mapping of file_path -> list of co-change partners sorted by frequency / weight.
     """
     file_change_counts: dict[str, int] = defaultdict(int)
+    file_change_weights: dict[str, float] = defaultdict(float)
     pair_counts: dict[tuple[str, str], int] = defaultdict(int)
+    pair_weights: dict[tuple[str, str], float] = defaultdict(float)
 
-    for file_set in commit_file_sets:
+    ref_time = reference_time or datetime.now(timezone.utc)
+    if ref_time.tzinfo is None:
+        ref_time = ref_time.replace(tzinfo=timezone.utc)
+
+    for item in commit_file_sets:
+        if isinstance(item, tuple) and len(item) == 2 and isinstance(item[1], datetime):
+            file_set, c_time = item
+            if c_time.tzinfo is None:
+                c_time = c_time.replace(tzinfo=timezone.utc)
+            age_days = max(0.0, (ref_time - c_time).total_seconds() / 86400.0)
+            weight = math.pow(2.0, -age_days / half_life_days)
+        else:
+            file_set = item  # type: ignore[assignment]
+            weight = 1.0
+
         files = sorted(file_set)
         for f in files:
             file_change_counts[f] += 1
+            file_change_weights[f] += weight
 
         for i, fa in enumerate(files):
             for fb in files[i + 1 :]:
                 pair_counts[(fa, fb)] += 1
                 pair_counts[(fb, fa)] += 1
+                pair_weights[(fa, fb)] += weight
+                pair_weights[(fb, fa)] += weight
 
     partners: dict[str, list[CoChangePartner]] = defaultdict(list)
 
@@ -65,7 +92,10 @@ def mine_co_change_partners(
         total_a = file_change_counts[fa]
         if total_a <= 0:
             continue
+
         freq = round(co_count / total_a, 3)
+        decayed_w = round(pair_weights[(fa, fb)], 3)
+
         if freq >= min_frequency:
             partners[fa].append(
                 CoChangePartner(
@@ -74,12 +104,15 @@ def mine_co_change_partners(
                     co_change_count=co_count,
                     total_target_changes=total_a,
                     frequency=freq,
+                    decayed_weight=decayed_w,
                 )
             )
 
-    # Sort each list by frequency descending
+    # Sort each list by frequency descending, then decayed_weight descending
     for fa in partners:
-        partners[fa].sort(key=lambda p: (-p.frequency, -p.co_change_count, p.partner_file))
+        partners[fa].sort(
+            key=lambda p: (-p.frequency, -p.decayed_weight, -p.co_change_count, p.partner_file)
+        )
 
     return dict(partners)
 

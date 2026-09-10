@@ -46,10 +46,11 @@ Pre-Change Investigation Brief
 - [x] **PH4-01: Bounded Investigation Engine & Planner** *(Completed)*
   - Build bounded LangGraph workflow with strict 1–3 model call limits.
   - Parse change intent (natural language query, diff, or file list) into normalized targets.
-- [ ] **PH4-02: Blast Radius & Co-Change Hidden Coupling**
+- [x] **PH4-02: Blast Radius & Co-Change Hidden Coupling** *(Completed)*
   - Compute static upstream and downstream call graph reachability.
   - Mine Git commit diff co-changes to identify hidden coupling partners (frequency $> 60\%$, $\tau = 180\text{d}$ half-life decay).
   - Flag unexplained coupling warnings when proposed changes omit historical partner files.
+
 - [ ] **PH4-03: Quantitative Change Risk & Defect Pressure**
   - Compute Kamei empirical metrics ($LA, LD, NF, ND, NS$).
   - Calculate Shannon churn entropy ($H(P)$) to score dispersion vs focus.
@@ -64,6 +65,19 @@ Pre-Change Investigation Brief
 - [ ] **PH4-06: Token Budgeting & Dual-Format Projection**
   - Implement token-budgeted distillation with priority shedding and recoverable omission markers (`[ref#<id>]`).
   - Project canonical `ProjectContext` into Human-facing Markdown and dense Agent-facing JSON.
+- [ ] **PH4-07: Concurrent Branch Overlap & Merge Conflict Detector**
+  - Query open pull requests and active branches touching target files or their direct blast radius.
+  - Flag concurrent in-flight changes to prevent merge conflicts before code is written.
+- [ ] **PH4-08: Independent Change Decomposition**
+  - Evaluate weakly-connected components across the dependency subgraph of proposed modified files.
+  - Suggest splitting large, unrelated change bundles into independent, modular pull requests.
+- [ ] **PH4-09: Code Ownership & Reviewer Recommender**
+  - Calculate authorship concentration over modified and blast-radius files using historical `CommitFileChange` blame.
+  - Recommend domain experts and reviewers best qualified to inspect the proposed change.
+- [ ] **PH4-10: C4 Architecture & Dependency Export**
+  - Generate clean C4 container/component models and Mermaid diagram definitions from canonical `ProjectContext`.
+  - Provide automated, portable architectural export for engineering documentation.
+
 
 ### 2. Specialized Workflows
 - [ ] **Pre-Change Investigation Brief** — Core product workflow: investigate a proposed change and generate a comprehensive brief.

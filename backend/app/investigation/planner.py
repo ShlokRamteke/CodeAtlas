@@ -3,15 +3,23 @@ from __future__ import annotations
 import logging
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from collections import defaultdict
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Set
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.history.change_risk import (
     FileChangeStat,
     assess_change_risk,
 )
+from app.history.co_change import (
+    detect_hidden_coupling,
+    mine_co_change_partners,
+)
 from app.history.guarding_tests import detect_verification_gaps
+from app.investigation.blast_radius import BlastRadiusAnalyzer
 from app.investigation.intent import IntentNormalizer
 from app.investigation.llm import LLMProvider, get_default_llm_provider
 from app.investigation.state import (
@@ -22,6 +30,9 @@ from app.investigation.state import (
     InvestigationStep,
     PreChangeBrief,
 )
+from app.models.commit import Commit
+from app.models.commit_file_change import CommitFileChange
+from app.models.dependency import CodeDependency
 from app.models.evidence import Evidence, EvidenceSourceType
 from app.models.investigation import Investigation, InvestigationStatus
 
@@ -171,11 +182,132 @@ class InvestigationEngine:
                 }
                 evidence_items.append(ev)
 
-        # 4. Compute deterministic risk & co-change signals
+        # 4. Compute deterministic blast radius, risk, and co-change signals
         if target_files:
+            # Query static dependencies for repository
+            dep_query = select(CodeDependency).where(
+                CodeDependency.repository_id == state.repository_id
+            )
+            dep_res = await db.execute(dep_query)
+            db_deps = dep_res.scalars().all()
+            static_edges = [(d.source_path, d.target_path) for d in db_deps]
+
+            # Compute Blast Radius
+            blast_radius = BlastRadiusAnalyzer.compute_blast_radius(
+                target_files=target_files,
+                dependency_edges=static_edges,
+                max_depth=3,
+            )
+            signals["blast_radius"] = {
+                "target_files": blast_radius.target_files,
+                "upstream_callers": [
+                    {
+                        "path": n.path,
+                        "depth": n.depth,
+                        "direction": n.direction,
+                        "via": n.via,
+                        "component": n.component,
+                    }
+                    for n in blast_radius.upstream_callers
+                ],
+                "downstream_dependencies": [
+                    {
+                        "path": n.path,
+                        "depth": n.depth,
+                        "direction": n.direction,
+                        "via": n.via,
+                        "component": n.component,
+                    }
+                    for n in blast_radius.downstream_dependencies
+                ],
+                "transitive_files": blast_radius.transitive_files,
+                "affected_components": blast_radius.affected_components,
+                "max_depth_reached": blast_radius.max_depth_reached,
+                "total_affected_count": blast_radius.total_affected_count,
+            }
+
+            # Add blast radius evidence if callers or callees found
+            if blast_radius.upstream_callers:
+                ev = {
+                    "id": f"ev-blast-up-{len(evidence_items) + 1}",
+                    "source_type": EvidenceSourceType.CODE,
+                    "source_id": "blast-radius-upstream",
+                    "title": f"Upstream Callers ({len(blast_radius.upstream_callers)} files)",
+                    "snippet": f"Direct and transitive upstream callers: {', '.join(n.path for n in blast_radius.upstream_callers[:5])}",
+                    "confidence": 1.0,
+                    "extra_metadata": {"affected_count": len(blast_radius.upstream_callers)},
+                }
+                evidence_items.append(ev)
+
+            # Query historical commit diffs for co-change mining
+            cfc_query = (
+                select(CommitFileChange.commit_id, CommitFileChange.file_path, Commit.committed_at)
+                .join(Commit, CommitFileChange.commit_id == Commit.id)
+                .where(Commit.repository_id == state.repository_id)
+                .order_by(Commit.committed_at.desc())
+            )
+            cfc_res = await db.execute(cfc_query)
+            cfc_rows = cfc_res.all()
+
+            commit_files_map: Dict[uuid.UUID, Set[str]] = defaultdict(set)
+            commit_time_map: Dict[uuid.UUID, datetime] = {}
+            for c_id, f_path, c_time in cfc_rows:
+                if f_path:
+                    commit_files_map[c_id].add(f_path)
+                    commit_time_map[c_id] = c_time
+
+            commit_diff_tuples = [
+                (files, commit_time_map[c_id]) for c_id, files in commit_files_map.items()
+            ]
+
+            co_change_matrix = mine_co_change_partners(
+                commit_file_sets=commit_diff_tuples,
+                min_co_changes=2,
+                min_frequency=0.5,
+                half_life_days=180.0,
+            )
+
+            known_static_set = set(static_edges)
+            hidden_warnings = detect_hidden_coupling(
+                proposed_files=set(target_files),
+                co_change_matrix=co_change_matrix,
+                known_static_edges=known_static_set,
+            )
+
+            signals["co_change"] = {
+                "hidden_coupling_warnings": [
+                    {
+                        "target_file": w.target_file,
+                        "omitted_partner": w.omitted_partner,
+                        "frequency": w.frequency,
+                        "co_change_count": w.co_change_count,
+                        "has_static_import": w.has_static_import,
+                        "explanation": w.explanation,
+                    }
+                    for w in hidden_warnings
+                ],
+                "has_hidden_coupling": any(not w.has_static_import for w in hidden_warnings),
+            }
+
+            for hw in hidden_warnings:
+                ev = {
+                    "id": f"ev-coupling-{len(evidence_items) + 1}",
+                    "source_type": EvidenceSourceType.COMMIT,
+                    "source_id": hw.omitted_partner,
+                    "title": f"{'Hidden Coupling' if not hw.has_static_import else 'Coupled Partner'}: {hw.omitted_partner}",
+                    "snippet": hw.explanation,
+                    "confidence": 0.9,
+                    "extra_metadata": {
+                        "target_file": hw.target_file,
+                        "frequency": hw.frequency,
+                        "co_change_count": hw.co_change_count,
+                    },
+                }
+                evidence_items.append(ev)
+
+            # Quantitative Change Risk calculation
             file_stats = [
-                FileChangeStat(path=tf, lines_added=50, lines_deleted=10)
-                for tf in target_files
+                FileChangeStat(path=tf, lines_added=50, lines_deleted=10) for tf in target_files
             ]
             risk_report = assess_change_risk(file_stats)
             signals["change_risk"] = {
@@ -297,6 +429,24 @@ class InvestigationEngine:
             "Verify all inbound callers before modifying interface signatures.",
             "Run guarding test suite covering modified symbols.",
         ]
+        blast_sig = state.gathered_signals.get("blast_radius", {})
+        if blast_sig.get("total_affected_count", 0) > 3:
+            affected_comps = blast_sig.get("affected_components", [])
+            recommended_checks.append(
+                f"Broad blast radius ({blast_sig.get('total_affected_count')} files across {len(affected_comps)} components): stage rollouts incrementally."
+            )
+
+        co_change_sig = state.gathered_signals.get("co_change", {})
+        hidden_warnings = co_change_sig.get("hidden_coupling_warnings", [])
+        if hidden_warnings:
+            omitted_list = [w["omitted_partner"] for w in hidden_warnings]
+            recommended_checks.append(
+                f"Historical co-change coupling: inspect omitted partner files ({', '.join(omitted_list[:3])}) before completing change."
+            )
+            unknowns.append(
+                f"Potential omitted partner files: {', '.join(omitted_list[:3])} frequently co-change with targets."
+            )
+
         if state.gathered_signals.get("change_risk", {}).get("shannon_entropy", 0) > 1.5:
             recommended_checks.append("High churn entropy detected: ensure changes remain modular.")
 

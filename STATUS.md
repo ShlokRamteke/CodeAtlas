@@ -6,11 +6,12 @@ Phase 4 — Change Investigation Engine
 
 ## Current Task
 
-PH4-01 Complete &mdash; Next: PH4-02 (Blast Radius & Co-Change Hidden Coupling)
+PH4-02 Complete &mdash; Next: PH4-03 (Quantitative Change Risk & Defect Pressure)
 
 ## Status
 
-PH4-01 COMPLETE / READY FOR PH4-02
+PH4-02 COMPLETE / READY FOR PH4-03
+
 
 ## Product Focus
 
@@ -81,18 +82,26 @@ developer understand a proposed change before implementation.
   - REST endpoints: `POST /api/v1/investigations/preview-intent` and `POST /api/v1/investigations/{id}/run`.
   - Next.js interactive UI: "Change Investigation" tab in Architecture Explorer with live OpenRouter triggers, preset scenarios, and classified claim badges.
   - 100% automated test pass rate across 64 pytest tests, clean frontend build, and clean contracts typecheck.
+- **Phase 4 — Task PH4-02 (Blast Radius & Co-Change Hidden Coupling)**:
+  - `BlastRadiusAnalyzer`: computes static upstream callers, downstream dependencies, cycle protection, depth level tracking, and affected component boundary aggregation.
+  - `mine_co_change_partners`: enhanced with exponential recency decay ($\tau = 180\text{d}$) and timestamp-weighted co-occurrence frequency mining over commit diffs.
+  - `detect_hidden_coupling`: flags omitted partner files and differentiates corroborated static dependencies from hidden coupling alerts.
+  - Integrated directly into deterministic `InvestigationEngine.gather` and brief recommendation synthesis.
+  - 100% automated test pass rate across 67 pytest tests, clean frontend build, and clean contracts typecheck.
 
 ## Remaining
 
-- **Phase 4**: Change Investigation Engine (PH4-02: Blast Radius & Co-Change Hidden Coupling, PH4-03: Quantitative Change Risk & Defect Pressure, PH4-04: Guarding Test Analyzer, PH4-05: Invariant Synthesis, PH4-06: Token Budgeting & Distillation).
+- **Phase 4**: Change Investigation Engine (PH4-03: Quantitative Change Risk & Defect Pressure, PH4-04: Guarding Test Analyzer, PH4-05: Invariant Synthesis, PH4-06: Token Budgeting & Distillation, PH4-07: Concurrent Branch Overlap & Merge Conflict Detector, PH4-08: Independent Change Decomposition, PH4-09: Code Ownership & Reviewer Recommender, PH4-10: C4 Architecture & Dependency Export).
 
 ## Blockers
+
 
 None known.
 
 ## Next Action
 
-Start Task PH4-02 (Blast Radius & Co-Change Hidden Coupling).
+Start Task PH4-03 (Quantitative Change Risk & Defect Pressure).
+
 
 ## Session Rule
 

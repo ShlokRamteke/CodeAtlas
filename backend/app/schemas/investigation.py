@@ -33,6 +33,33 @@ class InvestigationClaimSchema(BaseModel):
     confidence: float = 1.0
 
 
+class ReachableNodeSchema(BaseModel):
+    path: str
+    depth: int
+    direction: str
+    via: Optional[str] = None
+    component: str = ""
+
+
+class BlastRadiusResultSchema(BaseModel):
+    target_files: List[str] = Field(default_factory=list)
+    upstream_callers: List[ReachableNodeSchema] = Field(default_factory=list)
+    downstream_dependencies: List[ReachableNodeSchema] = Field(default_factory=list)
+    transitive_files: List[str] = Field(default_factory=list)
+    affected_components: List[str] = Field(default_factory=list)
+    max_depth_reached: int = 0
+    total_affected_count: int = 0
+
+
+class HiddenCouplingWarningSchema(BaseModel):
+    target_file: str
+    omitted_partner: str
+    frequency: float
+    co_change_count: int
+    has_static_import: bool
+    explanation: str
+
+
 class NormalizedChangeIntentSchema(BaseModel):
     raw_query: str
     action_verbs: List[str] = Field(default_factory=list)
