@@ -523,6 +523,7 @@ export async function createInvestigation(
         type: data.type || "before_change",
         target_path: data.targetPath,
         target_symbol: data.targetSymbol,
+        diff: data.diff,
       }),
     });
     if (!res.ok) return null;
@@ -536,7 +537,8 @@ export async function createInvestigation(
 export async function runInvestigation(
   investigationId: string,
   targetPath?: string,
-  targetSymbol?: string
+  targetSymbol?: string,
+  diff?: string
 ): Promise<InvestigationResponse | null> {
   try {
     const res = await fetch(`${API_BASE}/api/v1/investigations/${investigationId}/run`, {
@@ -545,6 +547,7 @@ export async function runInvestigation(
       body: JSON.stringify({
         target_path: targetPath,
         target_symbol: targetSymbol,
+        diff: diff,
       }),
     });
     if (!res.ok) return null;

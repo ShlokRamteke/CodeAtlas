@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import {
+  Activity,
   Sparkles,
   Zap,
   Play,
@@ -41,6 +42,8 @@ export function PreChangeInvestigationViewer({
   const [query, setQuery] = useState("");
   const [targetPath, setTargetPath] = useState("");
   const [targetSymbol, setTargetSymbol] = useState("");
+  const [diff, setDiff] = useState("");
+  const [showDiffInput, setShowDiffInput] = useState(false);
   const [running, setRunning] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -75,6 +78,7 @@ export function PreChangeInvestigationViewer({
         type: "before_change",
         targetPath: targetPath.trim() || undefined,
         targetSymbol: targetSymbol.trim() || undefined,
+        diff: diff.trim() || undefined,
       });
 
       if (!created) {
@@ -85,7 +89,8 @@ export function PreChangeInvestigationViewer({
       const executed = await runInvestigation(
         created.id,
         targetPath.trim() || undefined,
-        targetSymbol.trim() || undefined
+        targetSymbol.trim() || undefined,
+        diff.trim() || undefined
       );
 
       if (!executed) {
@@ -212,6 +217,30 @@ export function PreChangeInvestigationViewer({
                 </div>
               </div>
 
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium text-slate-300">
+                    Proposed Git Diff / Patch (Optional)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowDiffInput(!showDiffInput)}
+                    className="text-[11px] text-indigo-400 hover:text-indigo-300 font-mono"
+                  >
+                    {showDiffInput ? "Hide Diff" : "+ Add Diff"}
+                  </button>
+                </div>
+                {showDiffInput && (
+                  <textarea
+                    rows={4}
+                    value={diff}
+                    onChange={(e) => setDiff(e.target.value)}
+                    placeholder="Paste git diff here to evaluate exact Kamei metrics (LA, LD, NF, ND, NS, entropy)..."
+                    className="w-full px-3 py-2 text-xs rounded-lg bg-slate-950 border border-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-white font-mono placeholder:text-slate-600 resize-y"
+                  />
+                )}
+              </div>
+
               {errorMsg && (
                 <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -333,6 +362,117 @@ export function PreChangeInvestigationViewer({
                   )}
                 </div>
               </div>
+
+              {/* Quantitative Change Risk & Defect Pressure Section */}
+              {(() => {
+                const riskEv = selectedInv.evidence?.find((e) => e.sourceId === "kamei-change-risk");
+                const riskMeta = (riskEv?.metadata || {}) as any;
+                if (!riskMeta || (!riskMeta.risk_level && !riskMeta.riskLevel)) return null;
+
+                const riskLevel = riskMeta.risk_level || riskMeta.riskLevel;
+                const riskScore = riskMeta.risk_score ?? riskMeta.riskScore ?? 0;
+                const km = riskMeta.kamei_metrics || riskMeta.kameiMetrics || {};
+                const defectPressure = riskMeta.defect_pressure ?? riskMeta.defectPressure ?? 0;
+                const fixCount = riskMeta.fix_commit_count ?? riskMeta.fixCommitCount ?? 0;
+                const factors = riskMeta.explanatory_factors || riskMeta.explanatoryFactors || [];
+
+                return (
+                  <div className="p-6 rounded-xl bg-slate-900/70 border border-slate-800 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-amber-400" />
+                        <h4 className="text-sm font-bold text-white">
+                          Quantitative Change Risk &amp; Defect Pressure
+                        </h4>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-xs font-bold px-2.5 py-0.5 rounded border uppercase font-mono ${
+                            riskLevel === "CRITICAL"
+                              ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                              : riskLevel === "HIGH"
+                              ? "bg-orange-500/10 text-orange-400 border-orange-500/30"
+                              : riskLevel === "MEDIUM"
+                              ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                              : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                          }`}
+                        >
+                          {riskLevel} Risk ({(riskScore * 100).toFixed(0)}%)
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Kamei Metrics Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-center font-mono text-xs">
+                      <div className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800/80">
+                        <div className="text-slate-400 text-[10px] uppercase">Lines Added</div>
+                        <div className="text-emerald-400 font-bold mt-1 text-sm">
+                          +{km.lines_added ?? km.linesAdded ?? 0}
+                        </div>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800/80">
+                        <div className="text-slate-400 text-[10px] uppercase">Lines Deleted</div>
+                        <div className="text-rose-400 font-bold mt-1 text-sm">
+                          -{km.lines_deleted ?? km.linesDeleted ?? 0}
+                        </div>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800/80">
+                        <div className="text-slate-400 text-[10px] uppercase">Files Touched</div>
+                        <div className="text-white font-bold mt-1 text-sm">
+                          {km.files_touched ?? km.filesTouched ?? 0}
+                        </div>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800/80">
+                        <div className="text-slate-400 text-[10px] uppercase">Subsystems</div>
+                        <div className="text-indigo-300 font-bold mt-1 text-sm">
+                          {km.distinct_subsystems ?? km.distinctSubsystems ?? 0}
+                        </div>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800/80">
+                        <div className="text-slate-400 text-[10px] uppercase">Directories</div>
+                        <div className="text-cyan-300 font-bold mt-1 text-sm">
+                          {km.distinct_directories ?? km.distinctDirectories ?? 0}
+                        </div>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800/80">
+                        <div className="text-slate-400 text-[10px] uppercase">Shannon Entropy</div>
+                        <div className="text-purple-300 font-bold mt-1 text-sm">
+                          {km.shannon_entropy ?? km.shannonEntropy ?? 0}
+                        </div>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800/80">
+                        <div className="text-slate-400 text-[10px] uppercase">Defect Pressure</div>
+                        <div className="text-amber-300 font-bold mt-1 text-sm">
+                          {Number(defectPressure).toFixed(2)}
+                        </div>
+                        {fixCount > 0 && (
+                          <div className="text-[10px] text-slate-500 mt-0.5">
+                            {fixCount} fix{fixCount > 1 ? "es" : ""}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Explanatory Factors */}
+                    {factors.length > 0 && (
+                      <div className="space-y-1.5 pt-1">
+                        <div className="text-xs font-semibold text-slate-400">Risk Drivers &amp; Explanatory Factors:</div>
+                        <div className="space-y-1.5">
+                          {factors.map((factor: string, i: number) => (
+                            <div
+                              key={i}
+                              className="flex items-center gap-2 text-xs text-amber-200/90 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-lg"
+                            >
+                              <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                              <span>{factor}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Synthesized Claims Section */}
               <div className="p-6 rounded-xl bg-slate-900/70 border border-slate-800 space-y-4">

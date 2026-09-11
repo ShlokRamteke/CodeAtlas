@@ -461,12 +461,31 @@ export interface InvestigationClaim {
   evidenceIds: string[];
 }
 
+export interface KameiMetrics {
+  linesAdded: number;
+  linesDeleted: number;
+  filesTouched: number;
+  distinctDirectories: number;
+  distinctSubsystems: number;
+  shannonEntropy: number;
+}
+
+export interface ChangeRiskReport {
+  riskScore: number;
+  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  kameiMetrics: KameiMetrics;
+  defectPressure: number;
+  explanatoryFactors: string[];
+  fixCommitCount?: number;
+}
+
 export interface InvestigationRequest {
   repositoryId: string;
   query: string;
   type?: InvestigationType;
   targetPath?: string;
   targetSymbol?: string;
+  diff?: string;
 }
 
 export interface InvestigationResponse {

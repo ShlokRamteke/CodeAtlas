@@ -9,10 +9,14 @@ Implements empirical software engineering defect prediction models:
 from __future__ import annotations
 
 import math
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
-from typing import Sequence
+from typing import TYPE_CHECKING, Sequence
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @dataclass(frozen=True)
@@ -60,6 +64,57 @@ class ChangeRiskReport:
     kamei_metrics: KameiMetrics
     defect_pressure: float
     explanatory_factors: list[str]
+    fix_commit_count: int = 0
+
+
+def parse_unified_diff(diff_str: str) -> list[FileChangeStat]:
+    """Parse unified git diff format and extract churn stats per file."""
+    if not diff_str or not diff_str.strip():
+        return []
+
+    file_stats: dict[str, dict[str, int]] = {}
+    current_file: str | None = None
+
+    for line in diff_str.splitlines():
+        if line.startswith("diff --git "):
+            parts = line.strip().split()
+            if len(parts) >= 4:
+                target = parts[3]
+                current_file = target[2:] if target.startswith("b/") else target
+                if current_file not in file_stats:
+                    file_stats[current_file] = {"added": 0, "deleted": 0}
+            continue
+
+        if line.startswith("+++ "):
+            target = line[4:].strip()
+            if target != "/dev/null":
+                current_file = target[2:] if target.startswith("b/") else target
+                if current_file not in file_stats:
+                    file_stats[current_file] = {"added": 0, "deleted": 0}
+            continue
+
+        if line.startswith("--- "):
+            target = line[4:].strip()
+            if target != "/dev/null" and current_file is None:
+                current_file = target[2:] if target.startswith("a/") else target
+                if current_file not in file_stats:
+                    file_stats[current_file] = {"added": 0, "deleted": 0}
+            continue
+
+        if current_file:
+            if line.startswith("+") and not line.startswith("+++"):
+                file_stats[current_file]["added"] += 1
+            elif line.startswith("-") and not line.startswith("---"):
+                file_stats[current_file]["deleted"] += 1
+
+    return [
+        FileChangeStat(
+            path=path,
+            lines_added=counts["added"],
+            lines_deleted=counts["deleted"],
+        )
+        for path, counts in file_stats.items()
+    ]
 
 
 def compute_shannon_entropy(per_file_churns: Sequence[int]) -> float:
@@ -191,6 +246,12 @@ def assess_change_risk(
     kamei = compute_kamei_metrics(changes)
     target_files = {c.path for c in changes}
     pressure = compute_defect_pressure(commits, target_files, reference_time=reference_time)
+    fix_commits = [
+        c
+        for c in commits
+        if (c.is_fix or is_fix_commit(c.message))
+        and any(f in target_files for f in c.touched_files)
+    ]
 
     factors: list[str] = []
     score = 0.0
@@ -250,4 +311,82 @@ def assess_change_risk(
         kamei_metrics=kamei,
         defect_pressure=pressure,
         explanatory_factors=factors,
+        fix_commit_count=len(fix_commits),
     )
+
+
+async def mine_defect_pressure_from_db(
+    db: AsyncSession,
+    repository_id: uuid.UUID,
+    target_files: set[str],
+    limit: int = 20000,
+    half_life_days: float = 365.0,
+    reference_time: datetime | None = None,
+) -> tuple[float, list[HistoricalCommitInfo]]:
+    """Deep walk of up to 20,000 commits from database, mining defect pressure for target files.
+
+    Returns (defect_pressure_score, list_of_matching_fix_commits).
+    """
+    if not target_files:
+        return 0.0, []
+
+    from sqlalchemy import select
+
+    from app.models.commit import Commit
+    from app.models.commit_file_change import CommitFileChange
+
+    clean_targets = {f.lstrip("/") for f in target_files}
+
+    query = (
+        select(
+            Commit.commit_hash,
+            Commit.message,
+            Commit.committed_at,
+            CommitFileChange.file_path,
+        )
+        .join(CommitFileChange, Commit.id == CommitFileChange.commit_id)
+        .where(
+            Commit.repository_id == repository_id,
+            CommitFileChange.file_path.in_(clean_targets),
+        )
+        .order_by(Commit.committed_at.desc())
+        .limit(limit)
+    )
+    res = await db.execute(query)
+    rows = res.all()
+
+    commit_dict: dict[str, dict] = {}
+    for c_hash, message, committed_at, file_path in rows:
+        if c_hash not in commit_dict:
+            commit_dict[c_hash] = {
+                "hash": c_hash,
+                "message": message,
+                "timestamp": committed_at,
+                "touched_files": set(),
+                "is_fix": is_fix_commit(message),
+            }
+        if file_path:
+            commit_dict[c_hash]["touched_files"].add(file_path)
+
+    commit_infos = [
+        HistoricalCommitInfo(
+            hash=info["hash"],
+            message=info["message"],
+            timestamp=info["timestamp"],
+            touched_files=tuple(info["touched_files"]),
+            is_fix=info["is_fix"],
+        )
+        for info in commit_dict.values()
+    ]
+
+    pressure = compute_defect_pressure(
+        commits=commit_infos,
+        target_files=clean_targets,
+        reference_time=reference_time,
+        half_life_days=half_life_days,
+    )
+
+    fix_commits = [
+        c for c in commit_infos if c.is_fix and any(f in clean_targets for f in c.touched_files)
+    ]
+    return pressure, fix_commits

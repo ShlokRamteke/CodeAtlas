@@ -92,17 +92,37 @@ class PreChangeBriefSchema(BaseModel):
     token_usage: Dict[str, int] = Field(default_factory=dict)
 
 
+class KameiMetricsSchema(BaseModel):
+    lines_added: int = 0
+    lines_deleted: int = 0
+    files_touched: int = 0
+    distinct_directories: int = 0
+    distinct_subsystems: int = 0
+    shannon_entropy: float = 0.0
+
+
+class ChangeRiskSchema(BaseModel):
+    risk_score: float = 0.0
+    risk_level: str = "LOW"
+    kamei_metrics: KameiMetricsSchema = Field(default_factory=KameiMetricsSchema)
+    defect_pressure: float = 0.0
+    explanatory_factors: List[str] = Field(default_factory=list)
+    fix_commit_count: int = 0
+
+
 class InvestigationCreate(BaseModel):
     repository_id: uuid.UUID
     query: str
     type: InvestigationType = InvestigationType.UNDERSTAND
     target_path: Optional[str] = None
     target_symbol: Optional[str] = None
+    diff: Optional[str] = None
 
 
 class InvestigationRunRequest(BaseModel):
     target_path: Optional[str] = None
     target_symbol: Optional[str] = None
+    diff: Optional[str] = None
 
 
 class InvestigationRead(BaseModel):

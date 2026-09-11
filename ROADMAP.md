@@ -94,25 +94,17 @@ Relevant code can be traced into its history and supporting engineering evidence
 ### Goal
 Turn current-system, historical, and engineering context into the core **Pre-Change Investigation** workflow.
 
-Core work:
-- Change-intent input and target identification
-- Bounded investigation planner
-- Dependency / impact tracing (blast radius)
-- Historical correlation and co-change signals
-- Concurrent branch overlap & merge conflict alerts
-- Independent change decomposition (connected components)
-- Authorship concentration & reviewer recommendations
-- Quantitative change risk & defect pressure (Kamei metrics + Shannon entropy)
-- Guarding test reachability & verification gap analyzer
-- Intent archaeology & invariant synthesis
-- C4 architecture & dependency export
-- Token budgeting & dual-format projection (Markdown & dense JSON)
-- Evidence ranking
-- Bounded LangGraph reasoning (1–3 model calls)
-- Claim / citation generation (fact, inference, unknown)
-- Lightweight verification
-- Pre-Change Investigation Brief generation
-- "Why Does This Exist?" as a focused workflow
+### Structured Tasks
+- **PH4-01 — Bounded Investigation Engine & Planner** *(Completed)*: Change intent parsing, bounded LangGraph state graph (1–3 model calls), OpenRouter gateway, Anthropic-standard hierarchical XML prompting.
+- **PH4-02 — Blast Radius & Co-Change Hidden Coupling** *(Completed)*: Static upstream/downstream call graph reachability, recency-decayed co-change mining, and unexplained hidden coupling detection.
+- **PH4-03 — Quantitative Change Risk & Defect Pressure** *(Completed)*: Unified diff parsing, Kamei empirical metrics ($LA, LD, NF, ND, NS$), Shannon churn entropy $H(P)$, and 20,000-commit deep walk defect pressure mining ($\tau = 365\text{d}$).
+- **PH4-04 — Guarding Test & Verification Gap Analyzer**: Test call path reachability, reach-ranking test ordering, untested change alerts, and stale test detection.
+- **PH4-05 — Intent Archaeology & Invariant Synthesis**: ADR constraint linking, governing vs superseded status, and rationale extraction.
+- **PH4-06 — Token Budgeting & Dual-Format Projection**: Priority shedding, recoverable omission markers (`[ref#<id>]`), human Markdown and dense agent JSON projections.
+- **PH4-07 — Concurrent Branch Overlap & Merge Conflict Detector**: In-flight branch inspection and merge collision warnings.
+- **PH4-08 — Independent Change Decomposition**: Weakly-connected component subgraph evaluation and change decomposition suggestions.
+- **PH4-09 — Code Ownership & Reviewer Recommender**: Historical blame concentration and qualified reviewer recommendations.
+- **PH4-10 — C4 Architecture & Dependency Export**: Portable C4 component models and Mermaid architectural diagram exports.
 
 
 ### Done when

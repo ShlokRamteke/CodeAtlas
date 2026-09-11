@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.history.change_risk import (
     FileChangeStat,
     HistoricalCommitInfo,
@@ -10,7 +13,12 @@ from app.history.change_risk import (
     compute_kamei_metrics,
     compute_shannon_entropy,
     is_fix_commit,
+    mine_defect_pressure_from_db,
+    parse_unified_diff,
 )
+from app.models.commit import Commit
+from app.models.commit_file_change import ChangeType, CommitFileChange
+from app.models.repository import Repository
 
 
 def test_shannon_entropy_calculation() -> None:
@@ -145,3 +153,126 @@ def test_assess_change_risk_consolidated() -> None:
     assert report.defect_pressure >= 2.5
     assert any("Large code churn" in f for f in report.explanatory_factors)
     assert any("distinct subsystems" in f for f in report.explanatory_factors)
+    assert report.fix_commit_count == 3
+
+
+def test_parse_unified_diff() -> None:
+    # Empty diff
+    assert parse_unified_diff("") == []
+    assert parse_unified_diff("   \n  ") == []
+
+    # Standard git diff
+    raw_diff = """diff --git a/backend/app/auth.py b/backend/app/auth.py
+index 1234567..89abcdef 100644
+--- a/backend/app/auth.py
++++ b/backend/app/auth.py
+@@ -10,4 +10,6 @@
+-old_auth_check()
++new_auth_check()
++validate_token()
++audit_log()
+diff --git a/frontend/src/Login.tsx b/frontend/src/Login.tsx
+--- a/frontend/src/Login.tsx
++++ b/frontend/src/Login.tsx
+@@ -1,2 +1,3 @@
+-import { old } from 'old';
++import { auth } from 'auth';
++const x = 1;
+"""
+    stats = parse_unified_diff(raw_diff)
+    assert len(stats) == 2
+
+    by_path = {s.path: s for s in stats}
+    assert "backend/app/auth.py" in by_path
+    assert by_path["backend/app/auth.py"].lines_added == 3
+    assert by_path["backend/app/auth.py"].lines_deleted == 1
+    assert by_path["backend/app/auth.py"].total_churn == 4
+
+    assert "frontend/src/Login.tsx" in by_path
+    assert by_path["frontend/src/Login.tsx"].lines_added == 2
+    assert by_path["frontend/src/Login.tsx"].lines_deleted == 1
+
+
+@pytest.mark.asyncio
+async def test_mine_defect_pressure_from_db(db_session: AsyncSession) -> None:
+    repo = Repository(
+        owner="test-owner",
+        name="risk-repo",
+        full_name="test-owner/risk-repo",
+        default_branch="main",
+    )
+    db_session.add(repo)
+    await db_session.commit()
+    await db_session.refresh(repo)
+
+    now = datetime.now(timezone.utc)
+
+    # Insert historical commits: 1 fix commit touching target, 1 non-fix commit, 1 fix commit touching unrelated
+    c1 = Commit(
+        repository_id=repo.id,
+        commit_hash="1111111111111111111111111111111111111111",
+        author_name="Dev",
+        author_email="dev@example.com",
+        committed_at=now - timedelta(days=10),
+        message="fix: resolve critical race condition in orders",
+    )
+    c2 = Commit(
+        repository_id=repo.id,
+        commit_hash="2222222222222222222222222222222222222222",
+        author_name="Dev",
+        author_email="dev@example.com",
+        committed_at=now - timedelta(days=20),
+        message="feat: add telemetry logging in orders",
+    )
+    c3 = Commit(
+        repository_id=repo.id,
+        commit_hash="3333333333333333333333333333333333333333",
+        author_name="Dev",
+        author_email="dev@example.com",
+        committed_at=now - timedelta(days=5),
+        message="fix: update docs css styling",
+    )
+    db_session.add_all([c1, c2, c3])
+    await db_session.commit()
+    await db_session.refresh(c1)
+    await db_session.refresh(c2)
+    await db_session.refresh(c3)
+
+    fc1 = CommitFileChange(
+        commit_id=c1.id,
+        file_path="backend/app/orders.py",
+        change_type=ChangeType.MODIFIED,
+        insertions=10,
+        deletions=2,
+    )
+    fc2 = CommitFileChange(
+        commit_id=c2.id,
+        file_path="backend/app/orders.py",
+        change_type=ChangeType.MODIFIED,
+        insertions=5,
+        deletions=0,
+    )
+    fc3 = CommitFileChange(
+        commit_id=c3.id,
+        file_path="docs/style.css",
+        change_type=ChangeType.MODIFIED,
+        insertions=1,
+        deletions=1,
+    )
+    db_session.add_all([fc1, fc2, fc3])
+    await db_session.commit()
+
+    # Mine defect pressure for target file backend/app/orders.py
+    pressure, fix_commits = await mine_defect_pressure_from_db(
+        db=db_session,
+        repository_id=repo.id,
+        target_files={"backend/app/orders.py"},
+        limit=20000,
+        half_life_days=365.0,
+        reference_time=now,
+    )
+
+    assert pressure > 0.9  # 10 days old with 365d half-life ~ 0.98
+    assert len(fix_commits) == 1
+    assert fix_commits[0].hash == "1111111111111111111111111111111111111111"
+    assert "backend/app/orders.py" in fix_commits[0].touched_files
