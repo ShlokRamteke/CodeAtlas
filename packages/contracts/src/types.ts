@@ -479,6 +479,33 @@ export interface ChangeRiskReport {
   fixCommitCount?: number;
 }
 
+export interface ReachRankedTest {
+  testFile: string;
+  reachedTargetCount: number;
+  reachedTargets: string[];
+}
+
+export interface UntestedChangeWarning {
+  targetFile: string;
+  explanation: string;
+}
+
+export interface StaleTestCandidateWarning {
+  targetFile: string;
+  guardingTests: string[];
+  explanation: string;
+}
+
+export interface GuardingTestReport {
+  rankedTests: ReachRankedTest[];
+  untestedChanges: UntestedChangeWarning[];
+  staleTestCandidates: StaleTestCandidateWarning[];
+  totalGuardingTests: number;
+  hasCoverageGaps: boolean;
+  untestedFiles: string[];
+}
+
+
 export interface InvestigationRequest {
   repositoryId: string;
   query: string;

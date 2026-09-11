@@ -6,11 +6,11 @@ Phase 4 — Change Investigation Engine
 
 ## Current Task
 
-PH4-03 Complete &mdash; Next: PH4-04 (Guarding Test & Verification Gap Analyzer)
+PH4-04 Complete &mdash; Next: PH4-05 (Intent Archaeology & Invariant Synthesis)
 
 ## Status
 
-PH4-03 COMPLETE / READY FOR PH4-04
+PH4-04 COMPLETE / READY FOR PH4-05
 
 
 ## Product Focus
@@ -95,10 +95,17 @@ developer understand a proposed change before implementation.
   - Integrated into `InvestigationEngine.gather()` with synthesized `ev-risk` evidence records and signal payloads.
   - Next.js UI interactive card with Kamei metric pills ($LA, LD, NF, ND, NS, H(P)$, defect pressure), risk level badges, and driver alert chips.
   - 100% automated test pass rate across 70 pytest tests, clean frontend build, and clean contracts typecheck.
+- **Phase 4 — Task PH4-04 (Guarding Test & Verification Gap Analyzer)**:
+  - `guarding_tests`: comprehensive test file detection (`is_test_file`), naming convention matching (`match_test_by_naming`), and static call path / dependency coverage graph mapping (`build_test_coverage_mapping`).
+  - Reach-ranked test ordering (`rank_tests_by_reach`): prioritizes test suites exercising the highest number of changed target files so developers and coding agents run the highest-impact tests first.
+  - Verification gap detection (`detect_verification_gaps`): detects Untested Changes (modified source files lacking test coverage) and Stale Test Candidates (modified code whose covering tests were untouched in the proposed change).
+  - Integrated into `InvestigationEngine.gather()`: extracts test dependencies, emits structured `ev-tests` evidence items and `signals["guarding_tests"]` payload, and populates prioritized test recommendations in brief synthesis.
+  - Next.js UI interactive card with reach-ranked test execution priority list, untested change warning banners, and stale test candidate alerts.
+  - 100% automated test pass rate across 73 pytest tests, clean frontend build, and clean contracts typecheck.
 
 ## Remaining
 
-- **Phase 4**: Change Investigation Engine (PH4-04: Guarding Test Analyzer, PH4-05: Invariant Synthesis, PH4-06: Token Budgeting & Distillation, PH4-07: Concurrent Branch Overlap & Merge Conflict Detector, PH4-08: Independent Change Decomposition, PH4-09: Code Ownership & Reviewer Recommender, PH4-10: C4 Architecture & Dependency Export).
+- **Phase 4**: Change Investigation Engine (PH4-05: Invariant Synthesis, PH4-06: Token Budgeting & Distillation, PH4-07: Concurrent Branch Overlap & Merge Conflict Detector, PH4-08: Independent Change Decomposition, PH4-09: Code Ownership & Reviewer Recommender, PH4-10: C4 Architecture & Dependency Export).
 
 ## Blockers
 
@@ -106,7 +113,7 @@ None known.
 
 ## Next Action
 
-Start Task PH4-04 (Guarding Test & Verification Gap Analyzer).
+Start Task PH4-05 (Intent Archaeology & Invariant Synthesis).
 
 ## Session Rule
 
@@ -123,4 +130,5 @@ receive scoped views of that model.
 
 ## Last Updated
 
-2026-09-10
+2026-09-11
+

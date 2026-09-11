@@ -373,3 +373,125 @@ diff --git a/backend/app/billing/charge.py b/backend/app/billing/charge.py
     assert "Quantitative Change Risk" in risk_ev["title"]
     assert risk_ev["extra_metadata"]["kamei_metrics"]["lines_added"] == 5
     assert risk_ev["extra_metadata"]["kamei_metrics"]["lines_deleted"] == 1
+
+
+@pytest.mark.asyncio
+async def test_investigation_engine_guarding_tests_reach_ranking(db_session: AsyncSession):
+    from app.models.dependency import CodeDependency
+    from app.models.source_file import SourceFile
+
+    repo = Repository(
+        owner="testorg",
+        name="testranking",
+        full_name="testorg/testranking",
+        default_branch="main",
+    )
+    db_session.add(repo)
+    await db_session.commit()
+    await db_session.refresh(repo)
+
+    # Add source files
+    sf1 = SourceFile(
+        repository_id=repo.id,
+        path="backend/app/auth/service.py",
+        language="python",
+        content_hash="h1",
+    )
+    sf2 = SourceFile(
+        repository_id=repo.id,
+        path="backend/app/billing/charge.py",
+        language="python",
+        content_hash="h2",
+    )
+    sf3 = SourceFile(
+        repository_id=repo.id,
+        path="tests/test_auth.py",
+        language="python",
+        content_hash="h3",
+    )
+    sf4 = SourceFile(
+        repository_id=repo.id,
+        path="tests/test_integration.py",
+        language="python",
+        content_hash="h4",
+    )
+    db_session.add_all([sf1, sf2, sf3, sf4])
+    await db_session.commit()
+    await db_session.refresh(sf1)
+    await db_session.refresh(sf2)
+    await db_session.refresh(sf3)
+    await db_session.refresh(sf4)
+
+    # Add test dependencies
+    # test_integration guards BOTH auth and billing
+    dep1 = CodeDependency(
+        repository_id=repo.id,
+        source_file_id=sf4.id,
+        source_path="tests/test_integration.py",
+        target_path="backend/app/auth/service.py",
+    )
+    dep2 = CodeDependency(
+        repository_id=repo.id,
+        source_file_id=sf4.id,
+        source_path="tests/test_integration.py",
+        target_path="backend/app/billing/charge.py",
+    )
+    # test_auth guards only auth
+    dep3 = CodeDependency(
+        repository_id=repo.id,
+        source_file_id=sf3.id,
+        source_path="tests/test_auth.py",
+        target_path="backend/app/auth/service.py",
+    )
+    db_session.add_all([dep1, dep2, dep3])
+    await db_session.commit()
+
+    inv = Investigation(
+        repository_id=repo.id,
+        query="Refactor auth and billing",
+    )
+    db_session.add(inv)
+    await db_session.commit()
+    await db_session.refresh(inv)
+
+    diff_content = """diff --git a/backend/app/auth/service.py b/backend/app/auth/service.py
+--- a/backend/app/auth/service.py
++++ b/backend/app/auth/service.py
+@@ -1,2 +1,3 @@
++def new_auth(): pass
+diff --git a/backend/app/billing/charge.py b/backend/app/billing/charge.py
+--- a/backend/app/billing/charge.py
++++ b/backend/app/billing/charge.py
+@@ -1,2 +1,3 @@
++def new_charge(): pass
+"""
+
+    engine = InvestigationEngine(llm_provider=MockLLMProvider())
+    state = await engine.run(
+        investigation_id=inv.id,
+        db=db_session,
+        diff=diff_content,
+    )
+
+    assert state.step == InvestigationStep.COMPLETED
+    assert "guarding_tests" in state.gathered_signals
+    gt_sig = state.gathered_signals["guarding_tests"]
+
+    assert gt_sig["total_guarding_tests"] == 2
+    # Reach ranking: test_integration guards 2 targets, test_auth guards 1
+    assert gt_sig["ranked_tests"][0]["test_file"] == "tests/test_integration.py"
+    assert gt_sig["ranked_tests"][0]["reached_target_count"] == 2
+    assert gt_sig["ranked_tests"][1]["test_file"] == "tests/test_auth.py"
+    assert gt_sig["ranked_tests"][1]["reached_target_count"] == 1
+
+    # Check evidence record
+    gt_ev = next(
+        (ev for ev in state.gathered_evidence if ev.get("source_id") == "guarding-tests"),
+        None,
+    )
+    assert gt_ev is not None
+    assert "Guarding Tests" in gt_ev["title"]
+    assert "tests/test_integration.py" in gt_ev["snippet"]
+
+    # Check recommendations
+    assert any("test_integration.py" in r for r in state.brief.recommended_checks)

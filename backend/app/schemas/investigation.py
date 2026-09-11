@@ -110,6 +110,32 @@ class ChangeRiskSchema(BaseModel):
     fix_commit_count: int = 0
 
 
+class ReachRankedTestSchema(BaseModel):
+    test_file: str
+    reached_target_count: int
+    reached_targets: List[str] = Field(default_factory=list)
+
+
+class UntestedChangeSchema(BaseModel):
+    target_file: str
+    explanation: str
+
+
+class StaleTestCandidateSchema(BaseModel):
+    target_file: str
+    guarding_tests: List[str] = Field(default_factory=list)
+    explanation: str
+
+
+class GuardingTestReportSchema(BaseModel):
+    ranked_tests: List[ReachRankedTestSchema] = Field(default_factory=list)
+    untested_changes: List[UntestedChangeSchema] = Field(default_factory=list)
+    stale_test_candidates: List[StaleTestCandidateSchema] = Field(default_factory=list)
+    total_guarding_tests: int = 0
+    has_coverage_gaps: bool = False
+    untested_files: List[str] = Field(default_factory=list)
+
+
 class InvestigationCreate(BaseModel):
     repository_id: uuid.UUID
     query: str
