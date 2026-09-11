@@ -505,6 +505,27 @@ export interface GuardingTestReport {
   untestedFiles: string[];
 }
 
+export interface SynthesizedInvariant {
+  id: string;
+  title: string;
+  statement: string;
+  level: 'must' | 'should' | 'must_not';
+  category: 'security' | 'architecture' | 'performance' | 'testing' | 'data_integrity' | 'general';
+  governingStatus: 'governing' | 'superseded' | 'proposed' | 'deprecated';
+  supersededBy?: string | null;
+  sourceDocTitle: string;
+  sourceDocPath: string;
+  lineStart?: number | null;
+  lineEnd?: number | null;
+  rationale: string;
+  originCommitHash?: string | null;
+  originCommitMessage?: string | null;
+  originPrNumber?: number | null;
+  originPrTitle?: string | null;
+  originAuthor?: string | null;
+  relevantFiles: string[];
+}
+
 
 export interface InvestigationRequest {
   repositoryId: string;

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 
 import pytest
 from httpx import AsyncClient
@@ -495,3 +496,98 @@ diff --git a/backend/app/billing/charge.py b/backend/app/billing/charge.py
 
     # Check recommendations
     assert any("test_integration.py" in r for r in state.brief.recommended_checks)
+
+
+@pytest.mark.asyncio
+async def test_investigation_intent_archaeology_and_invariants(
+    db_session: AsyncSession,
+):
+    repo = Repository(
+        owner="testowner",
+        name="archrepo",
+        full_name="testowner/archrepo",
+        default_branch="main",
+    )
+    db_session.add(repo)
+    await db_session.commit()
+    await db_session.refresh(repo)
+
+    inv = Investigation(
+        repository_id=repo.id,
+        query="Refactor payment gateway schema in app/payments/schema.py",
+    )
+    db_session.add(inv)
+    await db_session.commit()
+    await db_session.refresh(inv)
+
+    mock_docs = [
+        {
+            "path": "docs/adr/0001-strict-schema.md",
+            "title": "ADR-001: Strict Schema Validation",
+            "raw_content": (
+                "# ADR-001: Strict Schema Validation\n"
+                "Status: Accepted\n"
+                "All payment gateway payloads must strictly validate against Pydantic schema.\n"
+            ),
+        },
+        {
+            "path": "docs/adr/0002-dynamic-json.md",
+            "title": "ADR-002: Dynamic JSON Payloads",
+            "raw_content": (
+                "# ADR-002: Dynamic JSON Payloads\n"
+                "Status: Superseded by [ADR-001]\n"
+                "- Gateways should accept freeform JSON dictionaries.\n"
+            ),
+        },
+    ]
+
+    mock_commits = [
+        {
+            "hash": "deadbeef000111",
+            "message": "Add initial schema validation for payments (PR #34)",
+            "author": "Alice Engineer",
+            "committed_at": datetime(2026, 2, 1, tzinfo=timezone.utc),
+        }
+    ]
+
+    engine = InvestigationEngine(llm_provider=MockLLMProvider())
+    state = await engine.run(
+        investigation_id=inv.id,
+        db=db_session,
+        target_path="app/payments/schema.py",
+        engineering_docs=mock_docs,
+        file_commits=mock_commits,
+    )
+
+    assert state.step == InvestigationStep.COMPLETED
+    assert state.brief is not None
+    assert "invariants" in state.gathered_signals
+    inv_sig = state.gathered_signals["invariants"]
+    assert inv_sig["total_count"] >= 2
+    assert inv_sig["governing_count"] >= 1
+    assert inv_sig["superseded_count"] >= 1
+
+    # Check brief constraints populated
+    assert len(state.brief.constraints) >= 2
+    gov_brief_invs = [c for c in state.brief.constraints if c["governing_status"] == "governing"]
+    sup_brief_invs = [c for c in state.brief.constraints if c["governing_status"] == "superseded"]
+
+    assert len(gov_brief_invs) >= 1
+    assert "deadbeef000111" in gov_brief_invs[0]["origin_commit_hash"]
+    assert gov_brief_invs[0]["origin_pr_number"] == 34
+    assert "PR #34" in gov_brief_invs[0]["rationale"]
+
+    assert len(sup_brief_invs) >= 1
+    assert sup_brief_invs[0]["superseded_by"] == "ADR-001"
+
+    # Check invariant evidence item
+    inv_ev = next(
+        (ev for ev in state.gathered_evidence if ev.get("source_id") == "synthesized-invariants"),
+        None,
+    )
+    assert inv_ev is not None
+    assert "Intent Archaeology" in inv_ev["title"]
+
+    # Check recommended checks
+    assert any("governing invariant" in r.lower() for r in state.brief.recommended_checks)
+    assert any("superseded" in r.lower() for r in state.brief.recommended_checks)

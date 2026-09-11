@@ -78,6 +78,27 @@ class InvestigationPlanSchema(BaseModel):
     reasoning_focus: str = ""
 
 
+class SynthesizedInvariantSchema(BaseModel):
+    id: str
+    title: str
+    statement: str
+    level: str  # "must" | "should" | "must_not"
+    category: str  # "security" | "architecture" | "performance" | "testing" | "data_integrity" | "general"
+    governing_status: str  # "governing" | "superseded" | "proposed" | "deprecated"
+    superseded_by: Optional[str] = None
+    source_doc_title: str = ""
+    source_doc_path: str = ""
+    line_start: Optional[int] = None
+    line_end: Optional[int] = None
+    rationale: str = ""
+    origin_commit_hash: Optional[str] = None
+    origin_commit_message: Optional[str] = None
+    origin_pr_number: Optional[int] = None
+    origin_pr_title: Optional[str] = None
+    origin_author: Optional[str] = None
+    relevant_files: List[str] = Field(default_factory=list)
+
+
 class PreChangeBriefSchema(BaseModel):
     summary: str
     intent_summary: str
@@ -85,7 +106,7 @@ class PreChangeBriefSchema(BaseModel):
     target_symbols: List[str] = Field(default_factory=list)
     claims: List[InvestigationClaimSchema] = Field(default_factory=list)
     signals: Dict[str, Any] = Field(default_factory=dict)
-    constraints: List[Dict[str, Any]] = Field(default_factory=list)
+    constraints: List[SynthesizedInvariantSchema] = Field(default_factory=list)
     unknowns: List[str] = Field(default_factory=list)
     recommended_checks: List[str] = Field(default_factory=list)
     model_calls_count: int = 0
