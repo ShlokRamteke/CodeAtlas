@@ -19,6 +19,8 @@ import {
   Search,
   ExternalLink,
   ListChecks,
+  Landmark,
+  GitPullRequest,
 } from "lucide-react";
 import type { InvestigationResponse, Repository } from "@codeatlas/contracts";
 import {
@@ -615,6 +617,195 @@ export function PreChangeInvestigationViewer({
                         </div>
                       </div>
                     )}
+                  </div>
+                );
+              })()}
+
+              {/* Intent Archaeology & Architectural Invariants Section */}
+              {(() => {
+                const invEv = selectedInv.evidence?.find((e) => e.sourceId === "synthesized-invariants");
+                const invMeta = (invEv?.metadata || {}) as any;
+                const rawInvs: any[] = invMeta.invariants || [];
+                
+                const singleInvs = (selectedInv.evidence || [])
+                  .filter((e) => e.sourceId?.startsWith("docs/adr") || e.id?.startsWith("ev-inv-"))
+                  .map((e) => (e.metadata || {}) as any)
+                  .filter((m) => m.statement);
+                  
+                const invariants = rawInvs.length > 0 ? rawInvs : singleInvs;
+                if (!invEv && invariants.length === 0) return null;
+
+                const governingCount = invMeta.governing_count ?? invariants.filter((i) => (i.governing_status || i.governingStatus) === "governing").length;
+                const supersededCount = invMeta.superseded_count ?? invariants.filter((i) => (i.governing_status || i.governingStatus) === "superseded").length;
+
+                return (
+                  <div className="p-6 rounded-xl bg-slate-900/70 border border-slate-800 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Landmark className="w-4 h-4 text-violet-400" />
+                        <h4 className="text-sm font-bold text-white">
+                          Intent Archaeology &amp; Architectural Invariants
+                        </h4>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold px-2.5 py-0.5 rounded border uppercase font-mono bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                          {governingCount} Governing
+                        </span>
+                        {supersededCount > 0 && (
+                          <span className="text-xs font-bold px-2.5 py-0.5 rounded border uppercase font-mono bg-slate-800/80 text-slate-400 border-slate-700/80 line-through">
+                            {supersededCount} Superseded
+                          </span>
+                        )}
+                        <span className="text-xs font-mono text-slate-500">
+                          ({invariants.length} total)
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      {invariants.map((inv: any, idx: number) => {
+                        const govStatus = (inv.governing_status || inv.governingStatus || "governing").toLowerCase();
+                        const level = (inv.level || "must").toLowerCase();
+                        const category = (inv.category || "architecture").toUpperCase();
+                        const title = inv.title;
+                        const statement = inv.statement;
+                        const rationale = inv.rationale;
+                        const supersededBy = inv.superseded_by || inv.supersededBy;
+                        const commitHash = inv.origin_commit_hash || inv.originCommitHash;
+                        const prNumber = inv.origin_pr_number || inv.originPrNumber;
+                        const prTitle = inv.origin_pr_title || inv.originPrTitle;
+                        const author = inv.origin_author || inv.originAuthor;
+                        const docTitle = inv.source_doc_title || inv.sourceDocTitle;
+                        const docPath = inv.source_doc_path || inv.sourceDocPath;
+                        const relevantFiles = inv.relevant_files || inv.relevantFiles || [];
+
+                        const isGoverning = govStatus === "governing";
+                        const isSuperseded = govStatus === "superseded";
+
+                        return (
+                          <div
+                            key={idx}
+                            className={`p-4 rounded-lg border space-y-3 ${
+                              isSuperseded
+                                ? "bg-slate-950/50 border-slate-800/60 opacity-80"
+                                : "bg-slate-950/80 border-slate-800/90"
+                            }`}
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                {/* Governing Status Badge */}
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase font-mono flex items-center gap-1 ${
+                                    isGoverning
+                                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                                      : isSuperseded
+                                      ? "bg-slate-800 text-slate-400 border-slate-700 line-through"
+                                      : "bg-indigo-500/10 text-indigo-300 border-indigo-500/30"
+                                  }`}
+                                >
+                                  {isGoverning ? (
+                                    <>
+                                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                      Governing Decision
+                                    </>
+                                  ) : isSuperseded ? (
+                                    <>
+                                      <AlertCircle className="w-3 h-3 text-slate-400" />
+                                      Superseded
+                                    </>
+                                  ) : (
+                                    govStatus
+                                  )}
+                                </span>
+
+                                {/* RFC 2119 Level Badge */}
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase font-mono ${
+                                    level === "must" || level === "must_not"
+                                      ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                                      : "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                                  }`}
+                                >
+                                  RFC {level.replace("_", " ").toUpperCase()}
+                                </span>
+
+                                {/* Category Badge */}
+                                <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-800/80 text-cyan-300 font-mono">
+                                  {category}
+                                </span>
+                              </div>
+
+                              {docTitle && (
+                                <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                                  <BookOpen className="w-3 h-3 text-slate-400" />
+                                  <span className="font-medium text-slate-300">{docTitle}</span>
+                                  {docPath && (
+                                    <span className="text-slate-500 font-mono text-[10px]">({docPath})</span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Invariant Statement */}
+                            <div className="space-y-1">
+                              <div className="text-xs font-semibold text-white">
+                                {title}
+                              </div>
+                              <div className="p-2.5 rounded bg-slate-900/90 border border-slate-800/70 font-mono text-xs text-indigo-200">
+                                {statement}
+                              </div>
+                            </div>
+
+                            {/* Rationale & Intent Archaeology */}
+                            {rationale && (
+                              <div className="text-xs text-slate-300 bg-slate-900/50 p-2.5 rounded border border-slate-800/50 space-y-1">
+                                <div className="text-[10px] uppercase font-bold text-violet-400">
+                                  Why This Constraint Exists:
+                                </div>
+                                <div className="text-[11px] leading-relaxed text-slate-300 font-sans">
+                                  {rationale}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Superseded Notice */}
+                            {isSuperseded && (
+                              <div className="flex items-center gap-2 p-2 rounded bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
+                                <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                                <span>
+                                  Caution: Superseded constraint{supersededBy ? ` by ${supersededBy}` : ""}. Ensure change does not reintroduce obsolete pattern.
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Origin Intent & Target Traceability */}
+                            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/50 text-[11px] text-slate-400">
+                              <div className="flex items-center gap-3">
+                                {commitHash && (
+                                  <span className="flex items-center gap-1 font-mono text-slate-300">
+                                    <GitCommit className="w-3 h-3 text-slate-400" />
+                                    {commitHash.slice(0, 7)}
+                                    {author ? ` (${author})` : ""}
+                                  </span>
+                                )}
+                                {prNumber && (
+                                  <span className="flex items-center gap-1 text-slate-300">
+                                    <GitPullRequest className="w-3 h-3 text-indigo-400" />
+                                    PR #{prNumber}
+                                    {prTitle ? `: ${prTitle.slice(0, 30)}` : ""}
+                                  </span>
+                                )}
+                              </div>
+                              {relevantFiles.length > 0 && (
+                                <div className="text-[10px] font-mono text-slate-500">
+                                  Bound targets: {relevantFiles.join(", ")}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 );
               })()}

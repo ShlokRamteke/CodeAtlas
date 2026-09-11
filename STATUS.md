@@ -6,11 +6,11 @@ Phase 4 — Change Investigation Engine
 
 ## Current Task
 
-PH4-04 Complete &mdash; Next: PH4-05 (Intent Archaeology & Invariant Synthesis)
+PH4-05 Complete &mdash; Next: PH4-06 (Token Budgeting & Dual-Format Projection)
 
 ## Status
 
-PH4-04 COMPLETE / READY FOR PH4-05
+PH4-05 COMPLETE / READY FOR PH4-06
 
 
 ## Product Focus
@@ -102,10 +102,17 @@ developer understand a proposed change before implementation.
   - Integrated into `InvestigationEngine.gather()`: extracts test dependencies, emits structured `ev-tests` evidence items and `signals["guarding_tests"]` payload, and populates prioritized test recommendations in brief synthesis.
   - Next.js UI interactive card with reach-ranked test execution priority list, untested change warning banners, and stale test candidate alerts.
   - 100% automated test pass rate across 73 pytest tests, clean frontend build, and clean contracts typecheck.
+- **Phase 4 — Task PH4-05 (Intent Archaeology & Invariant Synthesis)**:
+  - `InvariantSynthesizer` in `app.investigation.invariants`: links ADRs, RFC 2119 design invariants, PR rationale, and origin commits into structured `SynthesizedInvariant` records.
+  - Governing status resolution: automatically distinguishes governing decisions (`governing`) from superseded/deprecated records (`superseded`) via document status, explicit supersede text, and cross-ADR forward/reverse references.
+  - Intent archaeology & origin tracing: correlates target files with introducing commits (`CommitFileChange`) and merged PRs (`CommitPullRequestLink` -> `PullRequest`) to explain *why* constraints were established.
+  - Integrated into `InvestigationEngine.gather()` (`signals["invariants"]` and `ev-inv-*` evidence items), `reason()` (governing invariants fed to LLM reasoning prompt), and `synthesize()` (populates `brief.constraints` and generates invariant compliance checks and superseded warnings).
+  - Next.js UI interactive card in `PreChangeInvestigationViewer` with Governing vs Superseded badges, RFC 2119 severity tags, origin commit/PR chips, and rationale explanation cards.
+  - 100% automated test pass rate across 80 pytest tests, clean contracts compilation, and clean Next.js frontend production build.
 
 ## Remaining
 
-- **Phase 4**: Change Investigation Engine (PH4-05: Invariant Synthesis, PH4-06: Token Budgeting & Distillation, PH4-07: Concurrent Branch Overlap & Merge Conflict Detector, PH4-08: Independent Change Decomposition, PH4-09: Code Ownership & Reviewer Recommender, PH4-10: C4 Architecture & Dependency Export).
+- **Phase 4**: Change Investigation Engine (PH4-06: Token Budgeting & Distillation, PH4-07: Concurrent Branch Overlap & Merge Conflict Detector, PH4-08: Independent Change Decomposition, PH4-09: Code Ownership & Reviewer Recommender, PH4-10: C4 Architecture & Dependency Export).
 
 ## Blockers
 
@@ -113,7 +120,7 @@ None known.
 
 ## Next Action
 
-Start Task PH4-05 (Intent Archaeology & Invariant Synthesis).
+Start Task PH4-06 (Token Budgeting & Dual-Format Projection).
 
 ## Session Rule
 

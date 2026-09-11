@@ -29,6 +29,10 @@ from app.history.guarding_tests import (
 )
 from app.investigation.blast_radius import BlastRadiusAnalyzer
 from app.investigation.intent import IntentNormalizer
+from app.investigation.invariants import (
+    InvariantSynthesizer,
+    SynthesizedInvariant,
+)
 from app.investigation.llm import LLMProvider, get_default_llm_provider
 from app.investigation.state import (
     ClaimClassification,
@@ -186,7 +190,55 @@ class InvestigationEngine:
                 }
                 evidence_items.append(ev)
 
-        # 3. Gather documentation / ADR evidence
+        # 3. Intent Archaeology & Invariant Synthesis (ADRs, RFC 2119 invariants, PR rationale, origin commits)
+        synthesized_invariants = await InvariantSynthesizer.synthesize_invariants(
+            repository_id=state.repository_id,
+            target_files=target_files,
+            target_symbols=target_symbols,
+            db=db,
+            engineering_docs=engineering_docs,
+            file_commits=file_commits,
+        )
+        signals["invariants"] = {
+            "invariants": [inv.to_dict() for inv in synthesized_invariants],
+            "total_count": len(synthesized_invariants),
+            "governing_count": sum(1 for inv in synthesized_invariants if inv.governing_status == "governing"),
+            "superseded_count": sum(1 for inv in synthesized_invariants if inv.governing_status == "superseded"),
+        }
+
+        if synthesized_invariants:
+            gov_invs = [inv for inv in synthesized_invariants if inv.governing_status == "governing"]
+            sup_invs = [inv for inv in synthesized_invariants if inv.governing_status == "superseded"]
+            ev_inv = {
+                "id": f"ev-inv-{len(evidence_items) + 1}",
+                "source_type": EvidenceSourceType.DOC,
+                "source_id": "synthesized-invariants",
+                "title": f"Intent Archaeology: {len(synthesized_invariants)} Invariants ({len(gov_invs)} governing, {len(sup_invs)} superseded)",
+                "snippet": (
+                    f"Governing: {', '.join(i.title for i in gov_invs[:3]) if gov_invs else 'None'}. "
+                    f"Superseded: {', '.join(i.title for i in sup_invs[:2]) if sup_invs else 'None'}."
+                ),
+                "confidence": 1.0,
+                "extra_metadata": signals["invariants"],
+            }
+            evidence_items.append(ev_inv)
+
+            for inv in synthesized_invariants[:4]:
+                ev_single = {
+                    "id": f"ev-inv-{inv.id}",
+                    "source_type": EvidenceSourceType.DOC,
+                    "source_id": inv.source_doc_path or inv.id,
+                    "title": f"[{inv.governing_status.upper()}] {inv.title}",
+                    "snippet": f"{inv.statement} | Rationale: {inv.rationale}",
+                    "path": inv.source_doc_path,
+                    "line_start": inv.line_start,
+                    "line_end": inv.line_end,
+                    "confidence": 0.95,
+                    "extra_metadata": inv.to_dict(),
+                }
+                evidence_items.append(ev_single)
+
+        # Ingest general engineering doc evidence if provided
         if engineering_docs:
             for doc in engineering_docs:
                 ev = {
@@ -519,6 +571,15 @@ class InvestigationEngine:
         for e in state.gathered_evidence[:5]:
             context_str += f"- [{e['id']}] {e['title']}: {e['snippet'][:100]}\n"
 
+        inv_sig = state.gathered_signals.get("invariants", {})
+        if inv_sig.get("invariants"):
+            context_str += "Architectural Invariants & Intent Archaeology:\n"
+            for inv_data in inv_sig["invariants"][:5]:
+                context_str += (
+                    f"- [{inv_data['governing_status'].upper()}] ({inv_data['level'].upper()}) "
+                    f"{inv_data['title']}: {inv_data['statement']}. Rationale: {inv_data['rationale']}\n"
+                )
+
         try:
             summary, claims, tokens = await self.llm.reason_investigation(
                 intent=state.intent or IntentNormalizer.normalize(state.query),
@@ -620,6 +681,31 @@ class InvestigationEngine:
                 f"Verification gap: {len(untested_files)} target file(s) lack guarding tests ({', '.join(untested_files[:3])})."
             )
 
+        # Invariant-driven checks and unknowns
+        inv_sig = state.gathered_signals.get("invariants", {})
+        raw_invs = inv_sig.get("invariants", [])
+        for inv_d in raw_invs:
+            lvl = str(inv_d.get("level", "must")).lower()
+            gov = str(inv_d.get("governing_status", "governing")).lower()
+            stmt = inv_d.get("statement", "")
+            title = inv_d.get("title", "")
+            doc_title = inv_d.get("source_doc_title", "")
+
+            if gov == "governing":
+                if lvl in ("must", "must_not"):
+                    recommended_checks.append(
+                        f"Verify compliance with governing invariant: {stmt} (defined in '{doc_title}')."
+                    )
+            elif gov == "superseded":
+                sup_by = inv_d.get("superseded_by")
+                sup_msg = f" (superseded by {sup_by})" if sup_by else ""
+                recommended_checks.append(
+                    f"Caution against resurrecting superseded pattern '{title}'{sup_msg}."
+                )
+                unknowns.append(
+                    f"Verify proposed changes do not re-introduce superseded constraint '{title}'."
+                )
+
         if state.gathered_signals.get("change_risk", {}).get("shannon_entropy", 0) > 1.5:
             recommended_checks.append("High churn entropy detected: ensure changes remain modular.")
 
@@ -633,7 +719,7 @@ class InvestigationEngine:
             target_symbols=state.intent.target_symbols if state.intent else [],
             claims=state.claims,
             signals=state.gathered_signals,
-            constraints=[],
+            constraints=raw_invs,
             unknowns=unknowns,
             recommended_checks=recommended_checks,
             model_calls_count=state.model_calls_count,

@@ -60,7 +60,7 @@ Pre-Change Investigation Brief
   - Compute reach-ranked test ordering (tests exercising the highest number of changed files prioritized).
   - Detect *Untested Changes* and *Stale Test Candidates*.
 
-- [ ] **PH4-05: Intent Archaeology & Invariant Synthesis**
+- [x] **PH4-05: Intent Archaeology & Invariant Synthesis** *(Completed)*
   - Link ADRs, RFC 2119 design invariants, PR rationale, and origin commits.
   - Distinguish governing vs superseded decisions to explain *why* constraints exist.
 - [ ] **PH4-06: Token Budgeting & Dual-Format Projection**
