@@ -3,29 +3,24 @@ from __future__ import annotations
 import re
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.commit import Commit
 from app.models.commit_file_change import ChangeType, CommitFileChange
 from app.models.design_constraint import (
-    ConstraintCategory,
-    ConstraintLevel,
     DesignConstraint,
 )
 from app.models.engineering_doc import (
     ADRStatus,
-    EngineeringDocType,
     EngineeringDocument,
 )
 from app.models.historical_link import CommitPullRequestLink
 from app.parser.doc_parser import (
     EngineeringContextParser,
-    ParsedEngineeringDoc,
 )
 
 
@@ -126,7 +121,9 @@ class InvariantSynthesizer:
             doc_path.split("/")[-1].lower(),
             doc_title.lower(),
         }
-        for token in re.findall(r"(?:adr[-_]?)?\d{1,4}", doc_path.lower() + " " + doc_title.lower()):
+        for token in re.findall(
+            r"(?:adr[-_]?)?\d{1,4}", doc_path.lower() + " " + doc_title.lower()
+        ):
             clean_tok = token.replace("_", "-")
             doc_identifiers.add(clean_tok)
             num_part = re.sub(r"\D", "", clean_tok)
@@ -142,9 +139,15 @@ class InvariantSynthesizer:
                     pass
 
         for other in all_docs:
-            other_content = getattr(other, "raw_content", "") or (other.get("raw_content", "") if isinstance(other, dict) else "")
-            other_title = getattr(other, "title", "") or (other.get("title", "") if isinstance(other, dict) else "")
-            other_path = getattr(other, "path", "") or (other.get("path", "") if isinstance(other, dict) else "")
+            other_content = getattr(other, "raw_content", "") or (
+                other.get("raw_content", "") if isinstance(other, dict) else ""
+            )
+            other_title = getattr(other, "title", "") or (
+                other.get("title", "") if isinstance(other, dict) else ""
+            )
+            other_path = getattr(other, "path", "") or (
+                other.get("path", "") if isinstance(other, dict) else ""
+            )
 
             if other_path == doc_path or other_title == doc_title:
                 continue
@@ -317,10 +320,16 @@ class InvariantSynthesizer:
                 continue
 
             level_obj = getattr(c, "level", None)
-            level_str = level_obj.value if hasattr(level_obj, "value") else str(level_obj or "must").lower()
+            level_str = (
+                level_obj.value if hasattr(level_obj, "value") else str(level_obj or "must").lower()
+            )
 
             cat_obj = getattr(c, "category", None)
-            cat_str = cat_obj.value if hasattr(cat_obj, "value") else str(cat_obj or "architecture").lower()
+            cat_str = (
+                cat_obj.value
+                if hasattr(cat_obj, "value")
+                else str(cat_obj or "architecture").lower()
+            )
 
             doc = getattr(c, "document", None)
             if doc is not None:
@@ -344,7 +353,11 @@ class InvariantSynthesizer:
 
             for tf in clean_target_files:
                 tf_base = tf.split("/")[-1]
-                if tf.lower() in doc_path.lower() or tf.lower() in statement.lower() or tf_base.lower() in statement.lower():
+                if (
+                    tf.lower() in doc_path.lower()
+                    or tf.lower() in statement.lower()
+                    or tf_base.lower() in statement.lower()
+                ):
                     is_relevant = True
                     relevant_target_files.append(tf)
 
@@ -382,10 +395,14 @@ class InvariantSynthesizer:
 
             rationale_parts = []
             if gov_status == "governing":
-                rationale_parts.append(f"Governing {cat_str.upper()} constraint defined in '{doc_title}'.")
+                rationale_parts.append(
+                    f"Governing {cat_str.upper()} constraint defined in '{doc_title}'."
+                )
             elif gov_status == "superseded":
                 ref_text = f" by {superseded_by}" if superseded_by else ""
-                rationale_parts.append(f"SUPERSEDED decision{ref_text} (formerly defined in '{doc_title}').")
+                rationale_parts.append(
+                    f"SUPERSEDED decision{ref_text} (formerly defined in '{doc_title}')."
+                )
             else:
                 rationale_parts.append(f"{gov_status.capitalize()} constraint from '{doc_title}'.")
 

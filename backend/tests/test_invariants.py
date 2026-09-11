@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List
 
 import pytest
 
 from app.investigation.invariants import (
     InvariantSynthesizer,
-    SynthesizedInvariant,
 )
 from app.models.engineering_doc import ADRStatus
 
@@ -148,7 +146,10 @@ async def test_synthesize_invariants_with_docs() -> None:
     sup_invs = [inv for inv in invariants if inv.governing_status == "superseded"]
 
     assert len(gov_invs) >= 1
-    assert any("must never" in inv.statement.lower() or "signature" in inv.statement.lower() for inv in gov_invs)
+    assert any(
+        "must never" in inv.statement.lower() or "signature" in inv.statement.lower()
+        for inv in gov_invs
+    )
 
     # Check origin intent linkage
     first_gov = gov_invs[0]

@@ -31,7 +31,6 @@ from app.investigation.blast_radius import BlastRadiusAnalyzer
 from app.investigation.intent import IntentNormalizer
 from app.investigation.invariants import (
     InvariantSynthesizer,
-    SynthesizedInvariant,
 )
 from app.investigation.llm import LLMProvider, get_default_llm_provider
 from app.investigation.state import (
@@ -202,13 +201,21 @@ class InvestigationEngine:
         signals["invariants"] = {
             "invariants": [inv.to_dict() for inv in synthesized_invariants],
             "total_count": len(synthesized_invariants),
-            "governing_count": sum(1 for inv in synthesized_invariants if inv.governing_status == "governing"),
-            "superseded_count": sum(1 for inv in synthesized_invariants if inv.governing_status == "superseded"),
+            "governing_count": sum(
+                1 for inv in synthesized_invariants if inv.governing_status == "governing"
+            ),
+            "superseded_count": sum(
+                1 for inv in synthesized_invariants if inv.governing_status == "superseded"
+            ),
         }
 
         if synthesized_invariants:
-            gov_invs = [inv for inv in synthesized_invariants if inv.governing_status == "governing"]
-            sup_invs = [inv for inv in synthesized_invariants if inv.governing_status == "superseded"]
+            gov_invs = [
+                inv for inv in synthesized_invariants if inv.governing_status == "governing"
+            ]
+            sup_invs = [
+                inv for inv in synthesized_invariants if inv.governing_status == "superseded"
+            ]
             ev_inv = {
                 "id": f"ev-inv-{len(evidence_items) + 1}",
                 "source_type": EvidenceSourceType.DOC,

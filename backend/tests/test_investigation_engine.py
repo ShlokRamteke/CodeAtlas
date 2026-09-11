@@ -591,4 +591,3 @@ async def test_investigation_intent_archaeology_and_invariants(
     # Check recommended checks
     assert any("governing invariant" in r.lower() for r in state.brief.recommended_checks)
     assert any("superseded" in r.lower() for r in state.brief.recommended_checks)
-
