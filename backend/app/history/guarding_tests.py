@@ -68,7 +68,8 @@ class GuardingTestReport:
                 for w in self.stale_test_candidates
             ],
             "total_guarding_tests": self.total_guarding_tests,
-            "has_coverage_gaps": len(self.untested_changes) > 0 or len(self.stale_test_candidates) > 0,
+            "has_coverage_gaps": len(self.untested_changes) > 0
+            or len(self.stale_test_candidates) > 0,
             "untested_files": [w.target_file for w in self.untested_changes],
         }
 
@@ -124,7 +125,6 @@ def build_test_coverage_mapping(
     2. Transitive dependencies up to max_depth (e.g. test -> helper -> target).
     3. Naming convention heuristics (e.g. test_checkout.py matches checkout.py).
     """
-    clean_targets = {f.lstrip("/"): f for f in target_files}
     file_to_tests: dict[str, set[str]] = {f: set() for f in target_files}
 
     edges = list(dependency_edges or [])
@@ -273,4 +273,3 @@ def analyze_guarding_tests(
         stale_test_candidates=stale,
         total_guarding_tests=len(ranked),
     )
-

@@ -149,4 +149,3 @@ def test_build_test_coverage_mapping() -> None:
     assert "tests/test_payment.py" in mapping["src/payment.py"]
     # untested.py has no guarding tests
     assert len(mapping["src/untested.py"]) == 0
-

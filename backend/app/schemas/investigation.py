@@ -136,7 +136,6 @@ class GuardingTestReportSchema(BaseModel):
     untested_files: List[str] = Field(default_factory=list)
 
 
-
 class InvestigationCreate(BaseModel):
     repository_id: uuid.UUID
     query: str

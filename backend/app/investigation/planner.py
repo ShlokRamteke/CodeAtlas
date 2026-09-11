@@ -26,8 +26,6 @@ from app.history.co_change import (
 from app.history.guarding_tests import (
     analyze_guarding_tests,
     build_test_coverage_mapping,
-    detect_verification_gaps,
-    is_test_file,
 )
 from app.investigation.blast_radius import BlastRadiusAnalyzer
 from app.investigation.intent import IntentNormalizer
@@ -624,7 +622,6 @@ class InvestigationEngine:
 
         if state.gathered_signals.get("change_risk", {}).get("shannon_entropy", 0) > 1.5:
             recommended_checks.append("High churn entropy detected: ensure changes remain modular.")
-
 
         brief = PreChangeBrief(
             summary=(

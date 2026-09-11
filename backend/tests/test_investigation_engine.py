@@ -377,8 +377,8 @@ diff --git a/backend/app/billing/charge.py b/backend/app/billing/charge.py
 
 @pytest.mark.asyncio
 async def test_investigation_engine_guarding_tests_reach_ranking(db_session: AsyncSession):
-    from app.models.source_file import SourceFile
     from app.models.dependency import CodeDependency
+    from app.models.source_file import SourceFile
 
     repo = Repository(
         owner="testorg",
@@ -495,4 +495,3 @@ diff --git a/backend/app/billing/charge.py b/backend/app/billing/charge.py
 
     # Check recommendations
     assert any("test_integration.py" in r for r in state.brief.recommended_checks)
-
