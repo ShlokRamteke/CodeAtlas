@@ -55,10 +55,11 @@ Pre-Change Investigation Brief
   - Compute Kamei empirical metrics ($LA, LD, NF, ND, NS$).
   - Calculate Shannon churn entropy ($H(P)$) to score dispersion vs focus.
   - Mine historical defect pressure (20,000-commit deep walk with exponential recency decay $\tau = 365\text{d}$).
-- [ ] **PH4-04: Guarding Test & Verification Gap Analyzer**
-  - Map static call paths from tests to modified symbols.
+- [x] **PH4-04: Guarding Test & Verification Gap Analyzer** *(Completed)*
+  - Map static call paths and dependencies from tests to modified symbols and files.
   - Compute reach-ranked test ordering (tests exercising the highest number of changed files prioritized).
   - Detect *Untested Changes* and *Stale Test Candidates*.
+
 - [ ] **PH4-05: Intent Archaeology & Invariant Synthesis**
   - Link ADRs, RFC 2119 design invariants, PR rationale, and origin commits.
   - Distinguish governing vs superseded decisions to explain *why* constraints exist.

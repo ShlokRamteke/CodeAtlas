@@ -18,6 +18,7 @@ import {
   ShieldAlert,
   Search,
   ExternalLink,
+  ListChecks,
 } from "lucide-react";
 import type { InvestigationResponse, Repository } from "@codeatlas/contracts";
 import {
@@ -473,6 +474,151 @@ export function PreChangeInvestigationViewer({
                   </div>
                 );
               })()}
+
+              {/* Guarding Test Reachability & Verification Gaps Section */}
+              {(() => {
+                const testsEv = selectedInv.evidence?.find((e) => e.sourceId === "guarding-tests");
+                const testsMeta = (testsEv?.metadata || {}) as any;
+                if (!testsEv && !testsMeta.total_guarding_tests && !testsMeta.totalGuardingTests) return null;
+
+                const ranked = testsMeta.ranked_tests || testsMeta.rankedTests || [];
+                const untested = testsMeta.untested_changes || testsMeta.untestedChanges || [];
+                const stale = testsMeta.stale_test_candidates || testsMeta.staleTestCandidates || [];
+                const totalGuarding = testsMeta.total_guarding_tests ?? testsMeta.totalGuardingTests ?? ranked.length;
+                const hasGaps = testsMeta.has_coverage_gaps ?? testsMeta.hasCoverageGaps ?? (untested.length > 0 || stale.length > 0);
+
+                return (
+                  <div className="p-6 rounded-xl bg-slate-900/70 border border-slate-800 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ListChecks className="w-4 h-4 text-cyan-400" />
+                        <h4 className="text-sm font-bold text-white">
+                          Guarding Tests &amp; Verification Gaps
+                        </h4>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-xs font-bold px-2.5 py-0.5 rounded border uppercase font-mono ${
+                            hasGaps
+                              ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                              : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                          }`}
+                        >
+                          {hasGaps ? "Coverage Gaps Detected" : "Fully Guarded"} ({totalGuarding} suite{totalGuarding !== 1 ? "s" : ""})
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Reach-Ranked Test Suites */}
+                    {ranked.length > 0 ? (
+                      <div className="space-y-2">
+                        <div className="text-xs font-semibold text-slate-400 flex items-center justify-between">
+                          <span>Reach-Ranked Execution Priority (Run High Reach First):</span>
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            {ranked.length} test suite{ranked.length > 1 ? "s" : ""}
+                          </span>
+                        </div>
+                        <div className="space-y-2">
+                          {ranked.map((t: any, i: number) => {
+                            const testFile = t.test_file || t.testFile;
+                            const count = t.reached_target_count ?? t.reachedTargetCount ?? 0;
+                            const reached = t.reached_targets || t.reachedTargets || [];
+                            return (
+                              <div
+                                key={i}
+                                className="p-3 rounded-lg bg-slate-950/80 border border-slate-800/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                              >
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className={`text-[10px] font-bold px-2 py-0.5 rounded font-mono ${
+                                        i === 0
+                                          ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                                          : "bg-slate-800 text-slate-400"
+                                      }`}
+                                    >
+                                      #{i + 1} {i === 0 ? "PRIORITY" : ""}
+                                    </span>
+                                    <span className="font-mono text-xs text-white font-medium">
+                                      {testFile}
+                                    </span>
+                                  </div>
+                                  {reached.length > 0 && (
+                                    <div className="text-[11px] text-slate-400 flex items-center gap-1.5 pl-0.5">
+                                      <span>Guards {count} changed file{count > 1 ? "s" : ""}:</span>
+                                      <span className="font-mono text-slate-300 text-[10px]">
+                                        {reached.join(", ")}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex-shrink-0 font-mono text-xs text-cyan-400 bg-cyan-950/40 border border-cyan-800/40 px-2.5 py-1 rounded">
+                                  Reach: {count}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80 text-xs text-slate-400">
+                        No guarding tests found in repository covering the targeted source files.
+                      </div>
+                    )}
+
+                    {/* Verification Gaps: Untested Changes */}
+                    {untested.length > 0 && (
+                      <div className="space-y-1.5 pt-1">
+                        <div className="text-xs font-semibold text-rose-400 flex items-center gap-1.5">
+                          <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
+                          <span>Untested Modified Files ({untested.length}):</span>
+                        </div>
+                        <div className="space-y-1.5">
+                          {untested.map((w: any, i: number) => {
+                            const target = w.target_file || w.targetFile;
+                            const explanation = w.explanation;
+                            return (
+                              <div
+                                key={i}
+                                className="flex items-center gap-2 text-xs text-rose-300/90 bg-rose-500/10 border border-rose-500/20 px-3 py-2 rounded-lg font-mono"
+                              >
+                                <span className="font-bold">{target}:</span>
+                                <span className="font-sans text-rose-200/80">{explanation}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Verification Gaps: Stale Test Candidates */}
+                    {stale.length > 0 && (
+                      <div className="space-y-1.5 pt-1">
+                        <div className="text-xs font-semibold text-amber-400 flex items-center gap-1.5">
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Stale Test Candidates ({stale.length}):</span>
+                        </div>
+                        <div className="space-y-1.5">
+                          {stale.map((s: any, i: number) => {
+                            const target = s.target_file || s.targetFile;
+                            const explanation = s.explanation;
+                            return (
+                              <div
+                                key={i}
+                                className="flex items-center gap-2 text-xs text-amber-200/90 bg-amber-500/10 border border-amber-500/20 px-3 py-2 rounded-lg font-mono"
+                              >
+                                <span className="font-bold">{target}:</span>
+                                <span className="font-sans text-amber-200/80">{explanation}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
 
               {/* Synthesized Claims Section */}
               <div className="p-6 rounded-xl bg-slate-900/70 border border-slate-800 space-y-4">

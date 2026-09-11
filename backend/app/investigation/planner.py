@@ -23,7 +23,12 @@ from app.history.co_change import (
     detect_hidden_coupling,
     mine_co_change_partners,
 )
-from app.history.guarding_tests import detect_verification_gaps
+from app.history.guarding_tests import (
+    analyze_guarding_tests,
+    build_test_coverage_mapping,
+    detect_verification_gaps,
+    is_test_file,
+)
 from app.investigation.blast_radius import BlastRadiusAnalyzer
 from app.investigation.intent import IntentNormalizer
 from app.investigation.llm import LLMProvider, get_default_llm_provider
@@ -40,6 +45,7 @@ from app.models.commit_file_change import CommitFileChange
 from app.models.dependency import CodeDependency
 from app.models.evidence import Evidence, EvidenceSourceType
 from app.models.investigation import Investigation, InvestigationStatus
+from app.models.source_file import SourceFile
 
 logger = logging.getLogger(__name__)
 
@@ -204,6 +210,13 @@ class InvestigationEngine:
             dep_res = await db.execute(dep_query)
             db_deps = dep_res.scalars().all()
             static_edges = [(d.source_path, d.target_path) for d in db_deps]
+
+            # Query source files to discover all test files in repository
+            sf_query = select(SourceFile.path).where(
+                SourceFile.repository_id == state.repository_id
+            )
+            sf_res = await db.execute(sf_query)
+            all_repo_files = [r for r in sf_res.scalars().all()]
 
             # Compute Blast Radius
             blast_radius = BlastRadiusAnalyzer.compute_blast_radius(
@@ -441,15 +454,38 @@ class InvestigationEngine:
             }
             evidence_items.append(ev_risk)
 
-            # Guarding tests check
-            untested_warns, stale_warns = detect_verification_gaps(
-                proposed_files=set(target_files),
-                file_to_covering_tests={},
+            # Guarding tests check & verification gap detection
+            diff_files = set(target_files) | {f.path for f in file_stats}
+            coverage_mapping = build_test_coverage_mapping(
+                target_files=set(target_files),
+                dependency_edges=static_edges,
+                all_files=all_repo_files,
             )
-            signals["guarding_tests"] = {
-                "untested_files": [w.target_file for w in untested_warns],
-                "has_coverage_gaps": len(untested_warns) > 0,
+            guarding_report = analyze_guarding_tests(
+                proposed_files=set(target_files),
+                file_to_covering_tests=coverage_mapping,
+                files_in_diff=diff_files,
+            )
+            signals["guarding_tests"] = guarding_report.to_dict()
+
+            top_ranked = [t.test_file for t in guarding_report.ranked_tests[:3]]
+            untested_names = [w.target_file for w in guarding_report.untested_changes[:3]]
+            stale_names = [w.target_file for w in guarding_report.stale_test_candidates[:3]]
+
+            ev_tests = {
+                "id": f"ev-tests-{len(evidence_items) + 1}",
+                "source_type": EvidenceSourceType.CODE,
+                "source_id": "guarding-tests",
+                "title": f"Guarding Tests ({guarding_report.total_guarding_tests} suites, {len(guarding_report.untested_changes)} untested, {len(guarding_report.stale_test_candidates)} stale)",
+                "snippet": (
+                    f"Reach-ranked guarding test suites: {', '.join(top_ranked) if top_ranked else 'None'}. "
+                    f"Untested files: {', '.join(untested_names) if untested_names else 'None'}. "
+                    f"Stale test candidates: {', '.join(stale_names) if stale_names else 'None'}."
+                ),
+                "confidence": 1.0,
+                "extra_metadata": guarding_report.to_dict(),
             }
+            evidence_items.append(ev_tests)
 
         state.gathered_evidence = evidence_items
         state.gathered_signals = signals
@@ -541,12 +577,7 @@ class InvestigationEngine:
         unknowns: List[str] = [
             c.statement for c in state.claims if c.classification == ClaimClassification.UNKNOWN
         ]
-        if not unknowns and state.gathered_signals.get("guarding_tests", {}).get("untested_files"):
-            unknowns.append(
-                f"Untested files detected: {', '.join(state.gathered_signals['guarding_tests']['untested_files'])}"
-            )
-
-        recommended_checks = [
+        recommended_checks: List[str] = [
             "Verify all inbound callers before modifying interface signatures.",
             "Run guarding test suite covering modified symbols.",
         ]
@@ -568,8 +599,32 @@ class InvestigationEngine:
                 f"Potential omitted partner files: {', '.join(omitted_list[:3])} frequently co-change with targets."
             )
 
+        guarding_sig = state.gathered_signals.get("guarding_tests", {})
+        ranked_tests = guarding_sig.get("ranked_tests", [])
+        if ranked_tests:
+            top_t = ranked_tests[0]
+            recommended_checks.append(
+                f"Execute high-reach guarding test suite '{top_t['test_file']}' first (guards {top_t['reached_target_count']} modified target files)."
+            )
+        stale_candidates = guarding_sig.get("stale_test_candidates", [])
+        if stale_candidates:
+            stale_w = stale_candidates[0]
+            guarding_preview = ", ".join(stale_w["guarding_tests"][:2])
+            recommended_checks.append(
+                f"Update guarding test suite ({guarding_preview}) to assert modified behavior in '{stale_w['target_file']}'."
+            )
+        untested_files = guarding_sig.get("untested_files", [])
+        if untested_files:
+            recommended_checks.append(
+                f"Author guarding test coverage for untested targets ({', '.join(untested_files[:3])}) before deployment."
+            )
+            unknowns.append(
+                f"Verification gap: {len(untested_files)} target file(s) lack guarding tests ({', '.join(untested_files[:3])})."
+            )
+
         if state.gathered_signals.get("change_risk", {}).get("shannon_entropy", 0) > 1.5:
             recommended_checks.append("High churn entropy detected: ensure changes remain modular.")
+
 
         brief = PreChangeBrief(
             summary=(
