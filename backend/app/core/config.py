@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str | None = None
     OPENAI_MODEL: str = "gpt-4o"
     OPENROUTER_API_KEY: str | None = None
-    OPENROUTER_MODEL: str = "anthropic/claude-3.5-sonnet"
+    OPENROUTER_MODEL: str = "inclusionai/ling-3.0-flash-vl:free"
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
 
     # CORS
