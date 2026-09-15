@@ -133,8 +133,16 @@ class ProjectContext:
     documents: List[ContextDocument] = field(default_factory=list)
     design_constraints: List[ContextDesignConstraint] = field(default_factory=list)
 
-    def to_human_markdown(self) -> str:
-        """Render formatted human-readable markdown briefing."""
+    def to_human_markdown(self, token_budget: Optional[int] = None) -> str:
+        """Render formatted human-readable markdown briefing with optional token budgeting."""
+        if token_budget is not None:
+            from app.investigation.distillation import TokenBudgetDistiller
+
+            distilled = TokenBudgetDistiller.distill_project_context(
+                self.to_dict(), token_budget=token_budget, output_format="markdown"
+            )
+            return distilled.content_text
+
         sym_entities = [e for e in self.entities if e.kind == "symbol"]
         file_entities = [e for e in self.entities if e.kind == "file"]
 
@@ -344,7 +352,17 @@ ADRS_DOCS ({len(self.documents)}): [{", ".join(adr_strs) if adr_strs else "NONE"
 DESIGN_CONSTRAINTS ({len(self.design_constraints)}): [{"; ".join(constraint_strs) if constraint_strs else "NONE"}]
 UNKNOWNS_GAPS ({len(self.unknowns)}): [{", ".join(unknown_strs) if unknown_strs else "NONE"}]
 EVIDENCE_RECORDS ({len(self.evidence)}): [{", ".join(evidence_ids)}]
-========================================"""
+========================================
+"""
+
+    def to_agent_json(self, token_budget: Optional[int] = None) -> Dict[str, Any]:
+        """Render dense, token-budgeted JSON projection for AI coding agents."""
+        from app.investigation.distillation import TokenBudgetDistiller
+
+        distilled = TokenBudgetDistiller.distill_project_context(
+            self.to_dict(), token_budget=token_budget, output_format="json"
+        )
+        return distilled.content_json or {}
 
     def to_dict(self) -> Dict[str, Any]:
         """Structured dictionary for REST API serialization."""

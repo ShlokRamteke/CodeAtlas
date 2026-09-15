@@ -100,7 +100,7 @@ Turn current-system, historical, and engineering context into the core **Pre-Cha
 - **PH4-03 — Quantitative Change Risk & Defect Pressure** *(Completed)*: Unified diff parsing, Kamei empirical metrics ($LA, LD, NF, ND, NS$), Shannon churn entropy $H(P)$, and 20,000-commit deep walk defect pressure mining ($\tau = 365\text{d}$).
 - **PH4-04 — Guarding Test & Verification Gap Analyzer** *(Completed)*: Test call path reachability, reach-ranking test ordering, untested change alerts, and stale test detection.
 - **PH4-05 — Intent Archaeology & Invariant Synthesis** *(Completed)*: ADR constraint linking, governing vs superseded status, and rationale extraction.
-- **PH4-06 — Token Budgeting & Dual-Format Projection**: Priority shedding, recoverable omission markers (`[ref#<id>]`), human Markdown and dense agent JSON projections.
+- **PH4-06 — Token Budgeting & Dual-Format Projection** *(Completed)*: Priority shedding (5 tiers), recoverable omission markers (`[ref#<id>]`), on-demand reference expansion, human Markdown, and dense agent JSON projections.
 - **PH4-07 — Concurrent Branch Overlap & Merge Conflict Detector**: In-flight branch inspection and merge collision warnings.
 - **PH4-08 — Independent Change Decomposition**: Weakly-connected component subgraph evaluation and change decomposition suggestions.
 - **PH4-09 — Code Ownership & Reviewer Recommender**: Historical blame concentration and qualified reviewer recommendations.

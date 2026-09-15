@@ -6,11 +6,11 @@ Phase 4 — Change Investigation Engine
 
 ## Current Task
 
-PH4-05 Complete &mdash; Next: PH4-06 (Token Budgeting & Dual-Format Projection)
+PH4-06 Complete &mdash; Next: PH4-07 (Concurrent Branch Overlap & Merge Conflict Detector)
 
 ## Status
 
-PH4-05 COMPLETE / READY FOR PH4-06
+PH4-06 COMPLETE / READY FOR PH4-07
 
 
 ## Product Focus
@@ -109,10 +109,17 @@ developer understand a proposed change before implementation.
   - Integrated into `InvestigationEngine.gather()` (`signals["invariants"]` and `ev-inv-*` evidence items), `reason()` (governing invariants fed to LLM reasoning prompt), and `synthesize()` (populates `brief.constraints` and generates invariant compliance checks and superseded warnings).
   - Next.js UI interactive card in `PreChangeInvestigationViewer` with Governing vs Superseded badges, RFC 2119 severity tags, origin commit/PR chips, and rationale explanation cards.
   - 100% automated test pass rate across 80 pytest tests, clean contracts compilation, and clean Next.js frontend production build.
+- **Phase 4 — Task PH4-06 (Token Budgeting & Dual-Format Projection)**:
+  - `TokenBudgetDistiller` in `app.investigation.distillation`: implemented deterministic 5-tier priority shedding and calibrated token estimation heuristic (~3.8-4.0 chars/token).
+  - Recoverable omission markers: shed items are mapped to recoverable reference tokens (`[ref#<id>]`) and indexed in `OmissionRegistry`, allowing coding agents (Claude Code, Cursor, Copilot) to inspect or expand specific subgraphs on demand without context overflow.
+  - Dual-format projections: implemented `to_human_markdown(token_budget)` (rich GFM with tables, badges, and omission tags) and `to_agent_json(token_budget)` (dense, ultra-compact JSON with `_omitted` tokens and explicit telemetry) across both canonical `ProjectContext` and `PreChangeBrief`.
+  - REST endpoints: added `GET /api/v1/investigations/{id}/projection` (supporting `format=json|markdown` and `token_budget` ceilings) and `GET /api/v1/investigations/{id}/references/{ref_id}` (resolves and expands any shed detail on demand).
+  - Contracts & Frontend UI: added `OmissionMarker`, `InvestigationProjectionResponse`, and `ReferenceDetailResponse` to `@codeatlas/contracts`. Enhanced `PreChangeInvestigationViewer` with a 3-way view switcher ("Visual Analysis", "Human Markdown", "Dense Agent JSON"), budget presets ("Uncapped", "4k", "2k", "1k", "500"), live token telemetry, copy-to-clipboard actions, and interactive omission inspection modals.
+  - 100% automated test pass rate across 87 pytest tests, clean contracts compilation, and clean Next.js frontend production build.
 
 ## Remaining
 
-- **Phase 4**: Change Investigation Engine (PH4-06: Token Budgeting & Distillation, PH4-07: Concurrent Branch Overlap & Merge Conflict Detector, PH4-08: Independent Change Decomposition, PH4-09: Code Ownership & Reviewer Recommender, PH4-10: C4 Architecture & Dependency Export).
+- **Phase 4**: Change Investigation Engine (PH4-07: Concurrent Branch Overlap & Merge Conflict Detector, PH4-08: Independent Change Decomposition, PH4-09: Code Ownership & Reviewer Recommender, PH4-10: C4 Architecture & Dependency Export).
 
 ## Blockers
 
@@ -120,7 +127,7 @@ None known.
 
 ## Next Action
 
-Start Task PH4-06 (Token Budgeting & Dual-Format Projection).
+Start Task PH4-07 (Concurrent Branch Overlap & Merge Conflict Detector).
 
 ## Session Rule
 
@@ -137,5 +144,5 @@ receive scoped views of that model.
 
 ## Last Updated
 
-2026-09-11
+2026-09-15
 

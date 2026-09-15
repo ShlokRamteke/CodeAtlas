@@ -743,4 +743,71 @@ export interface EngineeringContextOverviewResponse {
   topConstraints: DesignConstraintItem[];
 }
 
+export interface OmissionMarker {
+  refId: string;
+  markerType: string;
+  title: string;
+  summary: string;
+}
+
+export interface InvestigationProjectionResponse {
+  investigationId: string;
+  format: 'json' | 'markdown';
+  tokenBudget?: number | null;
+  estimatedTokens: number;
+  isDistilled: boolean;
+  shedTier: number;
+  omittedCount: number;
+  omissions: OmissionMarker[];
+  contentText: string;
+  contentJson?: Record<string, unknown> | null;
+}
+
+export interface ReferenceDetailResponse {
+  refId: string;
+  markerType: string;
+  title: string;
+  summary: string;
+  originalPayload: Record<string, unknown>;
+}
+
+export interface DenseAgentBrief {
+  _schema: string;
+  _distilled: boolean;
+  _shed_tier: number;
+  intent: string;
+  targets: {
+    files: string[];
+    symbols: string[];
+  };
+  risk: {
+    score: number;
+    level: string;
+    entropy: number;
+    defect_pressure: number;
+    churn: {
+      la: number;
+      ld: number;
+      nf: number;
+    };
+  };
+  guarding_tests: {
+    untested: string[];
+    ranked?: Array<{ test: string; reach: number }>;
+    top_ranked?: Array<{ test: string; reach: number }>;
+    omitted_tests?: Record<string, unknown>;
+  };
+  blast_radius: {
+    affected_components: string[];
+    callers?: string[];
+    caller_count?: number;
+    omitted_callers?: Record<string, unknown>;
+  };
+  constraints: Array<Record<string, unknown>>;
+  checks: string[];
+  evidence_refs: Array<Record<string, unknown>>;
+  unknowns: string[];
+}
+
+
 

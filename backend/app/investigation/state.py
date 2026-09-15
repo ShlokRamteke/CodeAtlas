@@ -57,6 +57,50 @@ class PreChangeBrief:
     model_calls_count: int = 0
     token_usage: Dict[str, int] = field(default_factory=dict)
 
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "summary": self.summary,
+            "intent_summary": self.intent_summary,
+            "target_files": self.target_files,
+            "target_symbols": self.target_symbols,
+            "claims": [
+                {
+                    "id": c.id,
+                    "classification": (
+                        c.classification.value
+                        if hasattr(c.classification, "value")
+                        else str(c.classification)
+                    ),
+                    "statement": c.statement,
+                    "evidence_ids": c.evidence_ids,
+                    "confidence": c.confidence,
+                }
+                for c in self.claims
+            ],
+            "signals": self.signals,
+            "constraints": self.constraints,
+            "unknowns": self.unknowns,
+            "recommended_checks": self.recommended_checks,
+            "model_calls_count": self.model_calls_count,
+            "token_usage": self.token_usage,
+        }
+
+    def to_human_markdown(self, token_budget: Optional[int] = None) -> str:
+        from app.investigation.distillation import TokenBudgetDistiller
+
+        res = TokenBudgetDistiller.distill_brief(
+            self.to_dict(), token_budget=token_budget, output_format="markdown"
+        )
+        return res.content_text
+
+    def to_agent_json(self, token_budget: Optional[int] = None) -> Dict[str, Any]:
+        from app.investigation.distillation import TokenBudgetDistiller
+
+        res = TokenBudgetDistiller.distill_brief(
+            self.to_dict(), token_budget=token_budget, output_format="json"
+        )
+        return res.content_json or {}
+
 
 @dataclass
 class InvestigationState:

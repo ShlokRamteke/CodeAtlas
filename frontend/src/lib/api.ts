@@ -28,6 +28,8 @@ import type {
   EngineeringContextOverviewResponse,
   ComponentMilestoneEvent,
   ComponentTimelineResponse,
+  InvestigationProjectionResponse,
+  ReferenceDetailResponse,
 } from "@codeatlas/contracts";
 
 
@@ -589,6 +591,63 @@ export async function previewInvestigationIntent(
     });
     if (!res.ok) return null;
     return await res.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function fetchInvestigationProjection(
+  investigationId: string,
+  format: "json" | "markdown" = "json",
+  tokenBudget?: number
+): Promise<InvestigationProjectionResponse | null> {
+  try {
+    const url = new URL(`${API_BASE}/api/v1/investigations/${investigationId}/projection`);
+    url.searchParams.set("format", format);
+    if (tokenBudget !== undefined && tokenBudget !== null) {
+      url.searchParams.set("token_budget", tokenBudget.toString());
+    }
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) return null;
+    const raw = await res.json();
+    return {
+      investigationId: raw.investigation_id,
+      format: raw.format,
+      tokenBudget: raw.token_budget,
+      estimatedTokens: raw.estimated_tokens,
+      isDistilled: raw.is_distilled,
+      shedTier: raw.shed_tier,
+      omittedCount: raw.omitted_count,
+      omissions: (raw.omissions || []).map((o: any) => ({
+        refId: o.ref_id,
+        markerType: o.marker_type,
+        title: o.title,
+        summary: o.summary,
+      })),
+      contentText: raw.content_text,
+      contentJson: raw.content_json,
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function fetchInvestigationReference(
+  investigationId: string,
+  refId: string
+): Promise<ReferenceDetailResponse | null> {
+  try {
+    const url = `${API_BASE}/api/v1/investigations/${investigationId}/references/${encodeURIComponent(refId)}`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return null;
+    const raw = await res.json();
+    return {
+      refId: raw.ref_id,
+      markerType: raw.marker_type,
+      title: raw.title,
+      summary: raw.summary,
+      originalPayload: raw.original_payload || {},
+    };
   } catch (error) {
     return null;
   }

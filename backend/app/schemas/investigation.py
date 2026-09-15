@@ -187,3 +187,31 @@ class InvestigationRead(BaseModel):
     token_usage: Optional[Dict[str, Any]] = None
     latency_ms: Optional[int] = None
     created_at: datetime
+
+
+class OmissionMarkerSchema(BaseModel):
+    ref_id: str
+    marker_type: str
+    title: str
+    summary: str
+
+
+class InvestigationProjectionResponse(BaseModel):
+    investigation_id: uuid.UUID
+    format: str  # "json" | "markdown"
+    token_budget: Optional[int] = None
+    estimated_tokens: int
+    is_distilled: bool
+    shed_tier: int
+    omitted_count: int
+    omissions: List[OmissionMarkerSchema] = Field(default_factory=list)
+    content_text: str
+    content_json: Optional[Dict[str, Any]] = None
+
+
+class ReferenceDetailResponse(BaseModel):
+    ref_id: str
+    marker_type: str
+    title: str
+    summary: str
+    original_payload: Dict[str, Any] = Field(default_factory=dict)
