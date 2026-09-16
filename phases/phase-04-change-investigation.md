@@ -63,9 +63,11 @@ Pre-Change Investigation Brief
 - [x] **PH4-05: Intent Archaeology & Invariant Synthesis** *(Completed)*
   - Link ADRs, RFC 2119 design invariants, PR rationale, and origin commits.
   - Distinguish governing vs superseded decisions to explain *why* constraints exist.
-- [ ] **PH4-06: Token Budgeting & Dual-Format Projection**
-  - Implement token-budgeted distillation with priority shedding and recoverable omission markers (`[ref#<id>]`).
-  - Project canonical `ProjectContext` into Human-facing Markdown and dense Agent-facing JSON.
+- [x] **PH4-06: Token Budgeting & Dual-Format Projection** *(Completed)*
+  - Implement token-budgeted distillation with 5-tier priority shedding and recoverable omission markers (`[ref#<id>]`).
+  - Project canonical `ProjectContext` and `PreChangeBrief` into Human-facing Markdown and dense Agent-facing JSON.
+  - Implement on-demand reference expansion endpoint (`GET /api/v1/investigations/{id}/references/{ref_id}`) enabling coding agents to inspect shed subgraphs without overflowing context windows.
+  - Integrate interactive format switcher ("Visual Analysis", "Human Markdown", "Dense Agent JSON"), token budget presets, and omission inspection modal in Next.js UI.
 - [ ] **PH4-07: Concurrent Branch Overlap & Merge Conflict Detector**
   - Query open pull requests and active branches touching target files or their direct blast radius.
   - Flag concurrent in-flight changes to prevent merge conflicts before code is written.

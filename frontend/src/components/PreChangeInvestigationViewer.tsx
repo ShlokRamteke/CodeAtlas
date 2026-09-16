@@ -16,18 +16,31 @@ import {
   BookOpen,
   ArrowRight,
   ShieldAlert,
-  Search,
   ExternalLink,
   ListChecks,
   Landmark,
   GitPullRequest,
+  Code2,
+  Copy,
+  Check,
+  Layers,
+  Eye,
+  Sliders,
+  X,
 } from "lucide-react";
-import type { InvestigationResponse, Repository } from "@codeatlas/contracts";
+import type {
+  InvestigationResponse,
+  Repository,
+  InvestigationProjectionResponse,
+  ReferenceDetailResponse,
+} from "@codeatlas/contracts";
 import {
   createInvestigation,
   runInvestigation,
   fetchRepositoryInvestigations,
   previewInvestigationIntent,
+  fetchInvestigationProjection,
+  fetchInvestigationReference,
 } from "@/lib/api";
 
 interface PreChangeInvestigationViewerProps {
@@ -50,6 +63,15 @@ export function PreChangeInvestigationViewer({
   const [running, setRunning] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Projection and Token Budget state
+  const [activeTab, setActiveTab] = useState<"visual" | "markdown" | "json">("visual");
+  const [tokenBudget, setTokenBudget] = useState<number | null>(null);
+  const [projection, setProjection] = useState<InvestigationProjectionResponse | null>(null);
+  const [loadingProjection, setLoadingProjection] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [inspectRef, setInspectRef] = useState<ReferenceDetailResponse | null>(null);
+  const [loadingRef, setLoadingRef] = useState(false);
+
   // Load repository investigations
   useEffect(() => {
     async function load() {
@@ -65,6 +87,46 @@ export function PreChangeInvestigationViewer({
     }
     load();
   }, [repository.id]);
+
+  // Fetch projection on tab / budget / selectedInv change
+  useEffect(() => {
+    if (!selectedInv) {
+      setProjection(null);
+      return;
+    }
+    let cancelled = false;
+    async function loadProj() {
+      setLoadingProjection(true);
+      const fmt = activeTab === "markdown" ? "markdown" : "json";
+      const proj = await fetchInvestigationProjection(
+        selectedInv!.id,
+        fmt,
+        tokenBudget !== null ? tokenBudget : undefined
+      );
+      if (!cancelled) {
+        setProjection(proj);
+        setLoadingProjection(false);
+      }
+    }
+    loadProj();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedInv?.id, tokenBudget, activeTab]);
+
+  async function handleOpenReference(refId: string) {
+    if (!selectedInv) return;
+    setLoadingRef(true);
+    const detail = await fetchInvestigationReference(selectedInv.id, refId);
+    setInspectRef(detail);
+    setLoadingRef(false);
+  }
+
+  function handleCopy(text: string) {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   async function handleRunInvestigation(e: React.FormEvent) {
     e.preventDefault();
@@ -366,7 +428,154 @@ export function PreChangeInvestigationViewer({
                 </div>
               </div>
 
-              {/* Quantitative Change Risk & Defect Pressure Section */}
+              {/* Dual-Format & Token Budgeting Navigation Bar */}
+              <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-md">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  {/* Format View Switcher */}
+                  <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800/80">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("visual")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                        activeTab === "visual"
+                          ? "bg-indigo-600 text-white shadow-sm"
+                          : "text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      Visual Analysis
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("markdown")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                        activeTab === "markdown"
+                          ? "bg-indigo-600 text-white shadow-sm"
+                          : "text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      <BookOpen className="w-3.5 h-3.5" />
+                      Human Markdown
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("json")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                        activeTab === "json"
+                          ? "bg-indigo-600 text-white shadow-sm"
+                          : "text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      <Code2 className="w-3.5 h-3.5" />
+                      Dense Agent JSON
+                    </button>
+                  </div>
+
+                  {/* Token Budget Presets */}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1">
+                      <Sliders className="w-3 h-3 text-slate-500" />
+                      Budget:
+                    </span>
+                    {[
+                      { label: "Uncapped", val: null },
+                      { label: "4k", val: 4000 },
+                      { label: "2k", val: 2000 },
+                      { label: "1k", val: 1000 },
+                      { label: "500", val: 500 },
+                    ].map((b, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setTokenBudget(b.val)}
+                        className={`px-2 py-1 text-[11px] rounded font-mono transition-all ${
+                          tokenBudget === b.val
+                            ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-semibold"
+                            : "bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-800/40"
+                        }`}
+                      >
+                        {b.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Telemetry Bar & Actions */}
+                {projection && (
+                  <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2 font-mono">
+                      <span className="text-slate-400">Tokens:</span>
+                      <span className="text-white font-bold bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                        {projection.estimatedTokens} est
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                          projection.isDistilled
+                            ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                            : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                        }`}
+                      >
+                        {projection.isDistilled
+                          ? `Distilled (Tier ${projection.shedTier})`
+                          : "Full Fidelity"}
+                      </span>
+                      {projection.omittedCount > 0 && (
+                        <span className="text-amber-400 text-[11px]">
+                          &bull; {projection.omittedCount} detail(s) shed
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(projection.contentText)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs transition-colors border border-slate-700 font-medium"
+                      >
+                        {copied ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="text-emerald-400">Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copy {activeTab === "markdown" ? "Markdown" : activeTab === "json" ? "JSON" : "Content"}</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Recoverable Omission Reference Chips */}
+                {projection && projection.omissions && projection.omissions.length > 0 && (
+                  <div className="pt-2 border-t border-slate-800/60 flex flex-wrap items-center gap-1.5">
+                    <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
+                      Recoverable Omissions:
+                    </span>
+                    {projection.omissions.map((om, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleOpenReference(om.refId)}
+                        className="px-2 py-0.5 rounded bg-indigo-950/40 hover:bg-indigo-900/50 border border-indigo-800/40 text-indigo-300 font-mono text-[10px] flex items-center gap-1 transition-colors"
+                        title={`Click to inspect shed detail: ${om.title}`}
+                      >
+                        <span>{om.refId}</span>
+                        <span className="text-slate-400 font-sans truncate max-w-[140px]">
+                          ({om.title})
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* View Tab: Visual Analysis */}
+              {activeTab === "visual" && (
+                <div className="space-y-6">
+                  {/* Quantitative Change Risk & Defect Pressure Section */}
               {(() => {
                 const riskEv = selectedInv.evidence?.find((e) => e.sourceId === "kamei-change-risk");
                 const riskMeta = (riskEv?.metadata || {}) as any;
@@ -908,6 +1117,70 @@ export function PreChangeInvestigationViewer({
                 </div>
               </div>
             </div>
+          )}
+
+          {/* View Tab: Human Markdown */}
+          {activeTab === "markdown" && (
+            <div className="p-6 rounded-xl bg-slate-900/90 border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-indigo-400" />
+                  <h4 className="text-sm font-bold text-white">
+                    Projected Pre-Change Investigation Brief (Markdown)
+                  </h4>
+                </div>
+                {projection && (
+                  <span className="text-xs text-slate-400 font-mono">
+                    {projection.estimatedTokens} tokens
+                  </span>
+                )}
+              </div>
+
+              {loadingProjection ? (
+                <div className="p-12 text-center text-slate-400 text-xs animate-pulse">
+                  Distilling projection under token budget...
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <pre className="p-4 rounded-lg bg-slate-950 border border-slate-800/80 text-slate-200 font-mono text-xs overflow-x-auto whitespace-pre-wrap leading-relaxed">
+                    {projection?.contentText}
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* View Tab: Dense Agent JSON */}
+          {activeTab === "json" && (
+            <div className="p-6 rounded-xl bg-slate-900/90 border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Code2 className="w-4 h-4 text-cyan-400" />
+                  <h4 className="text-sm font-bold text-white">
+                    Dense Agent-Facing Projection (JSON)
+                  </h4>
+                </div>
+                {projection && (
+                  <span className="text-xs text-slate-400 font-mono">
+                    {projection.estimatedTokens} tokens
+                  </span>
+                )}
+              </div>
+
+              {loadingProjection ? (
+                <div className="p-12 text-center text-slate-400 text-xs animate-pulse">
+                  Distilling dense JSON under token budget...
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <pre className="p-4 rounded-lg bg-slate-950 border border-slate-800/80 text-cyan-300 font-mono text-xs overflow-x-auto whitespace-pre-wrap leading-relaxed">
+                    {projection?.contentText}
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
           ) : (
             <div className="p-12 rounded-xl bg-slate-900/30 border border-dashed border-slate-800 text-center space-y-3">
               <Sparkles className="w-8 h-8 text-indigo-400/60 mx-auto" />
@@ -921,6 +1194,55 @@ export function PreChangeInvestigationViewer({
           )}
         </div>
       </div>
+
+      {/* Recoverable Omission Reference Inspector Modal */}
+      {inspectRef && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl max-w-2xl w-full p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 font-mono text-xs font-bold">
+                  {inspectRef.refId}
+                </span>
+                <span className="text-xs uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">
+                  {inspectRef.markerType}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setInspectRef(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-md hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-bold text-white">{inspectRef.title}</h4>
+              <p className="text-xs text-slate-400 mt-1">{inspectRef.summary}</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                Recovered Original Payload:
+              </div>
+              <pre className="p-3.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 font-mono text-xs max-h-80 overflow-y-auto whitespace-pre-wrap">
+                {JSON.stringify(inspectRef.originalPayload, null, 2)}
+              </pre>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setInspectRef(null)}
+                className="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

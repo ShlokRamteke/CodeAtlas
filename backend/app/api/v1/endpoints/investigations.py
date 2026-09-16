@@ -3,20 +3,24 @@ from __future__ import annotations
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.db import get_db
 from app.investigation import IntentNormalizer, InvestigationEngine
+from app.investigation.distillation import GLOBAL_OMISSION_REGISTRY, TokenBudgetDistiller
 from app.models.investigation import Investigation
 from app.models.repository import Repository
 from app.schemas.investigation import (
     InvestigationCreate,
+    InvestigationProjectionResponse,
     InvestigationRead,
     InvestigationRunRequest,
     NormalizedChangeIntentSchema,
+    OmissionMarkerSchema,
+    ReferenceDetailResponse,
 )
 
 router = APIRouter()
@@ -144,3 +148,218 @@ async def run_investigation(
     result = await db.execute(query)
     updated_inv = result.scalar_one()
     return updated_inv
+
+
+def _reconstruct_brief_data(inv: Investigation) -> dict:
+    target_files: list[str] = []
+    target_symbols: list[str] = []
+    signals: dict = {}
+    constraints: list[dict] = []
+    evidence_list: list[dict] = []
+    recommended_checks: list[str] = []
+    unknowns: list[str] = []
+
+    for e in inv.evidence:
+        ev_item = {
+            "id": str(e.id),
+            "source_type": (
+                e.source_type.value if hasattr(e.source_type, "value") else str(e.source_type)
+            ),
+            "source_id": e.source_id,
+            "title": e.title,
+            "snippet": e.snippet,
+            "path": e.path,
+            "extra_metadata": e.extra_metadata or {},
+        }
+        evidence_list.append(ev_item)
+
+        meta = e.extra_metadata or {}
+        if e.source_id == "kamei-change-risk":
+            signals["change_risk"] = meta
+        elif e.source_id == "guarding-tests-report":
+            signals["guarding_tests"] = meta
+        elif e.source_id == "blast-radius-analysis":
+            signals["blast_radius"] = meta
+        elif e.source_id == "co-change-signals":
+            signals["co_change"] = meta
+        elif e.source_id.startswith("inv-") or meta.get("governing_status"):
+            constraints.append(
+                {
+                    "id": meta.get("id", e.source_id),
+                    "title": meta.get("title", e.title),
+                    "statement": meta.get("statement", e.snippet),
+                    "level": meta.get("level", "must"),
+                    "category": meta.get("category", "general"),
+                    "governing_status": meta.get("governing_status", "governing"),
+                    "superseded_by": meta.get("superseded_by"),
+                    "source_doc_title": meta.get("source_doc_title", ""),
+                    "source_doc_path": meta.get("source_doc_path", e.path or ""),
+                    "rationale": meta.get("rationale", ""),
+                }
+            )
+
+    for e in inv.evidence:
+        src_val = e.source_type.value if hasattr(e.source_type, "value") else str(e.source_type)
+        if e.path and e.path not in target_files and src_val == "code":
+            target_files.append(e.path)
+
+    guarding_sig = signals.get("guarding_tests", {})
+    if guarding_sig.get("untested_files"):
+        unknowns.append(f"Untested targets: {', '.join(guarding_sig['untested_files'])}")
+    if guarding_sig.get("ranked_tests"):
+        top_t = guarding_sig["ranked_tests"][0]
+        recommended_checks.append(
+            f"Execute high-reach guarding test suite '{top_t.get('test_file')}' first."
+        )
+
+    return {
+        "summary": inv.summary or inv.query,
+        "intent_summary": inv.answer or inv.query,
+        "target_files": target_files,
+        "target_symbols": target_symbols,
+        "claims": inv.claims or [],
+        "signals": signals,
+        "constraints": constraints,
+        "unknowns": unknowns,
+        "recommended_checks": recommended_checks,
+        "evidence": evidence_list,
+        "token_usage": inv.token_usage or {},
+    }
+
+
+@router.get(
+    "/{investigation_id}/projection",
+    response_model=InvestigationProjectionResponse,
+)
+async def get_investigation_projection(
+    investigation_id: uuid.UUID,
+    format: str = Query("json", description="'json' or 'markdown'"),
+    token_budget: Optional[int] = Query(
+        None, description="Optional token limit (e.g. 500, 1000, 2000, 4000)"
+    ),
+    db: AsyncSession = Depends(get_db),
+) -> InvestigationProjectionResponse:
+    query = (
+        select(Investigation)
+        .where(Investigation.id == investigation_id)
+        .options(selectinload(Investigation.evidence))
+    )
+    result = await db.execute(query)
+    inv = result.scalar_one_or_none()
+    if not inv:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Investigation not found",
+        )
+
+    brief_data = _reconstruct_brief_data(inv)
+    fmt = "json" if format.lower() == "json" else "markdown"
+    distilled = TokenBudgetDistiller.distill_brief(
+        brief_data=brief_data,
+        token_budget=token_budget,
+        output_format=fmt,
+    )
+
+    omissions_schema = [
+        OmissionMarkerSchema(
+            ref_id=o.ref_id,
+            marker_type=o.marker_type,
+            title=o.title,
+            summary=o.summary,
+        )
+        for o in distilled.omissions
+    ]
+
+    return InvestigationProjectionResponse(
+        investigation_id=inv.id,
+        format=distilled.format,
+        token_budget=distilled.token_budget,
+        estimated_tokens=distilled.estimated_tokens,
+        is_distilled=distilled.is_distilled,
+        shed_tier=distilled.shed_tier,
+        omitted_count=distilled.omitted_count,
+        omissions=omissions_schema,
+        content_text=distilled.content_text,
+        content_json=distilled.content_json,
+    )
+
+
+@router.get(
+    "/{investigation_id}/reference",
+    response_model=ReferenceDetailResponse,
+)
+@router.get(
+    "/{investigation_id}/references/{ref_id:path}",
+    response_model=ReferenceDetailResponse,
+)
+async def get_investigation_reference(
+    investigation_id: uuid.UUID,
+    ref_id: Optional[str] = None,
+    ref: Optional[str] = Query(None, alias="ref_id"),
+    db: AsyncSession = Depends(get_db),
+) -> ReferenceDetailResponse:
+    target_ref = ref_id or ref
+    if not target_ref:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ref_id must be specified",
+        )
+
+    import urllib.parse
+
+    decoded_ref = urllib.parse.unquote(target_ref).strip()
+
+    # 1. First check in-memory registry (try direct, decoded, and with/without ref#)
+    marker = (
+        GLOBAL_OMISSION_REGISTRY.get(target_ref)
+        or GLOBAL_OMISSION_REGISTRY.get(decoded_ref)
+        or GLOBAL_OMISSION_REGISTRY.get(f"ref#{decoded_ref.replace('ref#', '')}")
+    )
+    if marker:
+        return ReferenceDetailResponse(
+            ref_id=marker.ref_id,
+            marker_type=marker.marker_type,
+            title=marker.title,
+            summary=marker.summary,
+            original_payload=marker.original_payload,
+        )
+
+    # 2. Fallback: inspect persisted investigation evidence
+    query = (
+        select(Investigation)
+        .where(Investigation.id == investigation_id)
+        .options(selectinload(Investigation.evidence))
+    )
+    result = await db.execute(query)
+    inv = result.scalar_one_or_none()
+    if not inv:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Investigation not found",
+        )
+
+    clean_ref = ref_id.replace("ref#", "")
+    for e in inv.evidence:
+        if clean_ref in str(e.id) or clean_ref == e.source_id or clean_ref in e.source_id:
+            src_val = e.source_type.value if hasattr(e.source_type, "value") else str(e.source_type)
+            return ReferenceDetailResponse(
+                ref_id=ref_id,
+                marker_type="evidence",
+                title=e.title,
+                summary=e.snippet[:200],
+                original_payload={
+                    "id": str(e.id),
+                    "source_id": e.source_id,
+                    "source_type": src_val,
+                    "title": e.title,
+                    "snippet": e.snippet,
+                    "path": e.path,
+                    "confidence": e.confidence,
+                    "extra_metadata": e.extra_metadata or {},
+                },
+            )
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Reference '{ref_id}' not found",
+    )
