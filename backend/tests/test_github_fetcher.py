@@ -222,3 +222,64 @@ async def test_graphql_fallback_when_unauthorized():
             "query { viewer { login } }", {}, github_token="invalid_token"
         )
         assert data is None
+
+
+@pytest.mark.asyncio
+async def test_fetch_public_repo_files_redirect_and_canonical_naming():
+    fetcher = GitHubRepoFetcher()
+
+    repo_meta = {
+        "name": "CodeAtlas",
+        "owner": {"login": "ShlokRamteke"},
+        "default_branch": "main",
+    }
+    tree_data = {
+        "tree": [
+            {"type": "blob", "path": "app/main.py"},
+            {"type": "blob", "path": "README.md"},
+        ]
+    }
+
+    async def mock_get(url, *args, **kwargs):
+        resp = MagicMock()
+        resp.status_code = 200
+        if "api.github.com/repos/old_owner/old_repo" in url:
+            resp.json.return_value = repo_meta
+        elif "git/trees/main" in url:
+            assert "api.github.com/repos/ShlokRamteke/CodeAtlas/git/trees/main" in url
+            resp.json.return_value = tree_data
+        elif "raw.githubusercontent.com" in url:
+            assert "raw.githubusercontent.com/ShlokRamteke/CodeAtlas/main/app/main.py" in url
+            resp.text = "print('hello world')"
+        else:
+            resp.status_code = 404
+        return resp
+
+    with patch("httpx.AsyncClient.get", side_effect=mock_get):
+        files, branch = await fetcher.fetch_public_repo_files("old_owner", "old_repo")
+        assert branch == "main"
+        assert "app/main.py" in files
+        assert files["app/main.py"] == "print('hello world')"
+
+
+@pytest.mark.asyncio
+async def test_fetch_public_repo_files_follow_redirects_flag():
+    import httpx
+
+    fetcher = GitHubRepoFetcher()
+    init_kwargs = {}
+    original_init = httpx.AsyncClient.__init__
+
+    def spy_init(self, *args, **kwargs):
+        init_kwargs.update(kwargs)
+        return original_init(self, *args, **kwargs)
+
+    with patch.object(httpx.AsyncClient, "__init__", side_effect=spy_init, autospec=True):
+        with patch("httpx.AsyncClient.get") as mock_get:
+            mock_resp = MagicMock()
+            mock_resp.status_code = 200
+            mock_resp.json.return_value = {"default_branch": "main", "tree": []}
+            mock_get.return_value = mock_resp
+
+            await fetcher.fetch_public_repo_files("owner", "repo")
+            assert init_kwargs.get("follow_redirects") is True

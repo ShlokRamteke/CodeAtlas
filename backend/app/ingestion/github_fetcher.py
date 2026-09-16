@@ -151,7 +151,7 @@ class GitHubRepoFetcher:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
                 res = await client.post(
                     GITHUB_GRAPHQL_ENDPOINT,
                     json={"query": query, "variables": variables},
@@ -262,7 +262,7 @@ class GitHubRepoFetcher:
             if not sha:
                 return []
             try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
+                async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
                     detail_res = await client.get(
                         f"https://api.github.com/repos/{owner}/{repo}/commits/{sha}",
                         headers=rest_headers,
@@ -444,7 +444,7 @@ class GitHubRepoFetcher:
         if token:
             headers["Authorization"] = f"Bearer {token}"
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             # 1. Get repo metadata to get default branch
             repo_res = await client.get(
                 f"https://api.github.com/repos/{owner}/{repo}", headers=headers
@@ -458,10 +458,16 @@ class GitHubRepoFetcher:
 
             repo_meta = repo_res.json()
             default_branch = repo_meta.get("default_branch", "main")
+            actual_owner = (
+                repo_meta.get("owner", {}).get("login", owner)
+                if isinstance(repo_meta.get("owner"), dict)
+                else owner
+            )
+            actual_repo = repo_meta.get("name", repo)
 
             # 2. Fetch Git Tree recursively
             tree_res = await client.get(
-                f"https://api.github.com/repos/{owner}/{repo}/git/trees/{default_branch}?recursive=1",
+                f"https://api.github.com/repos/{actual_owner}/{actual_repo}/git/trees/{default_branch}?recursive=1",
                 headers=headers,
             )
             if tree_res.status_code != 200:
@@ -492,9 +498,7 @@ class GitHubRepoFetcher:
             # 4. Fetch raw content for candidate files via raw.githubusercontent.com
             files_content: Dict[str, str] = {}
             for path in candidate_files:
-                raw_url = (
-                    f"https://raw.githubusercontent.com/{owner}/{repo}/{default_branch}/{path}"
-                )
+                raw_url = f"https://raw.githubusercontent.com/{actual_owner}/{actual_repo}/{default_branch}/{path}"
                 try:
                     res = await client.get(raw_url, headers=headers)
                     if res.status_code == 200:
@@ -536,7 +540,7 @@ class GitHubRepoFetcher:
 
         parsed_commits: List[ParsedCommit] = []
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             res = await client.get(
                 f"https://api.github.com/repos/{owner}/{repo}/commits?per_page={max_commits}",
                 headers=headers,
@@ -643,7 +647,7 @@ class GitHubRepoFetcher:
 
         parsed_prs: List[ParsedPullRequest] = []
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             res = await client.get(
                 f"https://api.github.com/repos/{owner}/{repo}/pulls?state=all&per_page={max_prs}",
                 headers=headers,
@@ -730,7 +734,7 @@ class GitHubRepoFetcher:
 
         parsed_issues: List[ParsedIssue] = []
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             res = await client.get(
                 f"https://api.github.com/repos/{owner}/{repo}/issues?state=all&per_page={max_issues}",
                 headers=headers,
@@ -802,7 +806,7 @@ class GitHubRepoFetcher:
             headers["Authorization"] = f"Bearer {token}"
 
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
                 res = await client.get(
                     f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}",
                     headers=headers,
@@ -875,7 +879,7 @@ class GitHubRepoFetcher:
             headers["Authorization"] = f"Bearer {token}"
 
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
                 res = await client.get(
                     f"https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}",
                     headers=headers,
