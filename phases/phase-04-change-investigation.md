@@ -68,9 +68,11 @@ Pre-Change Investigation Brief
   - Project canonical `ProjectContext` and `PreChangeBrief` into Human-facing Markdown and dense Agent-facing JSON.
   - Implement on-demand reference expansion endpoint (`GET /api/v1/investigations/{id}/references/{ref_id}`) enabling coding agents to inspect shed subgraphs without overflowing context windows.
   - Integrate interactive format switcher ("Visual Analysis", "Human Markdown", "Dense Agent JSON"), token budget presets, and omission inspection modal in Next.js UI.
-- [ ] **PH4-07: Concurrent Branch Overlap & Merge Conflict Detector**
+- [x] **PH4-07: Concurrent Branch Overlap & Merge Conflict Detector** *(Completed)*
   - Query open pull requests and active branches touching target files or their direct blast radius.
-  - Flag concurrent in-flight changes to prevent merge conflicts before code is written.
+  - Classify direct file collisions (`CRITICAL`/`HIGH`) and dependency overlaps (`MEDIUM`).
+  - Integrate into `InvestigationEngine.gather()` (`signals["concurrent_overlaps"]` and `ev-overlap-*`), `reason()`, `synthesize()`, dual-format distillation, and Next.js UI interactive card.
+  - REST endpoints: `GET /api/v1/investigations/{id}/concurrent-overlap` and `GET /api/v1/repositories/{id}/concurrent-overlap`.
 - [ ] **PH4-08: Independent Change Decomposition**
   - Evaluate weakly-connected components across the dependency subgraph of proposed modified files.
   - Suggest splitting large, unrelated change bundles into independent, modular pull requests.

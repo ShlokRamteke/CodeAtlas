@@ -264,6 +264,35 @@ class TokenBudgetDistiller:
             )
             sections.append(f"### 🛡️ Pre-Implementation Checklist\n{checks_md}")
 
+        # Concurrent In-Flight PRs & Merge Conflicts (Tier 5 - retained)
+        overlap_sig = signals.get("concurrent_overlaps", {})
+        overlapping_prs = overlap_sig.get("overlapping_prs", [])
+        if overlapping_prs:
+            ov_lines = []
+            if overlap_sig.get("has_direct_conflicts"):
+                ov_lines.append(
+                    f"> 🚨 **MERGE CONFLICT RISK:** {overlap_sig.get('highest_risk_level')} priority collision with open PR(s)."
+                )
+            elif overlap_sig.get("has_blast_conflicts"):
+                ov_lines.append(
+                    "> ⚠️ **DEPENDENCY OVERLAP:** Open PR(s) modify files in direct blast radius."
+                )
+
+            for pr_ov in overlapping_prs if shed_tier < 4 else overlapping_prs[:2]:
+                pr_num = pr_ov.get("pr_number")
+                title = pr_ov.get("pr_title", "")
+                author = pr_ov.get("pr_author", "")
+                risk = pr_ov.get("risk_level", "HIGH")
+                branch = pr_ov.get("head_branch") or "branch"
+                files = ", ".join(f"`{f}`" for f in pr_ov.get("overlapping_files", []))
+                ov_lines.append(
+                    f"- **PR #{pr_num}** by @{author} (`{branch}`) [{risk}]: {title}\n"
+                    f"  - Overlapping: {files}\n"
+                    f"  - *{pr_ov.get('recommendation', '')}*"
+                )
+
+            sections.append("### ⚠️ Concurrent In-Flight Changes\n" + "\n".join(ov_lines))
+
         # Guarding Tests Section (Tier 3 priority shedding)
         guarding_sig = signals.get("guarding_tests", {})
         ranked_tests = guarding_sig.get("ranked_tests", [])
@@ -576,6 +605,46 @@ class TokenBudgetDistiller:
                 cl_val = cl.value if hasattr(cl, "value") else str(cl)
                 claims_data.append({"type": cl_val, "statement": st})
 
+        # Concurrent overlaps block
+        overlap_sig = signals.get("concurrent_overlaps", {})
+        overlapping_prs = overlap_sig.get("overlapping_prs", [])
+        if overlapping_prs:
+            if shed_tier >= 4:
+                overlap_block = {
+                    "has_direct_conflicts": overlap_sig.get("has_direct_conflicts", False),
+                    "highest_risk": overlap_sig.get("highest_risk_level", "NONE"),
+                    "top_conflicts": [
+                        {
+                            "pr": p.get("pr_number"),
+                            "author": p.get("pr_author"),
+                            "type": p.get("overlap_type"),
+                            "files": p.get("overlapping_files", []),
+                        }
+                        for p in overlapping_prs[:2]
+                    ],
+                }
+            else:
+                overlap_block = {
+                    "has_direct_conflicts": overlap_sig.get("has_direct_conflicts", False),
+                    "has_blast_conflicts": overlap_sig.get("has_blast_conflicts", False),
+                    "highest_risk": overlap_sig.get("highest_risk_level", "NONE"),
+                    "overlaps": [
+                        {
+                            "pr": p.get("pr_number"),
+                            "title": p.get("pr_title"),
+                            "author": p.get("pr_author"),
+                            "head_branch": p.get("head_branch"),
+                            "risk": p.get("risk_level"),
+                            "type": p.get("overlap_type"),
+                            "files": p.get("overlapping_files", []),
+                            "recommendation": p.get("recommendation"),
+                        }
+                        for p in overlapping_prs
+                    ],
+                }
+        else:
+            overlap_block = {"has_conflicts": False}
+
         # Assemble dense JSON
         dense = {
             "_schema": "codeatlas.pre_change_brief.v1",
@@ -586,6 +655,7 @@ class TokenBudgetDistiller:
             "risk": risk_block,
             "guarding_tests": tests_block,
             "blast_radius": blast_block,
+            "concurrent_overlaps": overlap_block,
             "constraints": constraints_block,
             "checks": (recommended_checks if shed_tier < 4 else recommended_checks[:3]),
             "claims": claims_data,

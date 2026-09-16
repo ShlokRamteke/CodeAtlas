@@ -10,10 +10,12 @@ from sqlalchemy.orm import selectinload
 
 from app.core.db import get_db
 from app.investigation import IntentNormalizer, InvestigationEngine
+from app.investigation.concurrent_overlap import ConcurrentOverlapDetector
 from app.investigation.distillation import GLOBAL_OMISSION_REGISTRY, TokenBudgetDistiller
 from app.models.investigation import Investigation
 from app.models.repository import Repository
 from app.schemas.investigation import (
+    ConcurrentOverlapReportSchema,
     InvestigationCreate,
     InvestigationProjectionResponse,
     InvestigationRead,
@@ -182,6 +184,8 @@ def _reconstruct_brief_data(inv: Investigation) -> dict:
             signals["blast_radius"] = meta
         elif e.source_id == "co-change-signals":
             signals["co_change"] = meta
+        elif e.source_id in ("concurrent-branch-overlap", "concurrent-branch-overlap-report"):
+            signals["concurrent_overlaps"] = meta
         elif e.source_id.startswith("inv-") or meta.get("governing_status"):
             constraints.append(
                 {
@@ -363,3 +367,44 @@ async def get_investigation_reference(
         status_code=status.HTTP_404_NOT_FOUND,
         detail=f"Reference '{ref_id}' not found",
     )
+
+
+@router.get(
+    "/{investigation_id}/concurrent-overlap",
+    response_model=ConcurrentOverlapReportSchema,
+)
+async def get_investigation_concurrent_overlap(
+    investigation_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+) -> ConcurrentOverlapReportSchema:
+    """Retrieve concurrent branch overlap & merge conflict report for an investigation."""
+    query = (
+        select(Investigation)
+        .where(Investigation.id == investigation_id)
+        .options(selectinload(Investigation.evidence))
+    )
+    result = await db.execute(query)
+    inv = result.scalar_one_or_none()
+    if not inv:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Investigation not found",
+        )
+
+    # 1. Check if overlap report was cached in evidence
+    for e in inv.evidence:
+        if e.source_id == "concurrent-branch-overlap" and e.extra_metadata:
+            return ConcurrentOverlapReportSchema(**e.extra_metadata)
+
+    # 2. Otherwise run detector live on target files
+    brief_data = _reconstruct_brief_data(inv)
+    target_files = brief_data.get("target_files", [])
+    blast_files = brief_data.get("signals", {}).get("blast_radius", {}).get("transitive_files", [])
+    detector = ConcurrentOverlapDetector()
+    report = await detector.detect_overlaps(
+        db=db,
+        repository_id=inv.repository_id,
+        target_files=target_files,
+        blast_radius_files=blast_files,
+    )
+    return ConcurrentOverlapReportSchema(**report.to_dict())

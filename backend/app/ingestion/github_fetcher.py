@@ -683,6 +683,13 @@ class GitHubRepoFetcher:
                     for lbl in pr.get("labels", [])
                 ]
 
+                head_branch = (
+                    pr.get("head", {}).get("ref") if isinstance(pr.get("head"), dict) else None
+                )
+                base_branch = (
+                    pr.get("base", {}).get("ref") if isinstance(pr.get("base"), dict) else None
+                )
+
                 parsed_prs.append(
                     ParsedPullRequest(
                         number=pr.get("number", 0),
@@ -697,6 +704,8 @@ class GitHubRepoFetcher:
                         labels=labels,
                         html_url=pr.get("html_url"),
                         created_at=created_at,
+                        head_branch=head_branch,
+                        base_branch=base_branch,
                     )
                 )
 

@@ -28,6 +28,7 @@ from app.history.guarding_tests import (
     build_test_coverage_mapping,
 )
 from app.investigation.blast_radius import BlastRadiusAnalyzer
+from app.investigation.concurrent_overlap import ConcurrentOverlapDetector
 from app.investigation.intent import IntentNormalizer
 from app.investigation.invariants import (
     InvariantSynthesizer,
@@ -544,6 +545,35 @@ class InvestigationEngine:
             }
             evidence_items.append(ev_tests)
 
+        # Concurrent branch overlap & merge conflict detection
+        overlap_detector = ConcurrentOverlapDetector()
+        blast_files = signals.get("blast_radius", {}).get("transitive_files", [])
+        overlap_report = await overlap_detector.detect_overlaps(
+            db=db,
+            repository_id=state.repository_id,
+            target_files=target_files,
+            blast_radius_files=blast_files,
+        )
+        signals["concurrent_overlaps"] = overlap_report.to_dict()
+
+        if overlap_report.overlapping_prs:
+            top_overlaps = overlap_report.overlapping_prs[:3]
+            ev_snippet_parts = []
+            for ov in top_overlaps:
+                ev_snippet_parts.append(
+                    f"PR #{ov.pr_number} by @{ov.pr_author} ({ov.risk_level}): {', '.join(ov.overlapping_files)}"
+                )
+            ev_overlap = {
+                "id": f"ev-overlap-{len(evidence_items) + 1}",
+                "source_type": EvidenceSourceType.PULL_REQUEST,
+                "source_id": "concurrent-branch-overlap",
+                "title": f"Concurrent In-Flight PRs ({overlap_report.overlapping_pr_count} overlapping, {overlap_report.highest_risk_level} risk)",
+                "snippet": f"{overlap_report.summary} Details: {'; '.join(ev_snippet_parts)}",
+                "confidence": 1.0,
+                "extra_metadata": overlap_report.to_dict(),
+            }
+            evidence_items.append(ev_overlap)
+
         state.gathered_evidence = evidence_items
         state.gathered_signals = signals
         state.gathered_context = {
@@ -585,6 +615,15 @@ class InvestigationEngine:
                 context_str += (
                     f"- [{inv_data['governing_status'].upper()}] ({inv_data['level'].upper()}) "
                     f"{inv_data['title']}: {inv_data['statement']}. Rationale: {inv_data['rationale']}\n"
+                )
+
+        overlap_sig = state.gathered_signals.get("concurrent_overlaps", {})
+        if overlap_sig.get("overlapping_prs"):
+            context_str += "Concurrent Open PR Overlaps:\n"
+            for ov in overlap_sig["overlapping_prs"][:3]:
+                context_str += (
+                    f"- [{ov['risk_level']}] PR #{ov['pr_number']} by @{ov['pr_author']} "
+                    f"({ov['overlap_type']}): modifies {', '.join(ov['overlapping_files'])}. {ov['recommendation']}\n"
                 )
 
         try:
@@ -711,6 +750,25 @@ class InvestigationEngine:
                 )
                 unknowns.append(
                     f"Verify proposed changes do not re-introduce superseded constraint '{title}'."
+                )
+
+        # Concurrent branch overlap checks and unknowns
+        overlap_sig = state.gathered_signals.get("concurrent_overlaps", {})
+        if overlap_sig.get("has_direct_conflicts"):
+            for ov in overlap_sig.get("overlapping_prs", []):
+                if ov.get("overlap_type") == "direct_target":
+                    recommended_checks.append(
+                        ov.get("recommendation")
+                        or f"Resolve direct file conflict with PR #{ov['pr_number']}."
+                    )
+                    unknowns.append(
+                        f"In-flight branch overlap: PR #{ov['pr_number']} ('{ov['pr_title']}') modifies {', '.join(ov.get('direct_overlapping_files', []))}."
+                    )
+        elif overlap_sig.get("has_blast_conflicts"):
+            for ov in overlap_sig.get("overlapping_prs", [])[:2]:
+                recommended_checks.append(
+                    ov.get("recommendation")
+                    or f"Check interface compatibility with PR #{ov['pr_number']}."
                 )
 
         if state.gathered_signals.get("change_risk", {}).get("shannon_entropy", 0) > 1.5:

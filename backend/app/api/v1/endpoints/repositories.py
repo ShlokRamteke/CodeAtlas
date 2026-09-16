@@ -12,6 +12,7 @@ from app.context_builder.builder import CurrentSystemContextBuilder
 from app.core.db import get_db
 from app.ingestion.engine import IngestionEngine
 from app.ingestion.github_fetcher import GitHubRepoFetcher
+from app.investigation.concurrent_overlap import ConcurrentOverlapDetector
 from app.models.commit import Commit
 from app.models.commit_file_change import ChangeType, CommitFileChange
 from app.models.dependency import CodeDependency
@@ -24,6 +25,7 @@ from app.models.source_file import SourceFile
 from app.models.symbol import Symbol, SymbolKind
 from app.parser.ast_parser import ExtractedDependency, ExtractedSymbol, ParsedFileResult
 from app.parser.relationship_analyzer import RelationshipAnalyzer
+from app.schemas.investigation import ConcurrentOverlapReportSchema
 from app.schemas.repository import (
     ArchitectureOverviewResponse,
     CodeDependencyRead,
@@ -960,3 +962,37 @@ async def get_repository_context(
     )
 
     return ProjectContextRead.model_validate(proj_ctx.to_dict())
+
+
+@router.get(
+    "/{repository_id}/concurrent-overlap",
+    response_model=ConcurrentOverlapReportSchema,
+)
+async def check_repository_concurrent_overlap(
+    repository_id: uuid.UUID,
+    target_files: List[str] = Query(
+        default_factory=list, description="Target file paths to evaluate"
+    ),
+    db: AsyncSession = Depends(get_db),
+) -> ConcurrentOverlapReportSchema:
+    """Evaluate concurrent branch overlap against open pull requests for specified target files."""
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Repository not found",
+        )
+
+    clean_targets = []
+    for tf in target_files:
+        for p in tf.split(","):
+            if p.strip():
+                clean_targets.append(p.strip())
+
+    detector = ConcurrentOverlapDetector()
+    report = await detector.detect_overlaps(
+        db=db,
+        repository_id=repository_id,
+        target_files=clean_targets,
+    )
+    return ConcurrentOverlapReportSchema(**report.to_dict())

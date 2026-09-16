@@ -32,6 +32,9 @@ class ParsedPullRequest:
     labels: List[str] = field(default_factory=list)
     html_url: Optional[str] = None
     created_at: Optional[datetime] = None
+    head_branch: Optional[str] = None
+    base_branch: Optional[str] = None
+    touched_files: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -86,6 +89,12 @@ class HistoricalLinker:
                 existing_pr.closed_at = pr_data.closed_at
                 existing_pr.labels = pr_data.labels
                 existing_pr.html_url = pr_data.html_url
+                if pr_data.head_branch:
+                    existing_pr.head_branch = pr_data.head_branch
+                if pr_data.base_branch:
+                    existing_pr.base_branch = pr_data.base_branch
+                if pr_data.touched_files:
+                    existing_pr.touched_files = pr_data.touched_files
                 pr_obj = existing_pr
             else:
                 pr_obj = PullRequest(
@@ -100,6 +109,9 @@ class HistoricalLinker:
                     closed_at=pr_data.closed_at,
                     labels=pr_data.labels,
                     html_url=pr_data.html_url,
+                    head_branch=pr_data.head_branch,
+                    base_branch=pr_data.base_branch,
+                    touched_files=pr_data.touched_files or [],
                 )
                 if pr_data.created_at:
                     pr_obj.created_at = pr_data.created_at

@@ -47,6 +47,11 @@ class PullRequest(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         JSON().with_variant(JSONB, "postgresql"), nullable=True, default=list
     )
     html_url: Mapped[Optional[str]] = mapped_column(String(510), nullable=True)
+    head_branch: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    base_branch: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    touched_files: Mapped[Optional[List[str]]] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=True, default=list
+    )
     embedding = mapped_column(Vector(1536), nullable=True)
 
     repository: Mapped["Repository"] = relationship("Repository", back_populates="pull_requests")
