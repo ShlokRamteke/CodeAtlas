@@ -123,7 +123,7 @@ developer understand a proposed change before implementation.
 - **Phase 4 — Task PH4-07 (Concurrent Branch Overlap & Merge Conflict Detector)**:
   - `ConcurrentOverlapDetector` in `app.investigation.concurrent_overlap`: analyzes unmerged pull requests, extracting touched files from direct PR records and linked commit file changes.
   - Multi-tier conflict classification: differentiates direct target collisions (`CRITICAL`/`HIGH`) from dependency blast-radius collisions (`MEDIUM`), generating actionable coordination recommendations.
-  - Database schema & Alembic migration `0006_add_pr_branches_and_touched_files`: added `head_branch`, `base_branch`, and `touched_files` JSONB to `pull_requests`.
+  - Database schema & Alembic migration `0006_pr_branches_files`: added `head_branch`, `base_branch`, and `touched_files` JSONB to `pull_requests`.
   - Investigation pipeline integration: seamlessly incorporated into `InvestigationEngine.gather()` (`signals["concurrent_overlaps"]` and `ev-overlap-*`), `reason()` (open PR overlap context injected into LLM prompt), and `synthesize()` (conflict resolution checks added to `brief.recommended_checks`).
   - Distillation & Projections: rendered dedicated `### ⚠️ Concurrent In-Flight Changes` warning blocks in Human Markdown and dense JSON `concurrent_overlaps` telemetry.
   - REST endpoints: added `GET /api/v1/investigations/{id}/concurrent-overlap` and `GET /api/v1/repositories/{id}/concurrent-overlap`.
