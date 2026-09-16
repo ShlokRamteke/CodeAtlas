@@ -30,6 +30,8 @@ import type {
   ComponentTimelineResponse,
   InvestigationProjectionResponse,
   ReferenceDetailResponse,
+  ConcurrentOverlapReport,
+  ConcurrentPROverlap,
 } from "@codeatlas/contracts";
 
 
@@ -647,6 +649,43 @@ export async function fetchInvestigationReference(
       title: raw.title,
       summary: raw.summary,
       originalPayload: raw.original_payload || {},
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function fetchInvestigationConcurrentOverlap(
+  investigationId: string
+): Promise<ConcurrentOverlapReport | null> {
+  try {
+    const url = `${API_BASE}/api/v1/investigations/${investigationId}/concurrent-overlap`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return null;
+    const raw = await res.json();
+    return {
+      totalOpenPrs: raw.total_open_prs,
+      overlappingPrCount: raw.overlapping_pr_count,
+      hasDirectConflicts: raw.has_direct_conflicts,
+      hasBlastConflicts: raw.has_blast_conflicts,
+      highestRiskLevel: raw.highest_risk_level,
+      overlappingPrs: (raw.overlapping_prs || []).map((p: any) => ({
+        prNumber: p.pr_number,
+        prTitle: p.pr_title,
+        prAuthor: p.pr_author,
+        prHtmlUrl: p.pr_html_url,
+        headBranch: p.head_branch,
+        baseBranch: p.base_branch,
+        overlapType: p.overlap_type,
+        directOverlappingFiles: p.direct_overlapping_files || [],
+        blastOverlappingFiles: p.blast_overlapping_files || [],
+        overlappingFiles: p.overlapping_files || [],
+        riskLevel: p.risk_level,
+        recommendation: p.recommendation,
+      })),
+      targetFilesAnalyzed: raw.target_files_analyzed || [],
+      blastRadiusFilesAnalyzed: raw.blast_radius_files_analyzed || [],
+      summary: raw.summary || "",
     };
   } catch (error) {
     return null;

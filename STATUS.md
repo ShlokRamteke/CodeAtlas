@@ -6,11 +6,11 @@ Phase 4 — Change Investigation Engine
 
 ## Current Task
 
-PH4-06 Complete &mdash; Next: PH4-07 (Concurrent Branch Overlap & Merge Conflict Detector)
+PH4-07 Complete &mdash; Next: PH4-08 (Independent Change Decomposition)
 
 ## Status
 
-PH4-06 COMPLETE / READY FOR PH4-07
+PH4-07 COMPLETE / READY FOR PH4-08
 
 
 ## Product Focus
@@ -120,10 +120,19 @@ developer understand a proposed change before implementation.
   - Enabled `follow_redirects=True` across all 8 `httpx.AsyncClient` instances in `GitHubRepoFetcher` (metadata, git tree, raw blobs, commits, PRs, issues).
   - Added canonical repository coordinates resolution (`actual_owner`, `actual_repo`) for tree and raw file fetches when repos are renamed/moved.
   - Added unit test suite in `test_github_fetcher.py` covering redirect traversal and configuration.
+- **Phase 4 — Task PH4-07 (Concurrent Branch Overlap & Merge Conflict Detector)**:
+  - `ConcurrentOverlapDetector` in `app.investigation.concurrent_overlap`: analyzes unmerged pull requests, extracting touched files from direct PR records and linked commit file changes.
+  - Multi-tier conflict classification: differentiates direct target collisions (`CRITICAL`/`HIGH`) from dependency blast-radius collisions (`MEDIUM`), generating actionable coordination recommendations.
+  - Database schema & Alembic migration `0006_add_pr_branches_and_touched_files`: added `head_branch`, `base_branch`, and `touched_files` JSONB to `pull_requests`.
+  - Investigation pipeline integration: seamlessly incorporated into `InvestigationEngine.gather()` (`signals["concurrent_overlaps"]` and `ev-overlap-*`), `reason()` (open PR overlap context injected into LLM prompt), and `synthesize()` (conflict resolution checks added to `brief.recommended_checks`).
+  - Distillation & Projections: rendered dedicated `### ⚠️ Concurrent In-Flight Changes` warning blocks in Human Markdown and dense JSON `concurrent_overlaps` telemetry.
+  - REST endpoints: added `GET /api/v1/investigations/{id}/concurrent-overlap` and `GET /api/v1/repositories/{id}/concurrent-overlap`.
+  - Contracts & Frontend UI: added `ConcurrentPROverlap` and `ConcurrentOverlapReport` to `@codeatlas/contracts`. Enhanced `PreChangeInvestigationViewer` with live interactive collision alert banners, PR chips, branch names, authors, and affected file tags.
+  - 100% automated test pass rate across 96 pytest tests, clean contracts compilation, and clean Next.js frontend production build.
 
 ## Remaining
 
-- **Phase 4**: Change Investigation Engine (PH4-07: Concurrent Branch Overlap & Merge Conflict Detector, PH4-08: Independent Change Decomposition, PH4-09: Code Ownership & Reviewer Recommender, PH4-10: C4 Architecture & Dependency Export).
+- **Phase 4**: Change Investigation Engine (PH4-08: Independent Change Decomposition, PH4-09: Code Ownership & Reviewer Recommender, PH4-10: C4 Architecture & Dependency Export).
 
 ## Blockers
 
@@ -131,7 +140,7 @@ None known.
 
 ## Next Action
 
-Start Task PH4-07 (Concurrent Branch Overlap & Merge Conflict Detector).
+Start Task PH4-08 (Independent Change Decomposition).
 
 ## Session Rule
 

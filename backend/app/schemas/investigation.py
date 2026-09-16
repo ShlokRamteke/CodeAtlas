@@ -215,3 +215,30 @@ class ReferenceDetailResponse(BaseModel):
     title: str
     summary: str
     original_payload: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ConcurrentPROverlapSchema(BaseModel):
+    pr_number: int
+    pr_title: str
+    pr_author: str
+    pr_html_url: Optional[str] = None
+    head_branch: Optional[str] = None
+    base_branch: Optional[str] = None
+    overlap_type: str  # "direct_target" | "blast_radius"
+    direct_overlapping_files: List[str] = Field(default_factory=list)
+    blast_overlapping_files: List[str] = Field(default_factory=list)
+    overlapping_files: List[str] = Field(default_factory=list)
+    risk_level: str  # "CRITICAL" | "HIGH" | "MEDIUM" | "LOW"
+    recommendation: str = ""
+
+
+class ConcurrentOverlapReportSchema(BaseModel):
+    total_open_prs: int = 0
+    overlapping_pr_count: int = 0
+    has_direct_conflicts: bool = False
+    has_blast_conflicts: bool = False
+    highest_risk_level: str = "NONE"
+    overlapping_prs: List[ConcurrentPROverlapSchema] = Field(default_factory=list)
+    target_files_analyzed: List[str] = Field(default_factory=list)
+    blast_radius_files_analyzed: List[str] = Field(default_factory=list)
+    summary: str = ""

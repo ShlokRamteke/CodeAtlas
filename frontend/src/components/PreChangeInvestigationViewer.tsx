@@ -686,6 +686,175 @@ export function PreChangeInvestigationViewer({
                 );
               })()}
 
+              {/* Concurrent Branch Overlap & Merge Conflict Detector Section */}
+              {(() => {
+                const overlapEv = selectedInv.evidence?.find(
+                  (e) =>
+                    e.sourceId === "concurrent-branch-overlap" ||
+                    e.sourceId === "concurrent-branch-overlap-report"
+                );
+                const overlapMeta = (overlapEv?.metadata || {}) as any;
+                const overlappingPrs =
+                  overlapMeta.overlapping_prs || overlapMeta.overlappingPrs || [];
+                const totalOpen = overlapMeta.total_open_prs ?? overlapMeta.totalOpenPrs ?? 0;
+                const hasDirect =
+                  overlapMeta.has_direct_conflicts ?? overlapMeta.hasDirectConflicts ?? false;
+                const hasBlast =
+                  overlapMeta.has_blast_conflicts ?? overlapMeta.hasBlastConflicts ?? false;
+                const highestRisk =
+                  overlapMeta.highest_risk_level || overlapMeta.highestRiskLevel || "NONE";
+                const summary = overlapMeta.summary || "";
+
+                if (!overlapEv && overlappingPrs.length === 0) return null;
+
+                return (
+                  <div className="p-6 rounded-xl bg-slate-900/70 border border-slate-800 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <GitPullRequest className="w-4 h-4 text-rose-400" />
+                        <h4 className="text-sm font-bold text-white">
+                          Concurrent In-Flight PRs &amp; Merge Conflict Detector
+                        </h4>
+                        <span className="text-xs font-mono text-slate-400">
+                          ({overlappingPrs.length} overlap
+                          {overlappingPrs.length === 1 ? "" : "s"} / {totalOpen} open PR
+                          {totalOpen === 1 ? "" : "s"})
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-xs font-bold px-2.5 py-0.5 rounded border uppercase font-mono ${
+                            highestRisk === "CRITICAL"
+                              ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                              : highestRisk === "HIGH"
+                              ? "bg-orange-500/10 text-orange-400 border-orange-500/30"
+                              : highestRisk === "MEDIUM"
+                              ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                              : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                          }`}
+                        >
+                          {highestRisk} Risk
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Alert Banner */}
+                    {hasDirect ? (
+                      <div className="p-3.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-start gap-2.5">
+                        <ShieldAlert className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <p className="font-semibold text-rose-200">
+                            Direct File Collision Detected
+                          </p>
+                          <p className="text-slate-300 leading-relaxed">
+                            {summary} Coordinate with the author(s) before modifying shared files.
+                          </p>
+                        </div>
+                      </div>
+                    ) : hasBlast ? (
+                      <div className="p-3.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-start gap-2.5">
+                        <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <p className="font-semibold text-amber-200">
+                            Dependency Overlap in Blast Radius
+                          </p>
+                          <p className="text-slate-300 leading-relaxed">
+                            {summary} Ensure interface changes stay synchronized across branches.
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center gap-2.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                        <span>No concurrent branch collisions detected on target files.</span>
+                      </div>
+                    )}
+
+                    {/* Overlapping PR Cards List */}
+                    {overlappingPrs.length > 0 && (
+                      <div className="space-y-2.5 pt-1">
+                        {overlappingPrs.map((pr: any, idx: number) => {
+                          const prNum = pr.pr_number ?? pr.prNumber;
+                          const title = pr.pr_title ?? pr.prTitle;
+                          const author = pr.pr_author ?? pr.prAuthor;
+                          const ovType = pr.overlap_type ?? pr.overlapType;
+                          const branch = pr.head_branch ?? pr.headBranch;
+                          const files = pr.overlapping_files ?? pr.overlappingFiles ?? [];
+                          const rec = pr.recommendation ?? "";
+                          const htmlUrl = pr.pr_html_url ?? pr.prHtmlUrl;
+
+                          return (
+                            <div
+                              key={idx}
+                              className="p-3.5 rounded-lg bg-slate-950/60 border border-slate-800 space-y-2"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-xs font-bold text-white">
+                                    PR #{prNum}
+                                  </span>
+                                  <span className="text-xs text-slate-300 font-medium truncate max-w-md">
+                                    {title}
+                                  </span>
+                                  {htmlUrl && (
+                                    <a
+                                      href={htmlUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-slate-400 hover:text-indigo-400 inline-flex items-center"
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                    </a>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {branch && (
+                                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                                      branch: {branch}
+                                    </span>
+                                  )}
+                                  <span
+                                    className={`text-[10px] font-mono px-2 py-0.5 rounded uppercase font-bold ${
+                                      ovType === "direct_target"
+                                        ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                        : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                    }`}
+                                  >
+                                    {ovType === "direct_target"
+                                      ? "Direct Collision"
+                                      : "Blast Radius"}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 font-mono">
+                                <span>Author: @{author}</span>
+                                <span>&bull;</span>
+                                <span>Files:</span>
+                                {files.map((f: string, fi: number) => (
+                                  <span
+                                    key={fi}
+                                    className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300 text-[11px]"
+                                  >
+                                    {f}
+                                  </span>
+                                ))}
+                              </div>
+
+                              {rec && (
+                                <p className="text-xs text-slate-400 italic pt-0.5 border-t border-slate-800/60">
+                                  {rec}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* Guarding Test Reachability & Verification Gaps Section */}
               {(() => {
                 const testsEv = selectedInv.evidence?.find((e) => e.sourceId === "guarding-tests");

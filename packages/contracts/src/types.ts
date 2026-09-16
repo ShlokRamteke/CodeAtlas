@@ -404,6 +404,9 @@ export interface PullRequestItem {
   closedAt?: string | null;
   labels?: string[];
   htmlUrl?: string | null;
+  headBranch?: string | null;
+  baseBranch?: string | null;
+  touchedFiles?: string[];
   createdAt: string;
   linkedIssues?: LinkedIssue[];
   linkedCommits?: Array<{
@@ -808,6 +811,34 @@ export interface DenseAgentBrief {
   evidence_refs: Array<Record<string, unknown>>;
   unknowns: string[];
 }
+
+export interface ConcurrentPROverlap {
+  prNumber: number;
+  prTitle: string;
+  prAuthor: string;
+  prHtmlUrl?: string | null;
+  headBranch?: string | null;
+  baseBranch?: string | null;
+  overlapType: 'direct_target' | 'blast_radius';
+  directOverlappingFiles: string[];
+  blastOverlappingFiles: string[];
+  overlappingFiles: string[];
+  riskLevel: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  recommendation: string;
+}
+
+export interface ConcurrentOverlapReport {
+  totalOpenPrs: number;
+  overlappingPrCount: number;
+  hasDirectConflicts: boolean;
+  hasBlastConflicts: boolean;
+  highestRiskLevel: 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  overlappingPrs: ConcurrentPROverlap[];
+  targetFilesAnalyzed: string[];
+  blastRadiusFilesAnalyzed: string[];
+  summary: string;
+}
+
 
 
 
