@@ -109,6 +109,10 @@ developer understand a proposed change before implementation.
   - Integrated into `InvestigationEngine.gather()` (`signals["invariants"]` and `ev-inv-*` evidence items), `reason()` (governing invariants fed to LLM reasoning prompt), and `synthesize()` (populates `brief.constraints` and generates invariant compliance checks and superseded warnings).
   - Next.js UI interactive card in `PreChangeInvestigationViewer` with Governing vs Superseded badges, RFC 2119 severity tags, origin commit/PR chips, and rationale explanation cards.
   - 100% automated test pass rate across 80 pytest tests, clean contracts compilation, and clean Next.js frontend production build.
+- **Bugfix — GitHub API 301 Redirect Handling (`fix/github-fetcher-follow-redirects`)**:
+  - Enabled `follow_redirects=True` across all 8 `httpx.AsyncClient` instances in `GitHubRepoFetcher` (metadata, git tree, raw blobs, commits, PRs, issues).
+  - Added canonical repository coordinates resolution (`actual_owner`, `actual_repo`) for tree and raw file fetches when repos are renamed/moved.
+  - Added unit test suite in `test_github_fetcher.py` covering redirect traversal and configuration.
 
 ## Remaining
 
@@ -137,5 +141,6 @@ receive scoped views of that model.
 
 ## Last Updated
 
-2026-09-11
+2026-09-16
+
 

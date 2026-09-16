@@ -498,9 +498,7 @@ class GitHubRepoFetcher:
             # 4. Fetch raw content for candidate files via raw.githubusercontent.com
             files_content: Dict[str, str] = {}
             for path in candidate_files:
-                raw_url = (
-                    f"https://raw.githubusercontent.com/{actual_owner}/{actual_repo}/{default_branch}/{path}"
-                )
+                raw_url = f"https://raw.githubusercontent.com/{actual_owner}/{actual_repo}/{default_branch}/{path}"
                 try:
                     res = await client.get(raw_url, headers=headers)
                     if res.status_code == 200:

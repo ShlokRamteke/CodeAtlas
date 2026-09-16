@@ -283,4 +283,3 @@ async def test_fetch_public_repo_files_follow_redirects_flag():
 
             await fetcher.fetch_public_repo_files("owner", "repo")
             assert init_kwargs.get("follow_redirects") is True
-
