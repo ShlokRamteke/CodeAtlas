@@ -115,7 +115,11 @@ developer understand a proposed change before implementation.
   - Dual-format projections: implemented `to_human_markdown(token_budget)` (rich GFM with tables, badges, and omission tags) and `to_agent_json(token_budget)` (dense, ultra-compact JSON with `_omitted` tokens and explicit telemetry) across both canonical `ProjectContext` and `PreChangeBrief`.
   - REST endpoints: added `GET /api/v1/investigations/{id}/projection` (supporting `format=json|markdown` and `token_budget` ceilings) and `GET /api/v1/investigations/{id}/references/{ref_id}` (resolves and expands any shed detail on demand).
   - Contracts & Frontend UI: added `OmissionMarker`, `InvestigationProjectionResponse`, and `ReferenceDetailResponse` to `@codeatlas/contracts`. Enhanced `PreChangeInvestigationViewer` with a 3-way view switcher ("Visual Analysis", "Human Markdown", "Dense Agent JSON"), budget presets ("Uncapped", "4k", "2k", "1k", "500"), live token telemetry, copy-to-clipboard actions, and interactive omission inspection modals.
-  - 100% automated test pass rate across 87 pytest tests, clean contracts compilation, and clean Next.js frontend production build.
+  - 100% automated test pass rate across 89 pytest tests, clean contracts compilation, and clean Next.js frontend production build.
+- **Bugfix — GitHub API 301 Redirect Handling (`fix/github-fetcher-follow-redirects`)**:
+  - Enabled `follow_redirects=True` across all 8 `httpx.AsyncClient` instances in `GitHubRepoFetcher` (metadata, git tree, raw blobs, commits, PRs, issues).
+  - Added canonical repository coordinates resolution (`actual_owner`, `actual_repo`) for tree and raw file fetches when repos are renamed/moved.
+  - Added unit test suite in `test_github_fetcher.py` covering redirect traversal and configuration.
 
 ## Remaining
 
@@ -144,5 +148,5 @@ receive scoped views of that model.
 
 ## Last Updated
 
-2026-09-15
+2026-09-16
 
