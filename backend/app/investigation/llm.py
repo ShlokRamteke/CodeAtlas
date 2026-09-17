@@ -128,6 +128,23 @@ class MockLLMProvider:
         return verified_claims, {"prompt_tokens": 80, "completion_tokens": 30}
 
 
+def extract_json_payload(raw_text: str) -> str:
+    """Extract clean JSON string from raw model output, stripping markdown fences."""
+    text = raw_text.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].startswith("```"):
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        return text[start : end + 1]
+    return text
+
+
 class OpenRouterLLMProvider:
     """Production provider connecting to OpenRouter API with prompt formatting and schema validation."""
 
@@ -149,6 +166,37 @@ class OpenRouterLLMProvider:
             "X-Title": "CodeAtlas",
         }
 
+    async def _post_chat_completion(
+        self, client: httpx.AsyncClient, messages: List[Dict[str, str]]
+    ) -> Dict[str, Any]:
+        """Send chat completion, falling back gracefully if response_format is unsupported by provider."""
+        payload: Dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "response_format": {"type": "json_object"},
+        }
+        resp = await client.post(
+            f"{self.base_url}/chat/completions",
+            headers=self.headers,
+            json=payload,
+        )
+        if resp.status_code == 400:
+            err_msg = resp.text.lower()
+            if (
+                "structured-outputs" in err_msg
+                or "response_format" in err_msg
+                or "invalid_request_body" in err_msg
+                or "not support" in err_msg
+            ):
+                payload.pop("response_format", None)
+                resp = await client.post(
+                    f"{self.base_url}/chat/completions",
+                    headers=self.headers,
+                    json=payload,
+                )
+        resp.raise_for_status()
+        return resp.json()
+
     async def plan_investigation(
         self, intent: NormalizedChangeIntent, context_preview: str
     ) -> Tuple[InvestigationPlan, Dict[str, int]]:
@@ -167,23 +215,17 @@ class OpenRouterLLMProvider:
         sys_prompt, user_msg = build_planner_prompt(intent, context_preview)
 
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                resp = await client.post(
-                    f"{self.base_url}/chat/completions",
-                    headers=self.headers,
-                    json={
-                        "model": self.model,
-                        "messages": [
-                            {"role": "system", "content": sys_prompt},
-                            {"role": "user", "content": user_msg},
-                        ],
-                        "response_format": {"type": "json_object"},
-                    },
+            async with httpx.AsyncClient(timeout=35.0) as client:
+                data = await self._post_chat_completion(
+                    client,
+                    [
+                        {"role": "system", "content": sys_prompt},
+                        {"role": "user", "content": user_msg},
+                    ],
                 )
-                resp.raise_for_status()
-                data = resp.json()
                 raw_text = data["choices"][0]["message"]["content"]
-                output = PlannerLLMOutput.model_validate_json(raw_text)
+                cleaned_json = extract_json_payload(raw_text)
+                output = PlannerLLMOutput.model_validate_json(cleaned_json)
 
                 usage = data.get("usage", {})
                 tokens = {
@@ -242,23 +284,17 @@ class OpenRouterLLMProvider:
         )
 
         try:
-            async with httpx.AsyncClient(timeout=25.0) as client:
-                resp = await client.post(
-                    f"{self.base_url}/chat/completions",
-                    headers=self.headers,
-                    json={
-                        "model": self.model,
-                        "messages": [
-                            {"role": "system", "content": sys_prompt},
-                            {"role": "user", "content": user_msg},
-                        ],
-                        "response_format": {"type": "json_object"},
-                    },
+            async with httpx.AsyncClient(timeout=40.0) as client:
+                data = await self._post_chat_completion(
+                    client,
+                    [
+                        {"role": "system", "content": sys_prompt},
+                        {"role": "user", "content": user_msg},
+                    ],
                 )
-                resp.raise_for_status()
-                data = resp.json()
                 raw_text = data["choices"][0]["message"]["content"]
-                output = ReasonerLLMOutput.model_validate_json(raw_text)
+                cleaned_json = extract_json_payload(raw_text)
+                output = ReasonerLLMOutput.model_validate_json(cleaned_json)
 
                 usage = data.get("usage", {})
                 tokens = {

@@ -308,6 +308,79 @@ def test_openrouter_provider_configuration():
     assert default_provider is not None
 
 
+def test_extract_json_payload():
+    from app.investigation.llm import extract_json_payload
+
+    # Raw JSON
+    assert extract_json_payload('{"steps": [1, 2]}') == '{"steps": [1, 2]}'
+
+    # Markdown fenced JSON
+    fenced = """```json
+    {
+      "summary": "analysis",
+      "claims": []
+    }
+    ```"""
+    clean = extract_json_payload(fenced)
+    assert '"summary": "analysis"' in clean
+
+    # Extra commentary surrounding JSON
+    noisy = 'Here is the plan:\n{"steps": ["step1"]}\nHope this helps!'
+    assert extract_json_payload(noisy) == '{"steps": ["step1"]}'
+
+
+@pytest.mark.asyncio
+async def test_openrouter_structured_outputs_fallback(monkeypatch):
+    import httpx
+
+    from app.investigation.llm import OpenRouterLLMProvider
+
+    provider = OpenRouterLLMProvider(api_key="test-key", model="test-model")
+
+    call_count = 0
+    payloads_sent = []
+
+    class MockResponse:
+        def __init__(self, status_code: int, text: str, data: dict):
+            self.status_code = status_code
+            self.text = text
+            self._data = data
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise httpx.HTTPStatusError("error", request=None, response=self)
+
+        def json(self):
+            return self._data
+
+    async def mock_post(url, headers, json):
+        nonlocal call_count
+        call_count += 1
+        payloads_sent.append(json.copy())
+        if call_count == 1:
+            # First call fails because model lacks structured-outputs
+            return MockResponse(
+                400, '{"message": "model does not support feature: structured-outputs"}', {}
+            )
+        # Second call succeeds without response_format
+        return MockResponse(
+            200,
+            "OK",
+            {
+                "choices": [{"message": {"content": '{"steps": ["step 1"]}'}}],
+                "usage": {"prompt_tokens": 10, "completion_tokens": 5},
+            },
+        )
+
+    async with httpx.AsyncClient() as client:
+        monkeypatch.setattr(client, "post", mock_post)
+        data = await provider._post_chat_completion(client, [{"role": "user", "content": "hi"}])
+        assert call_count == 2
+        assert "response_format" in payloads_sent[0]
+        assert "response_format" not in payloads_sent[1]
+        assert data["choices"][0]["message"]["content"] == '{"steps": ["step 1"]}'
+
+
 @pytest.mark.asyncio
 async def test_investigation_engine_with_diff_input(db_session: AsyncSession):
     repo = Repository(
