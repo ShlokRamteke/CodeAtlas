@@ -808,8 +808,22 @@ export interface DenseAgentBrief {
   };
   constraints: Array<Record<string, unknown>>;
   checks: string[];
+  code_changes?: ProposedCodeChange[];
   evidence_refs: Array<Record<string, unknown>>;
   unknowns: string[];
+}
+
+export interface ProposedCodeChange {
+  file_path?: string;
+  filePath?: string;
+  symbol_name?: string | null;
+  symbolName?: string | null;
+  action: 'modify' | 'add' | 'delete' | 'refactor';
+  description: string;
+  signature_or_snippet?: string | null;
+  signatureOrSnippet?: string | null;
+  affected_callers?: string[];
+  affectedCallers?: string[];
 }
 
 export interface ConcurrentPROverlap {

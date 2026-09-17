@@ -54,6 +54,7 @@ class PreChangeBrief:
     constraints: List[Dict[str, Any]] = field(default_factory=list)
     unknowns: List[str] = field(default_factory=list)
     recommended_checks: List[str] = field(default_factory=list)
+    code_changes: List[Dict[str, Any]] = field(default_factory=list)
     model_calls_count: int = 0
     token_usage: Dict[str, int] = field(default_factory=dict)
 
@@ -81,6 +82,7 @@ class PreChangeBrief:
             "constraints": self.constraints,
             "unknowns": self.unknowns,
             "recommended_checks": self.recommended_checks,
+            "code_changes": self.code_changes,
             "model_calls_count": self.model_calls_count,
             "token_usage": self.token_usage,
         }
@@ -116,6 +118,7 @@ class InvestigationState:
     gathered_evidence: List[Dict[str, Any]] = field(default_factory=list)
     gathered_signals: Dict[str, Any] = field(default_factory=dict)
     claims: List[InvestigationClaim] = field(default_factory=list)
+    code_changes: List[Dict[str, Any]] = field(default_factory=list)
     brief: Optional[PreChangeBrief] = None
     model_calls_count: int = 0
     max_model_calls: int = 3

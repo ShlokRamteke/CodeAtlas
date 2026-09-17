@@ -17,6 +17,8 @@ from app.investigation.state import (
 )
 from app.models.investigation import Investigation, InvestigationStatus
 from app.models.repository import Repository
+from app.models.source_file import SourceFile
+from app.models.symbol import Symbol, SymbolKind
 
 
 def test_intent_normalizer_explicit_and_heuristics():
@@ -82,9 +84,13 @@ async def test_mock_llm_provider_flow():
     assert isinstance(plan, InvestigationPlan)
     assert tokens["prompt_tokens"] > 0
 
-    summary, claims, tokens = await provider.reason_investigation(intent, "context", {})
+    summary, claims, tokens, code_changes = await provider.reason_investigation(
+        intent, "context", {}
+    )
     assert len(claims) == 3
     assert tokens["completion_tokens"] > 0
+    assert isinstance(code_changes, list)
+    assert len(code_changes) > 0
 
     # Verification checks evidence citations
     evidence_catalog = [{"id": "ev-1", "source_id": "app/auth/session.py"}]
@@ -664,3 +670,129 @@ async def test_investigation_intent_archaeology_and_invariants(
     # Check recommended checks
     assert any("governing invariant" in r.lower() for r in state.brief.recommended_checks)
     assert any("superseded" in r.lower() for r in state.brief.recommended_checks)
+
+
+@pytest.mark.asyncio
+async def test_investigation_code_changes_flow(db_session: AsyncSession):
+    """Verify that AST code symbols are queried and concrete code changes are synthesized."""
+    repo = Repository(
+        owner="archaeologist",
+        name="code-changes-repo",
+        full_name="archaeologist/code-changes-repo",
+        default_branch="main",
+    )
+    db_session.add(repo)
+    await db_session.commit()
+    await db_session.refresh(repo)
+
+    source_file = SourceFile(
+        repository_id=repo.id,
+        path="backend/app/auth/session.py",
+        language="python",
+        content_hash="abc123456",
+        size_bytes=1024,
+    )
+    db_session.add(source_file)
+    await db_session.commit()
+    await db_session.refresh(source_file)
+
+    sym1 = Symbol(
+        file_id=source_file.id,
+        repository_id=repo.id,
+        name="SessionManager",
+        kind=SymbolKind.CLASS,
+        line_start=10,
+        line_end=45,
+        signature="class SessionManager:",
+    )
+    sym2 = Symbol(
+        file_id=source_file.id,
+        repository_id=repo.id,
+        name="create_session_token",
+        kind=SymbolKind.METHOD,
+        line_start=20,
+        line_end=35,
+        signature="def create_session_token(self, user_id: str, ttl: int = 3600) -> str:",
+    )
+    db_session.add_all([sym1, sym2])
+    await db_session.commit()
+
+    inv = Investigation(
+        repository_id=repo.id,
+        query="Migrate session token to include tenant ID in SessionManager",
+        status=InvestigationStatus.PENDING,
+    )
+    db_session.add(inv)
+    await db_session.commit()
+    await db_session.refresh(inv)
+
+    custom_mock_changes = [
+        {
+            "file_path": "backend/app/auth/session.py",
+            "symbol_name": "SessionManager.create_session_token",
+            "action": "modify",
+            "description": "Add tenant_id parameter to token payload signature and verification.",
+            "signature_or_snippet": "def create_session_token(self, user_id: str, tenant_id: str, ttl: int = 3600) -> str:",
+            "affected_callers": ["backend/app/api/auth.py:login_endpoint"],
+        }
+    ]
+
+    mock_llm = MockLLMProvider(mock_code_changes=custom_mock_changes)
+    engine = InvestigationEngine(llm_provider=mock_llm)
+
+    state = await engine.run(
+        investigation_id=inv.id,
+        db=db_session,
+        target_path="backend/app/auth/session.py",
+        target_symbol="SessionManager",
+    )
+
+    assert state.step == InvestigationStep.COMPLETED
+    assert state.brief is not None
+
+    # 1. Verify AST evidence gathered
+    ast_ev = next(
+        (
+            ev
+            for ev in state.gathered_evidence
+            if ev.get("source_type") == "code" and "SessionManager" in ev.get("title", "")
+        ),
+        None,
+    )
+    assert ast_ev is not None
+    assert ast_ev.get("path") == "backend/app/auth/session.py"
+
+    # 2. Verify code_changes on state and brief
+    assert len(state.code_changes) == 1
+    assert state.code_changes[0]["symbol_name"] == "SessionManager.create_session_token"
+    assert state.code_changes[0]["action"] == "modify"
+    assert len(state.brief.code_changes) == 1
+    assert state.brief.code_changes[0]["file_path"] == "backend/app/auth/session.py"
+
+    # 3. Verify evidence record persisted in DB
+    changes_ev = next(
+        (ev for ev in state.gathered_evidence if ev.get("source_id") == "proposed-code-changes"),
+        None,
+    )
+    assert changes_ev is not None
+    assert "Implementation Blueprint" in changes_ev["title"]
+
+    # 4. Verify recommended checks include code modification item and affected caller check
+    assert any(
+        "MODIFY" in c and "backend/app/auth/session.py" in c for c in state.brief.recommended_checks
+    )
+    assert any("login_endpoint" in c for c in state.brief.recommended_checks)
+
+    # 5. Verify human markdown projection includes implementation blueprint
+    md = state.brief.to_human_markdown()
+    assert "### 💻 Implementation Blueprint & Code Changes" in md
+    assert "**`[MODIFY]`**" in md
+    assert "backend/app/auth/session.py" in md
+    assert "def create_session_token" in md
+    assert "Affected Callers" in md
+
+    # 6. Verify dense agent JSON projection includes code_changes
+    agent_json = state.brief.to_agent_json()
+    assert "code_changes" in agent_json
+    assert len(agent_json["code_changes"]) == 1
+    assert agent_json["code_changes"][0]["action"] == "modify"

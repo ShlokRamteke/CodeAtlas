@@ -130,6 +130,14 @@ developer understand a proposed change before implementation.
   - Contracts & Frontend UI: added `ConcurrentPROverlap` and `ConcurrentOverlapReport` to `@codeatlas/contracts`. Enhanced `PreChangeInvestigationViewer` with live interactive collision alert banners, PR chips, branch names, authors, and affected file tags.
   - 100% automated test pass rate across 96 pytest tests, clean contracts compilation, and clean Next.js frontend production build.
 
+- **Phase 4 — Concrete Code Change Specifications & Implementation Blueprint**:
+  - `Symbol` and `SourceFile` Tree-sitter AST queries in `InvestigationEngine.gather()`: extracts real function, method, and class definitions, signatures, and line spans into grounded `ev-code-*` evidence items.
+  - Concrete Code Change schemas: introduced `ProposedCodeChangeOutput` and `ProposedCodeChangeSchema` with `file_path`, `symbol_name`, `action` (`modify`/`add`/`delete`/`refactor`), `description`, `signature_or_snippet`, and `affected_callers`.
+  - Prompts & Reasoner LLM output: updated `REASONER_SYSTEM_PROMPT` and `build_reasoner_prompt()` to instruct models to synthesize structured code modifications alongside invariant and evidence claims.
+  - Distillation & Projections: rendered `### 💻 Implementation Blueprint & Code Changes` with action tags, symbols, descriptions, code snippets, and callers in Human Markdown and dense agent JSON `code_changes` blocks.
+  - Contracts & Frontend UI: added `ProposedCodeChange` to `@codeatlas/contracts`. Implemented interactive **Implementation Blueprint & Code Changes** card in `PreChangeInvestigationViewer` Next.js UI.
+  - 100% automated test pass rate across 99 pytest tests, ruff format/lint clean, and Next.js frontend production build clean.
+
 ## Remaining
 
 - **Phase 4**: Change Investigation Engine (PH4-08: Independent Change Decomposition, PH4-09: Code Ownership & Reviewer Recommender, PH4-10: C4 Architecture & Dependency Export).
@@ -157,5 +165,5 @@ receive scoped views of that model.
 
 ## Last Updated
 
-2026-09-16
+2026-09-17
 

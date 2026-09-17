@@ -1188,6 +1188,117 @@ export function PreChangeInvestigationViewer({
                 );
               })()}
 
+              {/* Implementation Blueprint & Concrete Code Changes Section */}
+              {(() => {
+                const codeEv = selectedInv.evidence?.find(
+                  (e) => e.sourceId === "proposed-code-changes"
+                );
+                const codeMeta = (codeEv?.metadata || {}) as any;
+                const rawChanges: any[] =
+                  codeMeta.code_changes ||
+                  (projection?.contentJson as any)?.code_changes ||
+                  [];
+
+                if (rawChanges.length === 0) return null;
+
+                return (
+                  <div className="p-6 rounded-xl bg-slate-900/70 border border-slate-800 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Code2 className="w-4 h-4 text-cyan-400" />
+                        <h4 className="text-sm font-bold text-white">
+                          Implementation Blueprint &amp; Code Changes
+                        </h4>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold px-2.5 py-0.5 rounded border uppercase font-mono bg-cyan-500/10 text-cyan-400 border-cyan-500/30">
+                          {rawChanges.length} Planned Modification{rawChanges.length > 1 ? "s" : ""}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      {rawChanges.map((change: any, idx: number) => {
+                        const action = (change.action || "modify").toLowerCase();
+                        const filePath = change.file_path || change.filePath || "unknown";
+                        const symbolName = change.symbol_name || change.symbolName;
+                        const description = change.description;
+                        const snippet =
+                          change.signature_or_snippet || change.signatureOrSnippet;
+                        const callers: string[] =
+                          change.affected_callers || change.affectedCallers || [];
+
+                        return (
+                          <div
+                            key={idx}
+                            className="p-4 rounded-lg bg-slate-950/80 border border-slate-800/90 space-y-3"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase font-mono ${
+                                    action === "add"
+                                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                                      : action === "delete"
+                                      ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                                      : action === "refactor"
+                                      ? "bg-purple-500/10 text-purple-400 border-purple-500/30"
+                                      : "bg-cyan-500/10 text-cyan-400 border-cyan-500/30"
+                                  }`}
+                                >
+                                  {action.toUpperCase()}
+                                </span>
+                                <span className="font-mono text-xs text-white font-medium">
+                                  {filePath}
+                                </span>
+                                {symbolName && (
+                                  <span className="text-xs text-slate-400 font-mono">
+                                    &rarr;{" "}
+                                    <span className="text-indigo-300 font-semibold">
+                                      {symbolName}
+                                    </span>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <p className="text-xs text-slate-200 leading-relaxed font-sans">
+                              {description}
+                            </p>
+
+                            {snippet && (
+                              <div className="space-y-1">
+                                <div className="text-[10px] uppercase font-bold text-slate-400">
+                                  Proposed Signature / Snippet:
+                                </div>
+                                <pre className="p-2.5 rounded bg-slate-900 border border-slate-800 text-cyan-200 font-mono text-xs overflow-x-auto">
+                                  {snippet}
+                                </pre>
+                              </div>
+                            )}
+
+                            {callers.length > 0 && (
+                              <div className="pt-2 border-t border-slate-800/50 flex flex-wrap items-center gap-1.5 text-xs">
+                                <span className="text-[10px] uppercase font-bold text-amber-400">
+                                  Affected Callers:
+                                </span>
+                                {callers.map((c: string, ci: number) => (
+                                  <span
+                                    key={ci}
+                                    className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300 font-mono text-[11px]"
+                                  >
+                                    {c}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Synthesized Claims Section */}
               <div className="p-6 rounded-xl bg-slate-900/70 border border-slate-800 space-y-4">

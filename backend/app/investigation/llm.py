@@ -29,7 +29,7 @@ class LLMProvider(Protocol):
         gathered_context: str,
         signals: Dict[str, Any],
         evidence_catalog: Optional[List[Dict[str, Any]]] = None,
-    ) -> Tuple[str, List[InvestigationClaim], Dict[str, int]]: ...
+    ) -> Tuple[str, List[InvestigationClaim], Dict[str, int], List[Dict[str, Any]]]: ...
 
     async def verify_claims(
         self, claims: List[InvestigationClaim], evidence_catalog: List[Dict[str, Any]]
@@ -44,10 +44,12 @@ class MockLLMProvider:
         mock_plan: Optional[InvestigationPlan] = None,
         mock_claims: Optional[List[InvestigationClaim]] = None,
         mock_summary: str = "Mock synthesis: Change verified with evidence.",
+        mock_code_changes: Optional[List[Dict[str, Any]]] = None,
     ):
         self.mock_plan = mock_plan
         self.mock_claims = mock_claims
         self.mock_summary = mock_summary
+        self.mock_code_changes = mock_code_changes
         self.calls_count = 0
 
     async def plan_investigation(
@@ -69,7 +71,7 @@ class MockLLMProvider:
         gathered_context: str,
         signals: Dict[str, Any],
         evidence_catalog: Optional[List[Dict[str, Any]]] = None,
-    ) -> Tuple[str, List[InvestigationClaim], Dict[str, int]]:
+    ) -> Tuple[str, List[InvestigationClaim], Dict[str, int], List[Dict[str, Any]]]:
         self.calls_count += 1
         claims = self.mock_claims or [
             InvestigationClaim(
@@ -94,7 +96,22 @@ class MockLLMProvider:
                 confidence=0.5,
             ),
         ]
-        return self.mock_summary, claims, {"prompt_tokens": 250, "completion_tokens": 90}
+        code_changes = self.mock_code_changes or [
+            {
+                "file_path": intent.target_files[0] if intent.target_files else "app/main.py",
+                "symbol_name": intent.target_symbols[0] if intent.target_symbols else "handler",
+                "action": "modify",
+                "description": f"Update implementation for {intent.intent_summary or intent.raw_query}",
+                "signature_or_snippet": None,
+                "affected_callers": [],
+            }
+        ]
+        return (
+            self.mock_summary,
+            claims,
+            {"prompt_tokens": 250, "completion_tokens": 90},
+            code_changes,
+        )
 
     async def verify_claims(
         self, claims: List[InvestigationClaim], evidence_catalog: List[Dict[str, Any]]
@@ -262,7 +279,7 @@ class OpenRouterLLMProvider:
         gathered_context: str,
         signals: Dict[str, Any],
         evidence_catalog: Optional[List[Dict[str, Any]]] = None,
-    ) -> Tuple[str, List[InvestigationClaim], Dict[str, int]]:
+    ) -> Tuple[str, List[InvestigationClaim], Dict[str, int], List[Dict[str, Any]]]:
         if not self.api_key:
             summary = f"Grounded pre-change investigation for: {intent.raw_query}."
             claims = [
@@ -274,7 +291,18 @@ class OpenRouterLLMProvider:
                     confidence=1.0,
                 )
             ]
-            return summary, claims, {"prompt_tokens": 0, "completion_tokens": 0}
+            code_changes = [
+                {
+                    "file_path": tf,
+                    "symbol_name": intent.target_symbols[0] if intent.target_symbols else None,
+                    "action": "modify",
+                    "description": f"Implement proposed change: {intent.raw_query}",
+                    "signature_or_snippet": None,
+                    "affected_callers": [],
+                }
+                for tf in (intent.target_files or ["app/main.py"])
+            ]
+            return summary, claims, {"prompt_tokens": 0, "completion_tokens": 0}, code_changes
 
         sys_prompt, user_msg = build_reasoner_prompt(
             intent=intent,
@@ -320,9 +348,48 @@ class OpenRouterLLMProvider:
                         )
                     )
 
-                return output.summary, claims, tokens
+                code_changes: List[Dict[str, Any]] = []
+                for ch in output.code_changes:
+                    code_changes.append(
+                        {
+                            "file_path": ch.file_path,
+                            "symbol_name": ch.symbol_name,
+                            "action": ch.action.lower(),
+                            "description": ch.description,
+                            "signature_or_snippet": ch.signature_or_snippet,
+                            "affected_callers": ch.affected_callers,
+                        }
+                    )
+
+                if not code_changes and intent.target_files:
+                    for tf in intent.target_files:
+                        code_changes.append(
+                            {
+                                "file_path": tf,
+                                "symbol_name": intent.target_symbols[0]
+                                if intent.target_symbols
+                                else None,
+                                "action": "modify",
+                                "description": f"Implement changes for: {intent.raw_query}",
+                                "signature_or_snippet": None,
+                                "affected_callers": [],
+                            }
+                        )
+
+                return output.summary, claims, tokens, code_changes
         except Exception as e:
             logger.warning(f"OpenRouter reasoning call failed, using fallback: {e}")
+            fallback_changes = [
+                {
+                    "file_path": tf,
+                    "symbol_name": intent.target_symbols[0] if intent.target_symbols else None,
+                    "action": "modify",
+                    "description": f"Apply change: {intent.raw_query}",
+                    "signature_or_snippet": None,
+                    "affected_callers": [],
+                }
+                for tf in (intent.target_files or ["unknown"])
+            ]
             return (
                 f"Grounded analysis for {intent.raw_query}",
                 [
@@ -335,6 +402,7 @@ class OpenRouterLLMProvider:
                     )
                 ],
                 {"prompt_tokens": 0, "completion_tokens": 0},
+                fallback_changes,
             )
 
     async def verify_claims(

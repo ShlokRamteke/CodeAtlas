@@ -160,6 +160,7 @@ def _reconstruct_brief_data(inv: Investigation) -> dict:
     evidence_list: list[dict] = []
     recommended_checks: list[str] = []
     unknowns: list[str] = []
+    code_changes: list[dict] = []
 
     for e in inv.evidence:
         ev_item = {
@@ -206,6 +207,9 @@ def _reconstruct_brief_data(inv: Investigation) -> dict:
         src_val = e.source_type.value if hasattr(e.source_type, "value") else str(e.source_type)
         if e.path and e.path not in target_files and src_val == "code":
             target_files.append(e.path)
+        meta = e.extra_metadata or {}
+        if e.source_id == "proposed-code-changes" or "code_changes" in meta:
+            code_changes.extend(meta.get("code_changes", []))
 
     guarding_sig = signals.get("guarding_tests", {})
     if guarding_sig.get("untested_files"):
@@ -226,6 +230,7 @@ def _reconstruct_brief_data(inv: Investigation) -> dict:
         "constraints": constraints,
         "unknowns": unknowns,
         "recommended_checks": recommended_checks,
+        "code_changes": code_changes,
         "evidence": evidence_list,
         "token_usage": inv.token_usage or {},
     }

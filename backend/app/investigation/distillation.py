@@ -264,6 +264,42 @@ class TokenBudgetDistiller:
             )
             sections.append(f"### 🛡️ Pre-Implementation Checklist\n{checks_md}")
 
+        # Proposed Code Changes & Implementation Blueprint (Tier 5 - retained)
+        code_changes = brief.get("code_changes", [])
+        if code_changes:
+            change_lines = []
+            selected_changes = code_changes if shed_tier < 4 else code_changes[:3]
+            for ch in selected_changes:
+                action = (ch.get("action") or "modify").upper()
+                file_path = ch.get("file_path", "unknown")
+                symbol_name = ch.get("symbol_name")
+                desc = ch.get("description", "")
+                snippet = ch.get("signature_or_snippet")
+                callers = ch.get("affected_callers", [])
+
+                sym_str = f" &rarr; `{symbol_name}`" if symbol_name else ""
+                change_lines.append(f"- **`[{action}]`** `{file_path}`{sym_str}: {desc}")
+                if snippet:
+                    clean_snippet = snippet.strip()
+                    change_lines.append(f"  ```\n  {clean_snippet}\n  ```")
+                if callers:
+                    caller_str = ", ".join(f"`{c}`" for c in callers[:4])
+                    change_lines.append(f"  *Affected Callers:* {caller_str}")
+
+            if shed_tier >= 4 and len(code_changes) > 3:
+                marker = registry.register(
+                    ref_id="ref#code-changes-remaining",
+                    marker_type="code_change",
+                    title=f"{len(code_changes) - 3} Additional Code Modifications",
+                    summary="Additional code modifications shed for budget",
+                    original_payload={"code_changes": code_changes[3:]},
+                )
+                change_lines.append(f"- *... and {marker.to_markdown_tag()}*")
+
+            sections.append(
+                "### 💻 Implementation Blueprint & Code Changes\n" + "\n".join(change_lines)
+            )
+
         # Concurrent In-Flight PRs & Merge Conflicts (Tier 5 - retained)
         overlap_sig = signals.get("concurrent_overlaps", {})
         overlapping_prs = overlap_sig.get("overlapping_prs", [])
@@ -645,6 +681,23 @@ class TokenBudgetDistiller:
         else:
             overlap_block = {"has_conflicts": False}
 
+        # Code changes block
+        code_changes = brief.get("code_changes", [])
+        if code_changes:
+            if shed_tier >= 4 and len(code_changes) > 3:
+                marker = registry.register(
+                    ref_id="ref#code-changes-remaining",
+                    marker_type="code_change",
+                    title=f"{len(code_changes) - 3} Additional Code Modifications",
+                    summary="Additional code modifications shed for budget",
+                    original_payload={"code_changes": code_changes[3:]},
+                )
+                code_changes_block = list(code_changes[:3]) + [marker.to_dense_json()]
+            else:
+                code_changes_block = code_changes
+        else:
+            code_changes_block = []
+
         # Assemble dense JSON
         dense = {
             "_schema": "codeatlas.pre_change_brief.v1",
@@ -652,6 +705,7 @@ class TokenBudgetDistiller:
             "_shed_tier": shed_tier,
             "intent": brief.get("intent_summary"),
             "targets": {"files": target_files, "symbols": target_symbols},
+            "code_changes": code_changes_block,
             "risk": risk_block,
             "guarding_tests": tests_block,
             "blast_radius": blast_block,
