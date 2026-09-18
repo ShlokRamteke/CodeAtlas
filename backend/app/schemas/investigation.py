@@ -99,6 +99,15 @@ class SynthesizedInvariantSchema(BaseModel):
     relevant_files: List[str] = Field(default_factory=list)
 
 
+class ProposedCodeChangeSchema(BaseModel):
+    file_path: str
+    symbol_name: Optional[str] = None
+    action: str = "modify"  # "modify" | "add" | "delete" | "refactor"
+    description: str
+    signature_or_snippet: Optional[str] = None
+    affected_callers: List[str] = Field(default_factory=list)
+
+
 class PreChangeBriefSchema(BaseModel):
     summary: str
     intent_summary: str
@@ -109,6 +118,7 @@ class PreChangeBriefSchema(BaseModel):
     constraints: List[SynthesizedInvariantSchema] = Field(default_factory=list)
     unknowns: List[str] = Field(default_factory=list)
     recommended_checks: List[str] = Field(default_factory=list)
+    code_changes: List[ProposedCodeChangeSchema] = Field(default_factory=list)
     model_calls_count: int = 0
     token_usage: Dict[str, int] = Field(default_factory=dict)
 

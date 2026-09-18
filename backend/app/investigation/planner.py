@@ -48,6 +48,7 @@ from app.models.dependency import CodeDependency
 from app.models.evidence import Evidence, EvidenceSourceType
 from app.models.investigation import Investigation, InvestigationStatus
 from app.models.source_file import SourceFile
+from app.models.symbol import Symbol
 
 logger = logging.getLogger(__name__)
 
@@ -164,17 +165,100 @@ class InvestigationEngine:
                 }
                 evidence_items.append(ev)
         elif target_files:
+            # Query AST symbols for target files to provide real function/class/method context
+            sym_stmt = (
+                select(Symbol, SourceFile.path)
+                .join(SourceFile, Symbol.file_id == SourceFile.id)
+                .where(
+                    SourceFile.repository_id == state.repository_id,
+                    SourceFile.path.in_(target_files),
+                )
+                .order_by(SourceFile.path, Symbol.line_start)
+            )
+            sym_res = await db.execute(sym_stmt)
+            ast_symbols = sym_res.all()
+
+            symbols_by_file: Dict[str, List[Any]] = defaultdict(list)
+            for sym, fpath in ast_symbols:
+                symbols_by_file[fpath].append(sym)
+
             for tf in target_files:
-                ev = {
-                    "id": f"ev-code-{len(evidence_items) + 1}",
-                    "source_type": EvidenceSourceType.CODE,
-                    "source_id": tf,
-                    "title": f"Target File: {tf}",
-                    "snippet": f"Target file identified for change: {tf}",
-                    "path": tf,
-                    "confidence": 1.0,
-                }
-                evidence_items.append(ev)
+                file_syms = symbols_by_file.get(tf, [])
+                if file_syms:
+                    sym_summaries = [
+                        f"{s.kind.value if hasattr(s.kind, 'value') else s.kind} {s.name}"
+                        + (f": {s.signature}" if s.signature else "")
+                        for s in file_syms[:8]
+                    ]
+                    snippet_text = f"Defined AST Symbols in {tf}:\n" + "\n".join(
+                        f"- {ss}" for ss in sym_summaries
+                    )
+                    ev = {
+                        "id": f"ev-code-{len(evidence_items) + 1}",
+                        "source_type": EvidenceSourceType.CODE,
+                        "source_id": tf,
+                        "title": f"Target File AST: {tf} ({len(file_syms)} symbols)",
+                        "snippet": snippet_text[:500],
+                        "path": tf,
+                        "confidence": 1.0,
+                        "extra_metadata": {
+                            "symbols": [
+                                {
+                                    "name": s.name,
+                                    "kind": (
+                                        s.kind.value if hasattr(s.kind, "value") else str(s.kind)
+                                    ),
+                                    "line_start": s.line_start,
+                                    "line_end": s.line_end,
+                                    "signature": s.signature,
+                                }
+                                for s in file_syms[:10]
+                            ]
+                        },
+                    }
+                    evidence_items.append(ev)
+
+                    # Add detailed evidence for matching target_symbols or first few symbols
+                    for s in file_syms:
+                        if (
+                            not target_symbols
+                            or s.name in target_symbols
+                            or any(ts.lower() in s.name.lower() for ts in target_symbols)
+                        ):
+                            ev_sym = {
+                                "id": f"ev-code-{len(evidence_items) + 1}",
+                                "source_type": EvidenceSourceType.CODE,
+                                "source_id": f"{tf}#{s.name}",
+                                "title": f"Symbol: {s.name} ({s.kind.value if hasattr(s.kind, 'value') else s.kind})",
+                                "snippet": s.signature
+                                or f"{s.name} lines {s.line_start}-{s.line_end}",
+                                "path": tf,
+                                "line_start": s.line_start,
+                                "line_end": s.line_end,
+                                "confidence": 1.0,
+                                "extra_metadata": {
+                                    "symbol_name": s.name,
+                                    "kind": (
+                                        s.kind.value if hasattr(s.kind, "value") else str(s.kind)
+                                    ),
+                                    "signature": s.signature,
+                                    "docstring": s.docstring,
+                                },
+                            }
+                            evidence_items.append(ev_sym)
+                            if len(evidence_items) >= 15:
+                                break
+                else:
+                    ev = {
+                        "id": f"ev-code-{len(evidence_items) + 1}",
+                        "source_type": EvidenceSourceType.CODE,
+                        "source_id": tf,
+                        "title": f"Target File: {tf}",
+                        "snippet": f"Target file identified for change: {tf}",
+                        "path": tf,
+                        "confidence": 1.0,
+                    }
+                    evidence_items.append(ev)
 
         # 2. Gather commit history evidence
         if file_commits:
@@ -604,9 +688,21 @@ class InvestigationEngine:
         # Prepare context summary
         context_str = f"Intent: {state.intent.raw_query if state.intent else state.query}\n"
         context_str += f"Target Files: {state.intent.target_files if state.intent else []}\n"
-        context_str += f"Evidence Items: {len(state.gathered_evidence)}\n"
-        for e in state.gathered_evidence[:5]:
-            context_str += f"- [{e['id']}] {e['title']}: {e['snippet'][:100]}\n"
+        context_str += f"Target Symbols: {state.intent.target_symbols if state.intent else []}\n"
+
+        # Code AST and Snippet Evidence
+        code_evs = [
+            e for e in state.gathered_evidence if e.get("source_type") == EvidenceSourceType.CODE
+        ]
+        if code_evs:
+            context_str += "Target Code AST & Symbol Evidence:\n"
+            for ce in code_evs[:6]:
+                context_str += f"- [{ce['id']}] {ce['title']}: {ce['snippet'][:150]}\n"
+
+        context_str += f"Total Evidence Items: {len(state.gathered_evidence)}\n"
+        for e in state.gathered_evidence[:6]:
+            if e not in code_evs:
+                context_str += f"- [{e['id']}] {e['title']}: {e['snippet'][:100]}\n"
 
         inv_sig = state.gathered_signals.get("invariants", {})
         if inv_sig.get("invariants"):
@@ -627,7 +723,7 @@ class InvestigationEngine:
                 )
 
         try:
-            summary, claims, tokens = await self.llm.reason_investigation(
+            summary, claims, tokens, code_changes = await self.llm.reason_investigation(
                 intent=state.intent or IntentNormalizer.normalize(state.query),
                 gathered_context=context_str,
                 signals=state.gathered_signals,
@@ -638,6 +734,7 @@ class InvestigationEngine:
                 completion_tokens=tokens.get("completion_tokens", 0),
             )
             state.claims = claims
+            state.code_changes = code_changes
             return claims
         except Exception as e:
             logger.warning(f"Reasoner LLM call failed, fallback: {e}")
@@ -651,6 +748,21 @@ class InvestigationEngine:
                 )
             ]
             state.claims = claims
+            state.code_changes = [
+                {
+                    "file_path": tf,
+                    "symbol_name": (
+                        state.intent.target_symbols[0]
+                        if state.intent and state.intent.target_symbols
+                        else None
+                    ),
+                    "action": "modify",
+                    "description": f"Implement changes for '{state.query}' in {tf}",
+                    "signature_or_snippet": None,
+                    "affected_callers": [],
+                }
+                for tf in (state.intent.target_files if state.intent else ["unknown"])
+            ]
             return claims
 
     async def verify(self, state: InvestigationState) -> List[InvestigationClaim]:
@@ -774,6 +886,21 @@ class InvestigationEngine:
         if state.gathered_signals.get("change_risk", {}).get("shannon_entropy", 0) > 1.5:
             recommended_checks.append("High churn entropy detected: ensure changes remain modular.")
 
+        # Code-driven implementation checks
+        for ch in state.code_changes:
+            act = (ch.get("action") or "modify").upper()
+            fp = ch.get("file_path")
+            sym = ch.get("symbol_name")
+            sym_part = f" (`{sym}`)" if sym else ""
+            desc = ch.get("description", "")
+            check_msg = f"[{act}] {fp}{sym_part}: {desc}" if desc else f"[{act}] {fp}{sym_part}"
+            if check_msg not in recommended_checks:
+                recommended_checks.append(check_msg)
+            for caller in ch.get("affected_callers", [])[:2]:
+                caller_check = f"Update caller '{caller}' to match modified interface in '{fp}'."
+                if caller_check not in recommended_checks:
+                    recommended_checks.append(caller_check)
+
         brief = PreChangeBrief(
             summary=(
                 f"Investigation of '{state.query}' completed with {len(state.claims)} verified claims "
@@ -787,6 +914,7 @@ class InvestigationEngine:
             constraints=raw_invs,
             unknowns=unknowns,
             recommended_checks=recommended_checks,
+            code_changes=state.code_changes,
             model_calls_count=state.model_calls_count,
             token_usage=state.token_usage,
         )
@@ -811,6 +939,23 @@ class InvestigationEngine:
             ]
             inv.token_usage = state.token_usage
             inv.latency_ms = state.latency_ms
+
+            # Persist proposed code changes evidence
+            if state.code_changes:
+                ev_changes = {
+                    "id": f"ev-code-changes-{len(state.gathered_evidence) + 1}",
+                    "source_type": EvidenceSourceType.CODE,
+                    "source_id": "proposed-code-changes",
+                    "title": f"Implementation Blueprint: {len(state.code_changes)} Code Modifications",
+                    "snippet": "; ".join(
+                        f"[{c.get('action', 'modify').upper()}] {c.get('file_path')}"
+                        + (f" ({c.get('symbol_name')})" if c.get("symbol_name") else "")
+                        for c in state.code_changes[:5]
+                    ),
+                    "confidence": 1.0,
+                    "extra_metadata": {"code_changes": state.code_changes},
+                }
+                state.gathered_evidence.append(ev_changes)
 
             # Persist Evidence records
             for ev_data in state.gathered_evidence:
