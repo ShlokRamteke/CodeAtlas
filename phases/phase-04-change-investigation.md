@@ -73,9 +73,11 @@ Pre-Change Investigation Brief
   - Classify direct file collisions (`CRITICAL`/`HIGH`) and dependency overlaps (`MEDIUM`).
   - Integrate into `InvestigationEngine.gather()` (`signals["concurrent_overlaps"]` and `ev-overlap-*`), `reason()`, `synthesize()`, dual-format distillation, and Next.js UI interactive card.
   - REST endpoints: `GET /api/v1/investigations/{id}/concurrent-overlap` and `GET /api/v1/repositories/{id}/concurrent-overlap`.
-- [ ] **PH4-08: Independent Change Decomposition**
+- [x] **PH4-08: Independent Change Decomposition** *(Completed)*
   - Evaluate weakly-connected components across the dependency subgraph of proposed modified files.
   - Suggest splitting large, unrelated change bundles into independent, modular pull requests.
+  - Integrate into `InvestigationEngine.gather()` (`signals["decomposition"]` and `ev-decomp-*`), `reason()`, `synthesize()`, dual-format distillation, and Next.js UI interactive card.
+  - REST endpoint: `GET /api/v1/investigations/{id}/decomposition`.
 - [ ] **PH4-09: Code Ownership & Reviewer Recommender**
   - Calculate authorship concentration over modified and blast-radius files using historical `CommitFileChange` blame.
   - Recommend domain experts and reviewers best qualified to inspect the proposed change.

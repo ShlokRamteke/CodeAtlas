@@ -29,6 +29,7 @@ from app.history.guarding_tests import (
 )
 from app.investigation.blast_radius import BlastRadiusAnalyzer
 from app.investigation.concurrent_overlap import ConcurrentOverlapDetector
+from app.investigation.decomposition import ChangeDecomposer
 from app.investigation.intent import IntentNormalizer
 from app.investigation.invariants import (
     InvariantSynthesizer,
@@ -658,6 +659,29 @@ class InvestigationEngine:
             }
             evidence_items.append(ev_overlap)
 
+        # Independent change decomposition (Weakly-Connected Components over target files)
+        decomp_report = ChangeDecomposer.evaluate_subgraph(
+            target_files=target_files,
+            dependency_edges=static_edges,
+        )
+        signals["decomposition"] = decomp_report.to_dict()
+
+        if decomp_report.is_decomposable:
+            cluster_snippets = [
+                f"{c.cluster_id} ({c.name}): {len(c.files)} files -> {c.suggested_pr_title}"
+                for c in decomp_report.clusters[:3]
+            ]
+            ev_decomp = {
+                "id": f"ev-decomp-{len(evidence_items) + 1}",
+                "source_type": EvidenceSourceType.CODE,
+                "source_id": "change-decomposition",
+                "title": f"Independent Change Decomposition ({decomp_report.component_count} decoupled clusters)",
+                "snippet": f"{decomp_report.summary} Recommended splits: {'; '.join(cluster_snippets)}",
+                "confidence": 1.0,
+                "extra_metadata": decomp_report.to_dict(),
+            }
+            evidence_items.append(ev_decomp)
+
         state.gathered_evidence = evidence_items
         state.gathered_signals = signals
         state.gathered_context = {
@@ -720,6 +744,16 @@ class InvestigationEngine:
                 context_str += (
                     f"- [{ov['risk_level']}] PR #{ov['pr_number']} by @{ov['pr_author']} "
                     f"({ov['overlap_type']}): modifies {', '.join(ov['overlapping_files'])}. {ov['recommendation']}\n"
+                )
+
+        decomp_sig = state.gathered_signals.get("decomposition", {})
+        if decomp_sig.get("is_decomposable"):
+            context_str += "Independent Change Decomposition (Modular PR Splits):\n"
+            for c in decomp_sig.get("clusters", []):
+                context_str += (
+                    f"- Order {c['recommended_order']}: [{c['name']}] "
+                    f"({', '.join(c['files'])}). Suggested PR: '{c['suggested_pr_title']}'. "
+                    f"Branch: '{c['suggested_branch_name']}'. Rationale: {c['rationale']}\n"
                 )
 
         try:
@@ -881,6 +915,19 @@ class InvestigationEngine:
                 recommended_checks.append(
                     ov.get("recommendation")
                     or f"Check interface compatibility with PR #{ov['pr_number']}."
+                )
+
+        # Independent change decomposition checks
+        decomp_sig = state.gathered_signals.get("decomposition", {})
+        if decomp_sig.get("is_decomposable"):
+            clusters = decomp_sig.get("clusters", [])
+            split_desc = ", ".join(f"{c['name']} ({len(c['files'])} files)" for c in clusters)
+            recommended_checks.append(
+                f"Decompose change into {len(clusters)} modular PRs: {split_desc}."
+            )
+            for c in clusters:
+                recommended_checks.append(
+                    f"PR #{c['recommended_order']} ({c['name']}): branch `{c['suggested_branch_name']}` -> {c['suggested_pr_title']}."
                 )
 
         if state.gathered_signals.get("change_risk", {}).get("shannon_entropy", 0) > 1.5:

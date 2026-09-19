@@ -93,3 +93,52 @@ async def test_investigation_projection_and_reference_api(client: AsyncClient):
     fake_id = str(uuid.uuid4())
     fake_res = await client.get(f"/api/v1/investigations/{fake_id}/projection")
     assert fake_res.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_investigation_decomposition_endpoint(client: AsyncClient):
+    # 1. Create a repository
+    repo_res = await client.post(
+        "/api/v1/repositories/",
+        json={
+            "owner": "codeatlas",
+            "name": "decomp-api-test",
+            "full_name": "codeatlas/decomp-api-test",
+            "default_branch": "main",
+        },
+    )
+    assert repo_res.status_code == 201
+    repo_id = repo_res.json()["id"]
+
+    # 2. Create an investigation with multi-file disjoint change
+    inv_res = await client.post(
+        "/api/v1/investigations/",
+        json={
+            "repository_id": repo_id,
+            "query": "Modify auth in backend/app/auth/router.py and billing in backend/app/billing/charge.py",
+            "type": "before_change",
+        },
+    )
+    assert inv_res.status_code == 201
+    inv_id = inv_res.json()["id"]
+
+    # 3. Run investigation
+    run_res = await client.post(f"/api/v1/investigations/{inv_id}/run", json={})
+    assert run_res.status_code == 200
+
+    # 4. Fetch decomposition endpoint
+    decomp_res = await client.get(f"/api/v1/investigations/{inv_id}/decomposition")
+    assert decomp_res.status_code == 200
+    decomp_data = decomp_res.json()
+
+    assert decomp_data["total_files"] == 2
+    assert decomp_data["component_count"] == 2
+    assert decomp_data["is_decomposable"] is True
+    assert len(decomp_data["clusters"]) == 2
+    assert "suggested_pr_title" in decomp_data["clusters"][0]
+    assert "suggested_branch_name" in decomp_data["clusters"][0]
+
+    # 5. Test 404 for nonexistent investigation
+    fake_id = str(uuid.uuid4())
+    not_found = await client.get(f"/api/v1/investigations/{fake_id}/decomposition")
+    assert not_found.status_code == 404

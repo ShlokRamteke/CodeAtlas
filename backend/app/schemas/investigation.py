@@ -252,3 +252,26 @@ class ConcurrentOverlapReportSchema(BaseModel):
     target_files_analyzed: List[str] = Field(default_factory=list)
     blast_radius_files_analyzed: List[str] = Field(default_factory=list)
     summary: str = ""
+
+
+class ChangeClusterSchema(BaseModel):
+    cluster_id: str
+    name: str
+    dominant_component: str
+    files: List[str] = Field(default_factory=list)
+    internal_edge_count: int = 0
+    external_dependencies: List[str] = Field(default_factory=list)
+    suggested_pr_title: str = ""
+    suggested_branch_name: str = ""
+    rationale: str = ""
+    recommended_order: int = 1
+
+
+class ChangeDecompositionReportSchema(BaseModel):
+    target_files: List[str] = Field(default_factory=list)
+    total_files: int = 0
+    component_count: int = 0
+    is_decomposable: bool = False
+    modularity_score: float = 0.0
+    clusters: List[ChangeClusterSchema] = Field(default_factory=list)
+    summary: str = ""

@@ -27,6 +27,8 @@ import {
   Eye,
   Sliders,
   X,
+  Split,
+  GitBranch,
 } from "lucide-react";
 import type {
   InvestigationResponse,
@@ -849,6 +851,140 @@ export function PreChangeInvestigationViewer({
                             </div>
                           );
                         })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Independent Change Decomposition & Modular PR Recommendations Section */}
+              {(() => {
+                const decompEv = selectedInv.evidence?.find(
+                  (e) => e.sourceId === "change-decomposition"
+                );
+                const decompMeta = (decompEv?.metadata || {}) as any;
+                const clusters = decompMeta.clusters || [];
+                const isDecomposable =
+                  decompMeta.is_decomposable ?? decompMeta.isDecomposable ?? false;
+                const componentCount =
+                  decompMeta.component_count ?? decompMeta.componentCount ?? clusters.length;
+                const modularityScore =
+                  decompMeta.modularity_score ?? decompMeta.modularityScore ?? 0.0;
+                const summary = decompMeta.summary || "";
+
+                if (!decompEv && clusters.length === 0) return null;
+
+                return (
+                  <div className="p-6 rounded-xl bg-slate-900/70 border border-slate-800 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <Split className="w-4 h-4 text-indigo-400" />
+                        <h4 className="text-sm font-bold text-white">
+                          Independent Change Decomposition &amp; Modular PRs
+                        </h4>
+                        <span className="text-xs font-mono text-slate-400">
+                          ({componentCount} {componentCount === 1 ? "component" : "components"})
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {isDecomposable ? (
+                          <span className="text-xs font-bold px-2.5 py-0.5 rounded border uppercase font-mono bg-indigo-500/10 text-indigo-400 border-indigo-500/30">
+                            Decomposable ({Math.round(modularityScore * 100)}% Modularity)
+                          </span>
+                        ) : (
+                          <span className="text-xs font-bold px-2.5 py-0.5 rounded border uppercase font-mono bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                            Cohesive Change
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {summary && (
+                      <div
+                        className={`p-3 rounded-lg border text-xs leading-relaxed ${
+                          isDecomposable
+                            ? "bg-indigo-950/20 border-indigo-800/40 text-indigo-200"
+                            : "bg-slate-800/40 border-slate-800 text-slate-300"
+                        }`}
+                      >
+                        {summary}
+                      </div>
+                    )}
+
+                    {/* Clusters List */}
+                    {clusters.length > 0 && (
+                      <div className="space-y-3 pt-1">
+                        <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                          Recommended Modular Pull Requests (Execution Order)
+                        </div>
+                        <div className="grid grid-cols-1 gap-3">
+                          {clusters.map((c: any, idx: number) => {
+                            const order = c.recommended_order ?? c.recommendedOrder ?? idx + 1;
+                            const name = c.name || `Cluster #${order}`;
+                            const prTitle = c.suggested_pr_title ?? c.suggestedPrTitle ?? "";
+                            const branch = c.suggested_branch_name ?? c.suggestedBranchName ?? "";
+                            const files = c.files || [];
+                            const rationale = c.rationale || "";
+                            const extDeps = c.external_dependencies ?? c.externalDependencies ?? [];
+
+                            return (
+                              <div
+                                key={c.cluster_id || idx}
+                                className="p-4 rounded-lg bg-slate-950/60 border border-slate-800/80 space-y-3 hover:border-slate-700 transition-colors"
+                              >
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="px-2 py-0.5 rounded bg-indigo-900/40 border border-indigo-700/50 text-indigo-300 font-mono text-xs font-bold">
+                                      PR #{order}
+                                    </span>
+                                    <span className="text-sm font-semibold text-white">
+                                      {name}
+                                    </span>
+                                  </div>
+
+                                  {branch && (
+                                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-xs font-mono text-slate-300">
+                                      <GitBranch className="w-3 h-3 text-slate-400" />
+                                      <span>{branch}</span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {prTitle && (
+                                  <div className="text-xs font-mono text-slate-200 bg-slate-900/90 px-3 py-1.5 rounded border border-slate-800 flex items-center justify-between">
+                                    <span className="truncate">
+                                      <strong className="text-slate-400">Title:</strong> {prTitle}
+                                    </span>
+                                  </div>
+                                )}
+
+                                <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-400 font-mono">
+                                  <span className="text-slate-500 font-sans">Files ({files.length}):</span>
+                                  {files.map((f: string, fi: number) => (
+                                    <span
+                                      key={fi}
+                                      className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300 text-[11px]"
+                                    >
+                                      {f}
+                                    </span>
+                                  ))}
+                                </div>
+
+                                {rationale && (
+                                  <p className="text-xs text-slate-400 italic pt-1 border-t border-slate-800/60">
+                                    {rationale}
+                                  </p>
+                                )}
+
+                                {extDeps.length > 0 && (
+                                  <div className="text-[11px] text-slate-500 font-mono">
+                                    External deps: {extDeps.join(", ")}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
                   </div>

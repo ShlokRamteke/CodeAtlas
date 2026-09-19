@@ -329,6 +329,30 @@ class TokenBudgetDistiller:
 
             sections.append("### ⚠️ Concurrent In-Flight Changes\n" + "\n".join(ov_lines))
 
+        # Independent Change Decomposition Section
+        decomp_sig = signals.get("decomposition", {})
+        if decomp_sig.get("is_decomposable"):
+            decomp_clusters = decomp_sig.get("clusters", [])
+            decomp_lines = [
+                f"> 💡 **MODULAR DECOMPOSITION:** Proposed change spans {decomp_sig.get('component_count', len(decomp_clusters))} independent subgraphs (modularity score: {decomp_sig.get('modularity_score', 0.0):.2f})."
+            ]
+            for c in decomp_clusters if shed_tier < 4 else decomp_clusters[:2]:
+                order = c.get("recommended_order", 1)
+                name = c.get("name", "Cluster")
+                branch = c.get("suggested_branch_name", "branch")
+                title = c.get("suggested_pr_title", "")
+                files = ", ".join(f"`{f}`" for f in c.get("files", []))
+                decomp_lines.append(
+                    f"- **PR #{order} ({name})** (`{branch}`) -> **{title}**\n"
+                    f"  - Files: {files}\n"
+                    f"  - *{c.get('rationale', '')}*"
+                )
+            if shed_tier >= 4 and len(decomp_clusters) > 2:
+                decomp_lines.append(
+                    f"  - *...and {len(decomp_clusters) - 2} more clusters shed for token budget.*"
+                )
+            sections.append("### 🔀 Independent Change Decomposition\n" + "\n".join(decomp_lines))
+
         # Guarding Tests Section (Tier 3 priority shedding)
         guarding_sig = signals.get("guarding_tests", {})
         ranked_tests = guarding_sig.get("ranked_tests", [])
@@ -698,6 +722,50 @@ class TokenBudgetDistiller:
         else:
             code_changes_block = []
 
+        # Decomposition block
+        decomp_sig = signals.get("decomposition", {})
+        if decomp_sig.get("is_decomposable"):
+            decomp_clusters = decomp_sig.get("clusters", [])
+            if shed_tier >= 4:
+                decomp_block = {
+                    "is_decomposable": True,
+                    "component_count": decomp_sig.get("component_count", 0),
+                    "modularity_score": decomp_sig.get("modularity_score", 0.0),
+                    "clusters": [
+                        {
+                            "id": c.get("cluster_id"),
+                            "name": c.get("name"),
+                            "branch": c.get("suggested_branch_name"),
+                            "title": c.get("suggested_pr_title"),
+                            "files": c.get("files", []),
+                        }
+                        for c in decomp_clusters[:2]
+                    ],
+                }
+            else:
+                decomp_block = {
+                    "is_decomposable": True,
+                    "component_count": decomp_sig.get("component_count", 0),
+                    "modularity_score": decomp_sig.get("modularity_score", 0.0),
+                    "clusters": [
+                        {
+                            "id": c.get("cluster_id"),
+                            "name": c.get("name"),
+                            "branch": c.get("suggested_branch_name"),
+                            "title": c.get("suggested_pr_title"),
+                            "files": c.get("files", []),
+                            "order": c.get("recommended_order"),
+                            "rationale": c.get("rationale"),
+                        }
+                        for c in decomp_clusters
+                    ],
+                }
+        else:
+            decomp_block = {
+                "is_decomposable": False,
+                "component_count": decomp_sig.get("component_count", 1),
+            }
+
         # Assemble dense JSON
         dense = {
             "_schema": "codeatlas.pre_change_brief.v1",
@@ -710,6 +778,7 @@ class TokenBudgetDistiller:
             "guarding_tests": tests_block,
             "blast_radius": blast_block,
             "concurrent_overlaps": overlap_block,
+            "decomposition": decomp_block,
             "constraints": constraints_block,
             "checks": (recommended_checks if shed_tier < 4 else recommended_checks[:3]),
             "claims": claims_data,

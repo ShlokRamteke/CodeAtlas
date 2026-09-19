@@ -853,6 +853,30 @@ export interface ConcurrentOverlapReport {
   summary: string;
 }
 
+export interface ChangeCluster {
+  clusterId: string;
+  name: string;
+  dominantComponent: string;
+  files: string[];
+  internalEdgeCount: number;
+  externalDependencies: string[];
+  suggestedPrTitle: string;
+  suggestedBranchName: string;
+  rationale: string;
+  recommendedOrder: number;
+}
+
+export interface ChangeDecompositionReport {
+  targetFiles: string[];
+  totalFiles: number;
+  componentCount: number;
+  isDecomposable: boolean;
+  modularityScore: number;
+  clusters: ChangeCluster[];
+  summary: string;
+}
+
+
 
 
 

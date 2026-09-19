@@ -6,11 +6,11 @@ Phase 4 — Change Investigation Engine
 
 ## Current Task
 
-PH4-07 Complete &mdash; Next: PH4-08 (Independent Change Decomposition)
+PH4-08 Complete &mdash; Next: PH4-09 (Code Ownership & Reviewer Recommender)
 
 ## Status
 
-PH4-07 COMPLETE / READY FOR PH4-08
+PH4-08 COMPLETE / READY FOR PH4-09
 
 
 ## Product Focus
@@ -136,11 +136,19 @@ developer understand a proposed change before implementation.
   - Prompts & Reasoner LLM output: updated `REASONER_SYSTEM_PROMPT` and `build_reasoner_prompt()` to instruct models to synthesize structured code modifications alongside invariant and evidence claims.
   - Distillation & Projections: rendered `### 💻 Implementation Blueprint & Code Changes` with action tags, symbols, descriptions, code snippets, and callers in Human Markdown and dense agent JSON `code_changes` blocks.
   - Contracts & Frontend UI: added `ProposedCodeChange` to `@codeatlas/contracts`. Implemented interactive **Implementation Blueprint & Code Changes** card in `PreChangeInvestigationViewer` Next.js UI.
-  - 100% automated test pass rate across 99 pytest tests, ruff format/lint clean, and Next.js frontend production build clean.
+- **Phase 4 — Task PH4-08 (Independent Change Decomposition)**:
+  - `ChangeDecomposer` in `app.investigation.decomposition`: evaluates weakly-connected components (WCC) across the induced dependency subgraph of proposed target files.
+  - Modularity scoring & cluster synthesis: quantifies decoupling ratio, computes dominant component namespaces, identifies external shared dependencies, and assigns foundational ordering (models/schemas before services before UI/endpoints).
+  - PR recommendations & Git branch generation: produces structured modular pull request plans with suggested PR titles (`feat(subsystem): modular update`), branch names, touched files, and independence rationale.
+  - Pipeline integration: integrated into `InvestigationEngine.gather()` (`signals["decomposition"]` and `ev-decomp-*` evidence items), `reason()` (decomposition context fed to LLM prompt), and `synthesize()` (actionable modular PR split checks).
+  - Distillation & Projections: rendered dedicated `### 🔀 Independent Change Decomposition & Modular PR Recommendations` blocks in Human Markdown and dense JSON `decomposition` telemetry.
+  - REST endpoints: added `GET /api/v1/investigations/{id}/decomposition` returning `ChangeDecompositionReportSchema`.
+  - Contracts & Frontend UI: added `ChangeCluster` and `ChangeDecompositionReport` to `@codeatlas/contracts`. Enhanced `PreChangeInvestigationViewer` with live interactive **Independent Change Decomposition & Modular PRs** card featuring modularity badges, execution order tags, branch chips, titles, and file tags.
+  - 100% automated test pass rate across 109 pytest tests, ruff format/lint clean, and Next.js frontend production build clean.
 
 ## Remaining
 
-- **Phase 4**: Change Investigation Engine (PH4-08: Independent Change Decomposition, PH4-09: Code Ownership & Reviewer Recommender, PH4-10: C4 Architecture & Dependency Export).
+- **Phase 4**: Change Investigation Engine (PH4-09: Code Ownership & Reviewer Recommender, PH4-10: C4 Architecture & Dependency Export).
 
 ## Blockers
 
@@ -148,7 +156,7 @@ None known.
 
 ## Next Action
 
-Start Task PH4-08 (Independent Change Decomposition).
+Start Task PH4-09 (Code Ownership & Reviewer Recommender).
 
 ## Session Rule
 
@@ -165,5 +173,6 @@ receive scoped views of that model.
 
 ## Last Updated
 
-2026-09-17
+2026-09-18
+
 
