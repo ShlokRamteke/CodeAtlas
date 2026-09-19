@@ -796,3 +796,65 @@ async def test_investigation_code_changes_flow(db_session: AsyncSession):
     assert "code_changes" in agent_json
     assert len(agent_json["code_changes"]) == 1
     assert agent_json["code_changes"][0]["action"] == "modify"
+
+
+@pytest.mark.asyncio
+async def test_investigation_independent_change_decomposition(
+    db_session: AsyncSession,
+):
+    repo = Repository(
+        owner="testowner",
+        name="decomprepo",
+        full_name="testowner/decomprepo",
+        default_branch="main",
+    )
+    db_session.add(repo)
+    await db_session.commit()
+    await db_session.refresh(repo)
+
+    inv = Investigation(
+        repository_id=repo.id,
+        query="Update auth session in backend/app/auth/session.py and billing in backend/app/billing/charge.py",
+    )
+    db_session.add(inv)
+    await db_session.commit()
+    await db_session.refresh(inv)
+
+    engine = InvestigationEngine(llm_provider=MockLLMProvider())
+    state = await engine.run(
+        investigation_id=inv.id,
+        db=db_session,
+    )
+
+    assert state.step == InvestigationStep.COMPLETED
+    assert state.brief is not None
+
+    # 1. Verify decomposition signals
+    decomp_sig = state.gathered_signals.get("decomposition")
+    assert decomp_sig is not None
+    assert decomp_sig["is_decomposable"] is True
+    assert decomp_sig["component_count"] == 2
+    assert len(decomp_sig["clusters"]) == 2
+
+    # 2. Verify evidence record emitted
+    decomp_ev = next(
+        (ev for ev in state.gathered_evidence if ev.get("source_id") == "change-decomposition"),
+        None,
+    )
+    assert decomp_ev is not None
+    assert "Independent Change Decomposition" in decomp_ev["title"]
+
+    # 3. Verify recommended checks
+    assert any("Decompose change into 2 modular PRs" in c for c in state.brief.recommended_checks)
+
+    # 4. Verify human markdown projection
+    md = state.brief.to_human_markdown()
+    assert "### 🔀 Independent Change Decomposition" in md
+    assert "MODULAR DECOMPOSITION" in md
+
+    # 5. Verify dense agent JSON projection
+    agent_json = state.brief.to_agent_json()
+    assert "decomposition" in agent_json
+    assert agent_json["decomposition"]["is_decomposable"] is True
+    assert agent_json["decomposition"]["component_count"] == 2
+    assert len(agent_json["decomposition"]["clusters"]) == 2

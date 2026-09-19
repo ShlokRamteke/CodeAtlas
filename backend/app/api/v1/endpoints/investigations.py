@@ -9,12 +9,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.db import get_db
-from app.investigation import IntentNormalizer, InvestigationEngine
+from app.investigation import ChangeDecomposer, IntentNormalizer, InvestigationEngine
 from app.investigation.concurrent_overlap import ConcurrentOverlapDetector
 from app.investigation.distillation import GLOBAL_OMISSION_REGISTRY, TokenBudgetDistiller
+from app.models.dependency import CodeDependency
 from app.models.investigation import Investigation
 from app.models.repository import Repository
 from app.schemas.investigation import (
+    ChangeDecompositionReportSchema,
     ConcurrentOverlapReportSchema,
     InvestigationCreate,
     InvestigationProjectionResponse,
@@ -413,3 +415,46 @@ async def get_investigation_concurrent_overlap(
         blast_radius_files=blast_files,
     )
     return ConcurrentOverlapReportSchema(**report.to_dict())
+
+
+@router.get(
+    "/{investigation_id}/decomposition",
+    response_model=ChangeDecompositionReportSchema,
+)
+async def get_investigation_decomposition(
+    investigation_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+) -> ChangeDecompositionReportSchema:
+    """Retrieve independent change decomposition & modular PR recommendations for an investigation."""
+    query = (
+        select(Investigation)
+        .where(Investigation.id == investigation_id)
+        .options(selectinload(Investigation.evidence))
+    )
+    result = await db.execute(query)
+    inv = result.scalar_one_or_none()
+    if not inv:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Investigation not found",
+        )
+
+    # 1. Check if decomposition report was cached in evidence
+    for e in inv.evidence:
+        if e.source_id == "change-decomposition" and e.extra_metadata:
+            return ChangeDecompositionReportSchema(**e.extra_metadata)
+
+    # 2. Otherwise run decomposer live on target files and dependencies
+    brief_data = _reconstruct_brief_data(inv)
+    target_files = brief_data.get("target_files", [])
+
+    dep_query = select(CodeDependency).where(CodeDependency.repository_id == inv.repository_id)
+    dep_res = await db.execute(dep_query)
+    db_deps = dep_res.scalars().all()
+    static_edges = [(d.source_path, d.target_path) for d in db_deps]
+
+    report = ChangeDecomposer.evaluate_subgraph(
+        target_files=target_files,
+        dependency_edges=static_edges,
+    )
+    return ChangeDecompositionReportSchema(**report.to_dict())
