@@ -6,11 +6,12 @@ Phase 4 — Change Investigation Engine
 
 ## Current Task
 
-PH4-08 Complete &mdash; Next: PH4-09 (Code Ownership & Reviewer Recommender)
+PH4-09 Complete &mdash; Next: PH4-10 (C4 Architecture & Dependency Export)
 
 ## Status
 
-PH4-08 COMPLETE / READY FOR PH4-09
+PH4-09 COMPLETE / READY FOR PH4-10
+
 
 
 ## Product Focus
@@ -145,10 +146,21 @@ developer understand a proposed change before implementation.
   - REST endpoints: added `GET /api/v1/investigations/{id}/decomposition` returning `ChangeDecompositionReportSchema`.
   - Contracts & Frontend UI: added `ChangeCluster` and `ChangeDecompositionReport` to `@codeatlas/contracts`. Enhanced `PreChangeInvestigationViewer` with live interactive **Independent Change Decomposition & Modular PRs** card featuring modularity badges, execution order tags, branch chips, titles, and file tags.
   - 100% automated test pass rate across 109 pytest tests, ruff format/lint clean, and Next.js frontend production build clean.
+- **Phase 4 — Task PH4-09 (Code Ownership & Reviewer Recommender)**:
+  - `CodeOwnershipAnalyzer` in `app.investigation.ownership`: calculates authorship concentration over target and blast-radius files using historical `Commit` and `CommitFileChange` blame.
+  - Exponential recency decay ($\tau = 180\text{d}$): balances historical contribution against recent maintenance activity, preventing inactive authors from eclipsing active contributors.
+  - Bus factor quantification: calculates per-file and overall Bus Factor metrics (minimum contributors required to reach 75% decayed churn); classifies ownership levels into `HIGH` ($\ge 70\%$), `MEDIUM` ($40-70\%$), and `DIFFUSED` ($< 40\%$).
+  - Reviewer recommendation engine: scores candidate reviewers across target file expertise ($0.60$), blast radius caller ownership ($0.30$), and recent activity ($0.10$); assigns domain roles (`PRIMARY_OWNER`, `COMPONENT_EXPERT`, `BLAST_RADIUS_GUARDIAN`) with grounded evidence rationales.
+  - Knowledge loss risk warnings: alerts on inactive primary authors ($> 180\text{d}$) and single-point-of-failure bus factor alerts.
+  - Investigation pipeline integration: integrated into `InvestigationEngine.gather()` (`signals["ownership"]` and `ev-ownership` evidence items), `reason()` (ownership context injected into LLM prompt), and `synthesize()` (actionable reviewer check items).
+  - Distillation & Projections: rendered dedicated `### 👥 Code Ownership & Recommended Reviewers` blocks with reviewer rankings, bus factor badges, file ownership tables, and alert banners in Human Markdown and dense JSON `ownership` telemetry.
+  - REST endpoints: added `GET /api/v1/investigations/{id}/ownership` returning `CodeOwnershipReportSchema`.
+  - Contracts & Frontend UI: added `AuthorCommitStat`, `FileOwnership`, `ReviewerRecommendation`, and `CodeOwnershipReport` to `@codeatlas/contracts`. Enhanced `PreChangeInvestigationViewer` with live interactive **Code Ownership & Recommended Reviewers** card with bus factor badges, reviewer cards, role tags, and authorship tables.
+  - 100% automated test pass rate across 119 pytest tests, ruff clean, and Next.js frontend production build clean.
 
 ## Remaining
 
-- **Phase 4**: Change Investigation Engine (PH4-09: Code Ownership & Reviewer Recommender, PH4-10: C4 Architecture & Dependency Export).
+- **Phase 4**: Change Investigation Engine (PH4-10: C4 Architecture & Dependency Export).
 
 ## Blockers
 
@@ -156,7 +168,7 @@ None known.
 
 ## Next Action
 
-Start Task PH4-09 (Code Ownership & Reviewer Recommender).
+Start Task PH4-10 (C4 Architecture & Dependency Export).
 
 ## Session Rule
 
@@ -173,6 +185,7 @@ receive scoped views of that model.
 
 ## Last Updated
 
-2026-09-18
+2026-09-21
+
 
 

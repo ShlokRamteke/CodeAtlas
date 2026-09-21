@@ -35,6 +35,7 @@ from app.investigation.invariants import (
     InvariantSynthesizer,
 )
 from app.investigation.llm import LLMProvider, get_default_llm_provider
+from app.investigation.ownership import CodeOwnershipAnalyzer
 from app.investigation.state import (
     ClaimClassification,
     InvestigationClaim,
@@ -682,7 +683,34 @@ class InvestigationEngine:
             }
             evidence_items.append(ev_decomp)
 
+        # Code ownership & reviewer recommendation
+        ownership_report = await CodeOwnershipAnalyzer.query_and_analyze(
+            db=db,
+            repository_id=state.repository_id,
+            target_files=target_files,
+            blast_radius_files=blast_files,
+            current_author=None,
+        )
+        signals["ownership"] = ownership_report.to_dict()
+
+        if ownership_report.recommended_reviewers or ownership_report.knowledge_loss_warnings:
+            rev_snippets = [
+                f"{r.author_name} ({r.role}, score {r.score:.2f}): {r.rationale}"
+                for r in ownership_report.recommended_reviewers[:3]
+            ]
+            ev_ownership = {
+                "id": f"ev-ownership-{len(evidence_items) + 1}",
+                "source_type": EvidenceSourceType.COMMIT,
+                "source_id": "code-ownership",
+                "title": f"Code Ownership & Reviewers (Bus Factor: {ownership_report.overall_bus_factor})",
+                "snippet": f"{ownership_report.summary} Recommended: {'; '.join(rev_snippets)}",
+                "confidence": 1.0,
+                "extra_metadata": ownership_report.to_dict(),
+            }
+            evidence_items.append(ev_ownership)
+
         state.gathered_evidence = evidence_items
+
         state.gathered_signals = signals
         state.gathered_context = {
             "target_files": target_files,
@@ -755,6 +783,16 @@ class InvestigationEngine:
                     f"({', '.join(c['files'])}). Suggested PR: '{c['suggested_pr_title']}'. "
                     f"Branch: '{c['suggested_branch_name']}'. Rationale: {c['rationale']}\n"
                 )
+
+        ownership_sig = state.gathered_signals.get("ownership", {})
+        if ownership_sig.get("recommended_reviewers"):
+            context_str += (
+                f"Code Ownership (Bus Factor: {ownership_sig.get('overall_bus_factor', 1)}):\n"
+            )
+            for rev in ownership_sig["recommended_reviewers"][:3]:
+                context_str += f"- Recommended Reviewer: {rev['author_name']} ({rev['role']}, score: {rev['score']}): {rev['rationale']}\n"
+            for warn in ownership_sig.get("knowledge_loss_warnings", [])[:2]:
+                context_str += f"- Ownership Alert: {warn}\n"
 
         try:
             summary, claims, tokens, code_changes = await self.llm.reason_investigation(
@@ -929,6 +967,17 @@ class InvestigationEngine:
                 recommended_checks.append(
                     f"PR #{c['recommended_order']} ({c['name']}): branch `{c['suggested_branch_name']}` -> {c['suggested_pr_title']}."
                 )
+
+        # Code ownership and reviewer recommendations
+        ownership_sig = state.gathered_signals.get("ownership", {})
+        if ownership_sig.get("recommended_reviewers"):
+            top_rev = ownership_sig["recommended_reviewers"][0]
+            recommended_checks.append(
+                f"Request code review from domain expert {top_rev['author_name']} ({top_rev['role']})."
+            )
+        for warn in ownership_sig.get("knowledge_loss_warnings", []):
+            if warn not in unknowns:
+                unknowns.append(warn)
 
         if state.gathered_signals.get("change_risk", {}).get("shannon_entropy", 0) > 1.5:
             recommended_checks.append("High churn entropy detected: ensure changes remain modular.")

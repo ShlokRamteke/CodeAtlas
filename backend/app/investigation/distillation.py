@@ -353,7 +353,55 @@ class TokenBudgetDistiller:
                 )
             sections.append("### 🔀 Independent Change Decomposition\n" + "\n".join(decomp_lines))
 
+        # Code Ownership & Reviewer Recommender Section
+        ownership_sig = signals.get("ownership", {})
+        reviewers = ownership_sig.get("recommended_reviewers", [])
+        file_ownerships = ownership_sig.get("file_ownerships", [])
+        bus_factor = ownership_sig.get("overall_bus_factor", 1)
+        ownership_warnings = ownership_sig.get("knowledge_loss_warnings", [])
+
+        if reviewers or file_ownerships or ownership_warnings:
+            own_lines = [
+                f"> 👥 **CODE OWNERSHIP:** Bus Factor: **{bus_factor}** | {len(reviewers)} recommended reviewer(s)."
+            ]
+            if ownership_warnings:
+                for w in ownership_warnings if shed_tier < 4 else ownership_warnings[:2]:
+                    own_lines.append(f"> ⚠️ **ALERT:** {w}")
+
+            if reviewers:
+                own_lines.append("\n**Recommended Reviewers:**")
+                own_lines.append("| Reviewer | Role | Score | Activity | Rationale |")
+                own_lines.append("| :--- | :--- | :--- | :--- | :--- |")
+                for r in reviewers if shed_tier < 4 else reviewers[:2]:
+                    act_str = (
+                        f"{r.get('days_since_last_commit')}d ago"
+                        if r.get("days_since_last_commit") is not None
+                        else "Active"
+                    )
+                    own_lines.append(
+                        f"| **{r.get('author_name')}** | `{r.get('role')}` | {r.get('score', 0):.2f} | {act_str} | {r.get('rationale')} |"
+                    )
+
+            if file_ownerships and shed_tier < 3:
+                own_lines.append("\n**File Authorship Breakdown:**")
+                own_lines.append("| File Path | Primary Owner | Share | Level | Bus Factor |")
+                own_lines.append("| :--- | :--- | :--- | :--- | :--- |")
+                for fo in file_ownerships[:8]:
+                    po = fo.get("primary_owner") or {}
+                    po_name = po.get("author_name", "Unknown")
+                    po_pct = po.get("ownership_percentage", 0.0)
+                    own_lines.append(
+                        f"| `{fo.get('file_path')}` | {po_name} | {po_pct:.0f}% | `{fo.get('ownership_level')}` | {fo.get('bus_factor', 1)} |"
+                    )
+                if len(file_ownerships) > 8:
+                    own_lines.append(f"*(+{len(file_ownerships) - 8} more files)*")
+
+            sections.append(
+                "### 👥 Code Ownership & Recommended Reviewers\n" + "\n".join(own_lines)
+            )
+
         # Guarding Tests Section (Tier 3 priority shedding)
+
         guarding_sig = signals.get("guarding_tests", {})
         ranked_tests = guarding_sig.get("ranked_tests", [])
         untested_files = guarding_sig.get("untested_files", [])
@@ -766,6 +814,41 @@ class TokenBudgetDistiller:
                 "component_count": decomp_sig.get("component_count", 1),
             }
 
+        # Ownership block
+        ownership_sig = signals.get("ownership", {})
+        if ownership_sig:
+            raw_reviewers = ownership_sig.get("recommended_reviewers", [])
+            raw_file_owns = ownership_sig.get("file_ownerships", [])
+            ownership_block = {
+                "bus_factor": ownership_sig.get("overall_bus_factor", 1),
+                "reviewers": [
+                    {
+                        "name": r.get("author_name"),
+                        "email": r.get("author_email"),
+                        "role": r.get("role"),
+                        "score": r.get("score"),
+                        "rationale": r.get("rationale"),
+                    }
+                    for r in (raw_reviewers if shed_tier < 4 else raw_reviewers[:2])
+                ],
+                "file_ownership": [
+                    {
+                        "file": fo.get("file_path"),
+                        "owner": (fo.get("primary_owner") or {}).get("author_name"),
+                        "share": (fo.get("primary_owner") or {}).get("ownership_percentage"),
+                        "level": fo.get("ownership_level"),
+                    }
+                    for fo in (raw_file_owns if shed_tier < 3 else raw_file_owns[:3])
+                ],
+                "warnings": (
+                    ownership_sig.get("knowledge_loss_warnings", [])
+                    if shed_tier < 4
+                    else ownership_sig.get("knowledge_loss_warnings", [])[:2]
+                ),
+            }
+        else:
+            ownership_block = {}
+
         # Assemble dense JSON
         dense = {
             "_schema": "codeatlas.pre_change_brief.v1",
@@ -779,6 +862,7 @@ class TokenBudgetDistiller:
             "blast_radius": blast_block,
             "concurrent_overlaps": overlap_block,
             "decomposition": decomp_block,
+            "ownership": ownership_block,
             "constraints": constraints_block,
             "checks": (recommended_checks if shed_tier < 4 else recommended_checks[:3]),
             "claims": claims_data,

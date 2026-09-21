@@ -15,6 +15,8 @@ from app.investigation.state import (
     InvestigationState,
     InvestigationStep,
 )
+from app.models.commit import Commit
+from app.models.commit_file_change import ChangeType, CommitFileChange
 from app.models.investigation import Investigation, InvestigationStatus
 from app.models.repository import Repository
 from app.models.source_file import SourceFile
@@ -858,3 +860,90 @@ async def test_investigation_independent_change_decomposition(
     assert agent_json["decomposition"]["is_decomposable"] is True
     assert agent_json["decomposition"]["component_count"] == 2
     assert len(agent_json["decomposition"]["clusters"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_investigation_code_ownership_and_reviewer_recommender(
+    db_session: AsyncSession,
+):
+    repo = Repository(
+        owner="testowner",
+        name="ownershiprepo",
+        full_name="testowner/ownershiprepo",
+        default_branch="main",
+    )
+    db_session.add(repo)
+    await db_session.commit()
+    await db_session.refresh(repo)
+
+    # Add commit and file change records
+    commit1 = Commit(
+        repository_id=repo.id,
+        commit_hash="a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0",
+        author_name="Alice Owner",
+        author_email="alice@example.com",
+        committed_at=datetime.now(timezone.utc),
+        message="feat: implement core auth provider",
+    )
+    db_session.add(commit1)
+    await db_session.commit()
+    await db_session.refresh(commit1)
+
+    cfc1 = CommitFileChange(
+        commit_id=commit1.id,
+        file_path="backend/app/auth/provider.py",
+        change_type=ChangeType.ADDED,
+        insertions=350,
+        deletions=10,
+    )
+    db_session.add(cfc1)
+    await db_session.commit()
+
+    inv = Investigation(
+        repository_id=repo.id,
+        query="Refactor auth tokens in backend/app/auth/provider.py",
+    )
+    db_session.add(inv)
+    await db_session.commit()
+    await db_session.refresh(inv)
+
+    engine = InvestigationEngine(llm_provider=MockLLMProvider())
+    state = await engine.run(
+        investigation_id=inv.id,
+        db=db_session,
+    )
+
+    assert state.step == InvestigationStep.COMPLETED
+    assert state.brief is not None
+
+    # 1. Verify ownership signals
+    own_sig = state.gathered_signals.get("ownership")
+    assert own_sig is not None
+    assert own_sig["overall_bus_factor"] == 1
+    assert len(own_sig["recommended_reviewers"]) >= 1
+    top_rev = own_sig["recommended_reviewers"][0]
+    assert top_rev["author_name"] == "Alice Owner"
+    assert top_rev["role"] == "PRIMARY_OWNER"
+
+    # 2. Verify evidence record
+    own_ev = next(
+        (ev for ev in state.gathered_evidence if ev.get("source_id") == "code-ownership"),
+        None,
+    )
+    assert own_ev is not None
+    assert "Code Ownership" in own_ev["title"]
+
+    # 3. Verify recommended check
+    assert any("Alice Owner" in c for c in state.brief.recommended_checks)
+
+    # 4. Verify human markdown projection
+    md = state.brief.to_human_markdown()
+    assert "### 👥 Code Ownership & Recommended Reviewers" in md
+    assert "Alice Owner" in md
+
+    # 5. Verify dense agent JSON projection
+    agent_json = state.brief.to_agent_json()
+    assert "ownership" in agent_json
+    assert agent_json["ownership"]["bus_factor"] == 1
+    assert len(agent_json["ownership"]["reviewers"]) >= 1
+    assert agent_json["ownership"]["reviewers"][0]["name"] == "Alice Owner"
