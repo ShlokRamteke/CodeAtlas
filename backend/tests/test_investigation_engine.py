@@ -1092,4 +1092,92 @@ async def test_investigation_infers_files_from_query_when_target_file_omitted(db
     assert "backend/app/payments/gateway.py" in state.intent.target_files
 
 
+@pytest.mark.asyncio
+async def test_investigation_resolves_llm_file_for_openai_query(db_session: AsyncSession):
+    """Verify that 'Move to openai based llms' resolves backend/app/investigation/llm.py and populates ownership."""
+    from app.models.source_file import SourceFile
+    from app.models.symbol import Symbol, SymbolKind
+    from app.models.commit import Commit
+    from app.models.commit_file_change import CommitFileChange, ChangeType
+
+    repo = Repository(
+        owner="ShlokRamteke",
+        name="CodeAtlas",
+        full_name="ShlokRamteke/CodeAtlas",
+        default_branch="main",
+    )
+    db_session.add(repo)
+    await db_session.commit()
+    await db_session.refresh(repo)
+
+    sf = SourceFile(
+        repository_id=repo.id,
+        path="backend/app/investigation/llm.py",
+        language="python",
+        content_hash="feedbeef12345678",
+    )
+    db_session.add(sf)
+    await db_session.commit()
+    await db_session.refresh(sf)
+
+    sym = Symbol(
+        repository_id=repo.id,
+        file_id=sf.id,
+        name="OpenAILLMProvider",
+        kind=SymbolKind.CLASS,
+        line_start=15,
+        line_end=80,
+    )
+    db_session.add(sym)
+
+    commit = Commit(
+        repository_id=repo.id,
+        commit_hash="c0ffee1234567890c0ffee1234567890c0ffee12",
+        author_name="Shlok Dev",
+        author_email="shlok@example.com",
+        committed_at=datetime.now(timezone.utc),
+        message="feat: add openai llm provider",
+    )
+    db_session.add(commit)
+    await db_session.commit()
+    await db_session.refresh(commit)
+
+    cfc = CommitFileChange(
+        commit_id=commit.id,
+        file_path="backend/app/investigation/llm.py",
+        change_type=ChangeType.ADDED,
+        insertions=200,
+        deletions=0,
+    )
+    db_session.add(cfc)
+    await db_session.commit()
+
+    inv = Investigation(
+        repository_id=repo.id,
+        query="Move to openai based llms",
+    )
+    db_session.add(inv)
+    await db_session.commit()
+    await db_session.refresh(inv)
+
+    engine = InvestigationEngine(llm_provider=MockLLMProvider())
+    state = await engine.run(
+        investigation_id=inv.id,
+        db=db_session,
+        target_path=None,
+        target_symbol=None,
+    )
+
+    assert state.step == InvestigationStep.COMPLETED
+    assert inv.status == InvestigationStatus.COMPLETED
+    assert "backend/app/investigation/llm.py" in state.intent.target_files
+
+    own_sig = state.gathered_signals.get("ownership")
+    assert own_sig is not None
+    assert own_sig["overall_bus_factor"] >= 1
+    assert len(own_sig["recommended_reviewers"]) >= 1
+    assert own_sig["recommended_reviewers"][0]["author_name"] == "Shlok Dev"
+
+
+
 

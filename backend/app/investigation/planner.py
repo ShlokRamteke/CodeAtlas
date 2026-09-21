@@ -8,7 +8,7 @@ from collections import defaultdict
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.history.change_risk import (
@@ -1151,21 +1151,57 @@ class InvestigationEngine:
             except Exception as e:
                 logger.debug(f"Could not resolve file from symbol: {e}")
 
-        # If still no target_files detected, match query keywords against known repository file paths
-        if state.intent and not state.intent.target_files and known_files:
+        # If still no target_files detected, match query keywords against known repository file paths & symbols
+        if state.intent and not state.intent.target_files:
             query_tokens = [
                 tok
                 for tok in re.findall(r"\b[a-zA-Z0-9_-]{3,}\b", inv.query.lower())
                 if tok not in COMMON_STOPWORDS and tok not in ACTION_VERBS
             ]
-            for tok in query_tokens:
-                for kf in known_files:
-                    if tok in kf.lower() and kf not in state.intent.target_files:
-                        state.intent.target_files.append(kf)
+            if known_files:
+                for tok in query_tokens:
+                    tok_root = tok[:-1] if tok.endswith("s") and len(tok) > 3 else tok
+                    for kf in known_files:
+                        kf_lower = kf.lower()
+                        stem = kf_lower.split("/")[-1].split(".")[0]
+                        if (
+                            tok in kf_lower
+                            or tok_root in kf_lower
+                            or stem in tok
+                            or (len(stem) >= 3 and stem in query_tokens)
+                        ) and kf not in state.intent.target_files:
+                            state.intent.target_files.append(kf)
+                        if len(state.intent.target_files) >= 5:
+                            break
                     if len(state.intent.target_files) >= 5:
                         break
-                if len(state.intent.target_files) >= 5:
-                    break
+
+            # If still no target_files, match query tokens against Symbol names in repository
+            if not state.intent.target_files and query_tokens:
+                try:
+                    sym_conditions = []
+                    for tok in query_tokens[:5]:
+                        tok_root = tok[:-1] if tok.endswith("s") and len(tok) > 3 else tok
+                        sym_conditions.append(Symbol.name.ilike(f"%{tok}%"))
+                        if tok_root != tok:
+                            sym_conditions.append(Symbol.name.ilike(f"%{tok_root}%"))
+
+                    if sym_conditions:
+                        sym_match_stmt = (
+                            select(SourceFile.path)
+                            .join(Symbol, Symbol.file_id == SourceFile.id)
+                            .where(
+                                SourceFile.repository_id == inv.repository_id,
+                                or_(*sym_conditions),
+                            )
+                            .limit(5)
+                        )
+                        sym_matches = await db.execute(sym_match_stmt)
+                        for sp in sym_matches.scalars().all():
+                            if sp not in state.intent.target_files:
+                                state.intent.target_files.append(sp)
+                except Exception as e:
+                    logger.debug(f"Could not match symbols by query tokens: {e}")
 
         try:
             await self.plan(state)
