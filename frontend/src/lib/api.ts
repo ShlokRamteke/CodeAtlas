@@ -32,6 +32,8 @@ import type {
   ReferenceDetailResponse,
   ConcurrentOverlapReport,
   ConcurrentPROverlap,
+  ChangeCluster,
+  ChangeDecompositionReport,
 } from "@codeatlas/contracts";
 
 
@@ -691,6 +693,40 @@ export async function fetchInvestigationConcurrentOverlap(
     return null;
   }
 }
+
+export async function fetchInvestigationDecomposition(
+  investigationId: string
+): Promise<ChangeDecompositionReport | null> {
+  try {
+    const url = `${API_BASE}/api/v1/investigations/${investigationId}/decomposition`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return null;
+    const raw = await res.json();
+    return {
+      targetFiles: raw.target_files || [],
+      totalFiles: raw.total_files || 0,
+      componentCount: raw.component_count || 0,
+      isDecomposable: Boolean(raw.is_decomposable),
+      modularityScore: raw.modularity_score || 0.0,
+      clusters: (raw.clusters || []).map((c: any) => ({
+        clusterId: c.cluster_id,
+        name: c.name,
+        dominantComponent: c.dominant_component,
+        files: c.files || [],
+        internalEdgeCount: c.internal_edge_count || 0,
+        externalDependencies: c.external_dependencies || [],
+        suggestedPrTitle: c.suggested_pr_title || "",
+        suggestedBranchName: c.suggested_branch_name || "",
+        rationale: c.rationale || "",
+        recommendedOrder: c.recommended_order || 1,
+      })),
+      summary: raw.summary || "",
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
 
 export async function fetchRepositoryCommits(
   repositoryId: string,

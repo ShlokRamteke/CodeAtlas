@@ -321,6 +321,10 @@ To avoid LLM hallucinations, the engine evaluates mathematical and graph algorit
    - Static call graph traversal identifies all test suites that exercise modified symbols.
    - Tests are ordered by *Reach Ranking* (tests reaching the highest count of changed files run first).
    - Flags *Untested Changes* (modified lines with zero test coverage) and *Stale Test Candidates* (exercised code changed without corresponding test modifications).
+4. **Independent Change Decomposition (Weakly-Connected Components):**
+   - Evaluates the induced dependency subgraph of proposed modified files using graph-theoretic Weakly-Connected Components (WCC).
+   - Computes a normalized modularity score and identifies decoupled change clusters.
+   - Recommends splitting large, multi-subsystem changes into modular, sequenced pull requests with suggested branch names, titles, and foundational ordering (models before services before UI).
 
 The agent is bounded, stateful, read-only, and evidence-driven.
 

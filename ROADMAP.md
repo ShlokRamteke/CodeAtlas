@@ -102,7 +102,7 @@ Turn current-system, historical, and engineering context into the core **Pre-Cha
 - **PH4-05 — Intent Archaeology & Invariant Synthesis** *(Completed)*: ADR constraint linking, governing vs superseded status, and rationale extraction.
 - **PH4-06 — Token Budgeting & Dual-Format Projection** *(Completed)*: Priority shedding (5 tiers), recoverable omission markers (`[ref#<id>]`), on-demand reference expansion, human Markdown, and dense agent JSON projections.
 - **PH4-07 — Concurrent Branch Overlap & Merge Conflict Detector** *(Completed)*: In-flight branch inspection, open PR file overlap detection, and merge collision risk warnings.
-- **PH4-08 — Independent Change Decomposition**: Weakly-connected component subgraph evaluation and change decomposition suggestions.
+- **PH4-08 — Independent Change Decomposition** *(Completed)*: Weakly-connected component subgraph evaluation, modular PR suggestions, foundational sequencing, and branch naming.
 - **PH4-09 — Code Ownership & Reviewer Recommender**: Historical blame concentration and qualified reviewer recommendations.
 - **PH4-10 — C4 Architecture & Dependency Export**: Portable C4 component models and Mermaid architectural diagram exports.
 
