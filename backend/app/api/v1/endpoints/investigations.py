@@ -142,9 +142,21 @@ async def run_investigation(
         )
 
     engine = InvestigationEngine()
-    target_path = run_req.target_path if run_req else None
-    target_symbol = run_req.target_symbol if run_req else None
-    diff = run_req.diff if run_req else None
+    target_path = (
+        run_req.target_path.strip()
+        if run_req and run_req.target_path and run_req.target_path.strip()
+        else None
+    )
+    target_symbol = (
+        run_req.target_symbol.strip()
+        if run_req and run_req.target_symbol and run_req.target_symbol.strip()
+        else None
+    )
+    diff = (
+        run_req.diff.strip()
+        if run_req and run_req.diff and run_req.diff.strip()
+        else None
+    )
 
     await engine.run(
         investigation_id=inv.id,

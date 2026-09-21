@@ -346,15 +346,15 @@ class InvestigationEngine:
                 evidence_items.append(ev)
 
         # 4. Compute deterministic blast radius, risk, and co-change signals
-        if target_files:
-            # Query static dependencies for repository
-            dep_query = select(CodeDependency).where(
-                CodeDependency.repository_id == state.repository_id
-            )
-            dep_res = await db.execute(dep_query)
-            db_deps = dep_res.scalars().all()
-            static_edges = [(d.source_path, d.target_path) for d in db_deps]
+        # Query static dependencies for repository
+        dep_query = select(CodeDependency).where(
+            CodeDependency.repository_id == state.repository_id
+        )
+        dep_res = await db.execute(dep_query)
+        db_deps = dep_res.scalars().all()
+        static_edges = [(d.source_path, d.target_path) for d in db_deps]
 
+        if target_files:
             # Query source files to discover all test files in repository
             sf_query = select(SourceFile.path).where(
                 SourceFile.repository_id == state.repository_id
@@ -1097,6 +1097,25 @@ class InvestigationEngine:
         inv.status = InvestigationStatus.PLANNING
         await db.commit()
 
+        # Populate known repository files and symbols to assist intent normalization
+        known_files: List[str] = []
+        known_symbols: List[str] = []
+        try:
+            sf_query = select(SourceFile.path).where(SourceFile.repository_id == inv.repository_id)
+            sf_res = await db.execute(sf_query)
+            known_files = [r for r in sf_res.scalars().all()]
+
+            sym_query = (
+                select(Symbol.name)
+                .join(SourceFile, Symbol.file_id == SourceFile.id)
+                .where(SourceFile.repository_id == inv.repository_id)
+                .limit(500)
+            )
+            sym_res = await db.execute(sym_query)
+            known_symbols = [r for r in sym_res.scalars().all()]
+        except Exception as e:
+            logger.debug(f"Could not load repository files/symbols for intent normalization: {e}")
+
         state = await self.initialize_state(
             investigation_id=inv.id,
             repository_id=inv.repository_id,
@@ -1104,7 +1123,28 @@ class InvestigationEngine:
             target_path=target_path,
             target_symbol=target_symbol,
             diff=diff,
+            known_files=known_files,
+            known_symbols=known_symbols,
         )
+
+        # If target_symbol was provided or detected but no target_files, resolve the file(s) owning the symbol
+        if state.intent and not state.intent.target_files and state.intent.target_symbols:
+            try:
+                sym_file_stmt = (
+                    select(SourceFile.path)
+                    .join(Symbol, Symbol.file_id == SourceFile.id)
+                    .where(
+                        SourceFile.repository_id == inv.repository_id,
+                        Symbol.name.in_(state.intent.target_symbols),
+                    )
+                    .limit(5)
+                )
+                sym_file_res = await db.execute(sym_file_stmt)
+                for sp in sym_file_res.scalars().all():
+                    if sp not in state.intent.target_files:
+                        state.intent.target_files.append(sp)
+            except Exception as e:
+                logger.debug(f"Could not resolve file from symbol: {e}")
 
         try:
             await self.plan(state)

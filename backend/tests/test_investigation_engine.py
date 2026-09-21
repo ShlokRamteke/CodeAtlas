@@ -947,3 +947,103 @@ async def test_investigation_code_ownership_and_reviewer_recommender(
     assert agent_json["ownership"]["bus_factor"] == 1
     assert len(agent_json["ownership"]["reviewers"]) >= 1
     assert agent_json["ownership"]["reviewers"][0]["name"] == "Alice Owner"
+
+
+@pytest.mark.asyncio
+async def test_investigation_without_target_file_succeeds(db_session: AsyncSession):
+    """Verify that an investigation without an explicit target file succeeds cleanly without crashing."""
+    repo = Repository(
+        owner="testowner",
+        name="nofilerepo",
+        full_name="testowner/nofilerepo",
+        default_branch="main",
+    )
+    db_session.add(repo)
+    await db_session.commit()
+    await db_session.refresh(repo)
+
+    inv = Investigation(
+        repository_id=repo.id,
+        query="Refactor global error handling and retry mechanics",
+    )
+    db_session.add(inv)
+    await db_session.commit()
+    await db_session.refresh(inv)
+
+    engine = InvestigationEngine(llm_provider=MockLLMProvider())
+    state = await engine.run(
+        investigation_id=inv.id,
+        db=db_session,
+        target_path=None,
+        target_symbol=None,
+    )
+
+    assert state.step == InvestigationStep.COMPLETED
+    assert state.brief is not None
+    assert inv.status == InvestigationStatus.COMPLETED
+    assert len(state.errors) == 0
+
+    # Signals exist and have safe defaults
+    assert "decomposition" in state.gathered_signals
+    assert "ownership" in state.gathered_signals
+    assert state.gathered_signals["ownership"]["overall_bus_factor"] == 1
+
+
+@pytest.mark.asyncio
+async def test_investigation_with_target_symbol_only_resolves_file(db_session: AsyncSession):
+    """Verify that when only target_symbol is provided, the engine discovers the owning file and succeeds."""
+    from app.models.source_file import SourceFile
+    from app.models.symbol import Symbol, SymbolKind
+
+    repo = Repository(
+        owner="testowner",
+        name="symrepo",
+        full_name="testowner/symrepo",
+        default_branch="main",
+    )
+    db_session.add(repo)
+    await db_session.commit()
+    await db_session.refresh(repo)
+
+    sf = SourceFile(
+        repository_id=repo.id,
+        path="backend/app/auth/session.py",
+        language="python",
+        content_hash="1234567890abcdef",
+    )
+    db_session.add(sf)
+    await db_session.commit()
+    await db_session.refresh(sf)
+
+    sym = Symbol(
+        repository_id=repo.id,
+        file_id=sf.id,
+        name="SessionManager",
+        kind=SymbolKind.CLASS,
+        line_start=10,
+        line_end=50,
+    )
+    db_session.add(sym)
+    await db_session.commit()
+
+    inv = Investigation(
+        repository_id=repo.id,
+        query="Upgrade session token timeout handling",
+    )
+    db_session.add(inv)
+    await db_session.commit()
+    await db_session.refresh(inv)
+
+    engine = InvestigationEngine(llm_provider=MockLLMProvider())
+    state = await engine.run(
+        investigation_id=inv.id,
+        db=db_session,
+        target_path=None,
+        target_symbol="SessionManager",
+    )
+
+    assert state.step == InvestigationStep.COMPLETED
+    assert inv.status == InvestigationStatus.COMPLETED
+    assert "backend/app/auth/session.py" in state.intent.target_files
+
+
