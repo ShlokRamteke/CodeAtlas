@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 import re
 from dataclasses import dataclass, field
 from typing import List, Optional, Set
@@ -194,11 +195,21 @@ class IntentNormalizer:
             if (is_pascal or is_snake) and w not in symbols:
                 symbols.append(w)
 
-        # 5. Match against known files if query mentions filename without directory
+        # 5. Match against known files if query mentions filename, stem, or path fragment
         if known_file_set:
             for kf in known_file_set:
                 basename = kf.split("/")[-1]
-                if basename.lower() in query.lower() and kf not in files:
+                stem = Path(kf).stem
+                parts = kf.split("/")
+                matches_basename = basename.lower() in query.lower()
+                matches_stem = len(stem) >= 3 and bool(
+                    re.search(rf"\b{re.escape(stem.lower())}\b", query.lower())
+                )
+                matches_subpath = (
+                    len(parts) > 1 and "/".join(parts[-2:]).lower() in query.lower()
+                )
+
+                if (matches_basename or matches_stem or matches_subpath) and kf not in files:
                     files.append(kf)
 
         # 6. Extract component candidates (e.g. directories like "payments", "auth", "history")

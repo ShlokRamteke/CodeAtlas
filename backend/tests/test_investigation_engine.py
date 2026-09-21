@@ -1047,3 +1047,49 @@ async def test_investigation_with_target_symbol_only_resolves_file(db_session: A
     assert "backend/app/auth/session.py" in state.intent.target_files
 
 
+@pytest.mark.asyncio
+async def test_investigation_infers_files_from_query_when_target_file_omitted(db_session: AsyncSession):
+    """Verify that when target_path is omitted, query keywords automatically resolve to matching repository files."""
+    from app.models.source_file import SourceFile
+
+    repo = Repository(
+        owner="testowner",
+        name="inferrepo",
+        full_name="testowner/inferrepo",
+        default_branch="main",
+    )
+    db_session.add(repo)
+    await db_session.commit()
+    await db_session.refresh(repo)
+
+    sf1 = SourceFile(
+        repository_id=repo.id,
+        path="backend/app/payments/gateway.py",
+        language="python",
+        content_hash="abcdef1234567890",
+    )
+    db_session.add(sf1)
+    await db_session.commit()
+
+    inv = Investigation(
+        repository_id=repo.id,
+        query="Refactor gateway timeout and retry handling",
+    )
+    db_session.add(inv)
+    await db_session.commit()
+    await db_session.refresh(inv)
+
+    engine = InvestigationEngine(llm_provider=MockLLMProvider())
+    state = await engine.run(
+        investigation_id=inv.id,
+        db=db_session,
+        target_path=None,
+        target_symbol=None,
+    )
+
+    assert state.step == InvestigationStep.COMPLETED
+    assert inv.status == InvestigationStatus.COMPLETED
+    assert "backend/app/payments/gateway.py" in state.intent.target_files
+
+
+

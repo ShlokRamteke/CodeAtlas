@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 import uuid
 from collections import defaultdict
@@ -30,7 +31,11 @@ from app.history.guarding_tests import (
 from app.investigation.blast_radius import BlastRadiusAnalyzer
 from app.investigation.concurrent_overlap import ConcurrentOverlapDetector
 from app.investigation.decomposition import ChangeDecomposer
-from app.investigation.intent import IntentNormalizer
+from app.investigation.intent import (
+    ACTION_VERBS,
+    COMMON_STOPWORDS,
+    IntentNormalizer,
+)
 from app.investigation.invariants import (
     InvariantSynthesizer,
 )
@@ -1145,6 +1150,22 @@ class InvestigationEngine:
                         state.intent.target_files.append(sp)
             except Exception as e:
                 logger.debug(f"Could not resolve file from symbol: {e}")
+
+        # If still no target_files detected, match query keywords against known repository file paths
+        if state.intent and not state.intent.target_files and known_files:
+            query_tokens = [
+                tok
+                for tok in re.findall(r"\b[a-zA-Z0-9_-]{3,}\b", inv.query.lower())
+                if tok not in COMMON_STOPWORDS and tok not in ACTION_VERBS
+            ]
+            for tok in query_tokens:
+                for kf in known_files:
+                    if tok in kf.lower() and kf not in state.intent.target_files:
+                        state.intent.target_files.append(kf)
+                    if len(state.intent.target_files) >= 5:
+                        break
+                if len(state.intent.target_files) >= 5:
+                    break
 
         try:
             await self.plan(state)
