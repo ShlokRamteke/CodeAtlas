@@ -142,3 +142,81 @@ async def test_investigation_decomposition_endpoint(client: AsyncClient):
     fake_id = str(uuid.uuid4())
     not_found = await client.get(f"/api/v1/investigations/{fake_id}/decomposition")
     assert not_found.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_investigation_ownership_endpoint(client: AsyncClient):
+    # 1. Create a repository
+    repo_res = await client.post(
+        "/api/v1/repositories/",
+        json={
+            "owner": "codeatlas",
+            "name": "ownership-api-test",
+            "full_name": "codeatlas/ownership-api-test",
+            "default_branch": "main",
+        },
+    )
+    assert repo_res.status_code == 201
+    repo_id = repo_res.json()["id"]
+
+    # 2. Ingest commit with file change
+    commit_res = await client.post(
+        f"/api/v1/repositories/{repo_id}/commits/ingest",
+        json={
+            "commits": [
+                {
+                    "commit_hash": "b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0",
+                    "author_name": "Charlie Maintainer",
+                    "author_email": "charlie@example.com",
+                    "committed_at": "2026-09-20T10:00:00Z",
+                    "message": "feat: init payments service",
+                    "file_changes": [
+                        {
+                            "file_path": "backend/app/payments/service.py",
+                            "change_type": "added",
+                            "insertions": 200,
+                            "deletions": 10,
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+    assert commit_res.status_code == 200
+
+    # 3. Create an investigation
+    inv_res = await client.post(
+        "/api/v1/investigations/",
+        json={
+            "repository_id": repo_id,
+            "query": "Refactor webhook handling in backend/app/payments/service.py",
+            "type": "before_change",
+        },
+    )
+    assert inv_res.status_code == 201
+    inv_id = inv_res.json()["id"]
+
+    # 4. Run investigation
+    run_res = await client.post(
+        f"/api/v1/investigations/{inv_id}/run",
+        json={"target_path": "backend/app/payments/service.py"},
+    )
+    assert run_res.status_code == 200
+
+    # 5. Fetch ownership endpoint
+    own_res = await client.get(f"/api/v1/investigations/{inv_id}/ownership")
+    assert own_res.status_code == 200
+    own_data = own_res.json()
+
+    assert own_data["target_files"] == ["backend/app/payments/service.py"]
+    assert own_data["overall_bus_factor"] == 1
+    assert len(own_data["file_ownerships"]) >= 1
+    assert own_data["file_ownerships"][0]["file_path"] == "backend/app/payments/service.py"
+    assert own_data["file_ownerships"][0]["primary_owner"]["author_name"] == "Charlie Maintainer"
+    assert len(own_data["recommended_reviewers"]) >= 1
+    assert own_data["recommended_reviewers"][0]["author_name"] == "Charlie Maintainer"
+
+    # 6. Test 404 for nonexistent investigation
+    fake_id = str(uuid.uuid4())
+    not_found = await client.get(f"/api/v1/investigations/{fake_id}/ownership")
+    assert not_found.status_code == 404

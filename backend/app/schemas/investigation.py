@@ -275,3 +275,48 @@ class ChangeDecompositionReportSchema(BaseModel):
     modularity_score: float = 0.0
     clusters: List[ChangeClusterSchema] = Field(default_factory=list)
     summary: str = ""
+
+
+class AuthorCommitStatSchema(BaseModel):
+    author_name: str
+    author_email: str
+    commit_count: int = 0
+    lines_added: int = 0
+    lines_deleted: int = 0
+    raw_churn: int = 0
+    decayed_churn: float = 0.0
+    ownership_percentage: float = 0.0
+    last_committed_at: Optional[str] = None
+    days_since_last_commit: Optional[int] = None
+
+
+class FileOwnershipSchema(BaseModel):
+    file_path: str
+    total_commits: int = 0
+    primary_owner: Optional[AuthorCommitStatSchema] = None
+    co_owners: List[AuthorCommitStatSchema] = Field(default_factory=list)
+    all_contributors: List[AuthorCommitStatSchema] = Field(default_factory=list)
+    ownership_level: str = "DIFFUSED"
+    bus_factor: int = 1
+
+
+class ReviewerRecommendationSchema(BaseModel):
+    author_name: str
+    author_email: str
+    score: float = 0.0
+    role: str = "COMPONENT_EXPERT"
+    rationale: str = ""
+    target_files_owned: List[str] = Field(default_factory=list)
+    blast_radius_files_owned: List[str] = Field(default_factory=list)
+    commits_count: int = 0
+    days_since_last_commit: Optional[int] = None
+
+
+class CodeOwnershipReportSchema(BaseModel):
+    target_files: List[str] = Field(default_factory=list)
+    blast_radius_files: List[str] = Field(default_factory=list)
+    file_ownerships: List[FileOwnershipSchema] = Field(default_factory=list)
+    recommended_reviewers: List[ReviewerRecommendationSchema] = Field(default_factory=list)
+    overall_bus_factor: int = 1
+    knowledge_loss_warnings: List[str] = Field(default_factory=list)
+    summary: str = ""

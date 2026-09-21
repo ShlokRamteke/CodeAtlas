@@ -78,9 +78,13 @@ Pre-Change Investigation Brief
   - Suggest splitting large, unrelated change bundles into independent, modular pull requests.
   - Integrate into `InvestigationEngine.gather()` (`signals["decomposition"]` and `ev-decomp-*`), `reason()`, `synthesize()`, dual-format distillation, and Next.js UI interactive card.
   - REST endpoint: `GET /api/v1/investigations/{id}/decomposition`.
-- [ ] **PH4-09: Code Ownership & Reviewer Recommender**
-  - Calculate authorship concentration over modified and blast-radius files using historical `CommitFileChange` blame.
-  - Recommend domain experts and reviewers best qualified to inspect the proposed change.
+- [x] **PH4-09: Code Ownership & Reviewer Recommender** *(Completed)*
+  - Calculate authorship concentration over modified and blast-radius files using historical `CommitFileChange` blame and exponential recency decay ($\tau = 180\text{d}$).
+  - Compute file-level and overall Bus Factor metrics; identify high, medium, and diffused ownership levels.
+  - Recommend domain experts and reviewers best qualified to inspect the proposed change (`PRIMARY_OWNER`, `COMPONENT_EXPERT`, `BLAST_RADIUS_GUARDIAN`) with grounded rationales.
+  - Detect knowledge loss risks (inactive primary authors) and single-point-of-failure alerts.
+  - Integrate into `InvestigationEngine.gather()` (`signals["ownership"]` and `ev-ownership`), `reason()`, `synthesize()`, dual-format distillation (Human Markdown and Agent JSON), and Next.js UI interactive card.
+  - REST endpoint: `GET /api/v1/investigations/{id}/ownership`.
 - [ ] **PH4-10: C4 Architecture & Dependency Export**
   - Generate clean C4 container/component models and Mermaid diagram definitions from canonical `ProjectContext`.
   - Provide automated, portable architectural export for engineering documentation.

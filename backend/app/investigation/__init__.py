@@ -14,6 +14,13 @@ from app.investigation.llm import (
     OpenRouterLLMProvider,
     get_default_llm_provider,
 )
+from app.investigation.ownership import (
+    AuthorCommitStat,
+    CodeOwnershipAnalyzer,
+    CodeOwnershipReport,
+    FileOwnership,
+    ReviewerRecommendation,
+)
 from app.investigation.planner import InvestigationEngine
 from app.investigation.state import (
     ClaimClassification,
@@ -30,6 +37,11 @@ __all__ = [
     "ChangeCluster",
     "ChangeDecompositionReport",
     "ChangeDecomposer",
+    "AuthorCommitStat",
+    "CodeOwnershipAnalyzer",
+    "CodeOwnershipReport",
+    "FileOwnership",
+    "ReviewerRecommendation",
     "IntentNormalizer",
     "NormalizedChangeIntent",
     "InvestigationStep",

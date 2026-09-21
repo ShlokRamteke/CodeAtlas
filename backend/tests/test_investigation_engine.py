@@ -15,6 +15,8 @@ from app.investigation.state import (
     InvestigationState,
     InvestigationStep,
 )
+from app.models.commit import Commit
+from app.models.commit_file_change import ChangeType, CommitFileChange
 from app.models.investigation import Investigation, InvestigationStatus
 from app.models.repository import Repository
 from app.models.source_file import SourceFile
@@ -858,3 +860,324 @@ async def test_investigation_independent_change_decomposition(
     assert agent_json["decomposition"]["is_decomposable"] is True
     assert agent_json["decomposition"]["component_count"] == 2
     assert len(agent_json["decomposition"]["clusters"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_investigation_code_ownership_and_reviewer_recommender(
+    db_session: AsyncSession,
+):
+    repo = Repository(
+        owner="testowner",
+        name="ownershiprepo",
+        full_name="testowner/ownershiprepo",
+        default_branch="main",
+    )
+    db_session.add(repo)
+    await db_session.commit()
+    await db_session.refresh(repo)
+
+    # Add commit and file change records
+    commit1 = Commit(
+        repository_id=repo.id,
+        commit_hash="a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0",
+        author_name="Alice Owner",
+        author_email="alice@example.com",
+        committed_at=datetime.now(timezone.utc),
+        message="feat: implement core auth provider",
+    )
+    db_session.add(commit1)
+    await db_session.commit()
+    await db_session.refresh(commit1)
+
+    cfc1 = CommitFileChange(
+        commit_id=commit1.id,
+        file_path="backend/app/auth/provider.py",
+        change_type=ChangeType.ADDED,
+        insertions=350,
+        deletions=10,
+    )
+    db_session.add(cfc1)
+    await db_session.commit()
+
+    inv = Investigation(
+        repository_id=repo.id,
+        query="Refactor auth tokens in backend/app/auth/provider.py",
+    )
+    db_session.add(inv)
+    await db_session.commit()
+    await db_session.refresh(inv)
+
+    engine = InvestigationEngine(llm_provider=MockLLMProvider())
+    state = await engine.run(
+        investigation_id=inv.id,
+        db=db_session,
+    )
+
+    assert state.step == InvestigationStep.COMPLETED
+    assert state.brief is not None
+
+    # 1. Verify ownership signals
+    own_sig = state.gathered_signals.get("ownership")
+    assert own_sig is not None
+    assert own_sig["overall_bus_factor"] == 1
+    assert len(own_sig["recommended_reviewers"]) >= 1
+    top_rev = own_sig["recommended_reviewers"][0]
+    assert top_rev["author_name"] == "Alice Owner"
+    assert top_rev["role"] == "PRIMARY_OWNER"
+
+    # 2. Verify evidence record
+    own_ev = next(
+        (ev for ev in state.gathered_evidence if ev.get("source_id") == "code-ownership"),
+        None,
+    )
+    assert own_ev is not None
+    assert "Code Ownership" in own_ev["title"]
+
+    # 3. Verify recommended check
+    assert any("Alice Owner" in c for c in state.brief.recommended_checks)
+
+    # 4. Verify human markdown projection
+    md = state.brief.to_human_markdown()
+    assert "### 👥 Code Ownership & Recommended Reviewers" in md
+    assert "Alice Owner" in md
+
+    # 5. Verify dense agent JSON projection
+    agent_json = state.brief.to_agent_json()
+    assert "ownership" in agent_json
+    assert agent_json["ownership"]["bus_factor"] == 1
+    assert len(agent_json["ownership"]["reviewers"]) >= 1
+    assert agent_json["ownership"]["reviewers"][0]["name"] == "Alice Owner"
+
+
+@pytest.mark.asyncio
+async def test_investigation_without_target_file_succeeds(db_session: AsyncSession):
+    """Verify that an investigation without an explicit target file succeeds cleanly without crashing."""
+    repo = Repository(
+        owner="testowner",
+        name="nofilerepo",
+        full_name="testowner/nofilerepo",
+        default_branch="main",
+    )
+    db_session.add(repo)
+    await db_session.commit()
+    await db_session.refresh(repo)
+
+    inv = Investigation(
+        repository_id=repo.id,
+        query="Refactor global error handling and retry mechanics",
+    )
+    db_session.add(inv)
+    await db_session.commit()
+    await db_session.refresh(inv)
+
+    engine = InvestigationEngine(llm_provider=MockLLMProvider())
+    state = await engine.run(
+        investigation_id=inv.id,
+        db=db_session,
+        target_path=None,
+        target_symbol=None,
+    )
+
+    assert state.step == InvestigationStep.COMPLETED
+    assert state.brief is not None
+    assert inv.status == InvestigationStatus.COMPLETED
+    assert len(state.errors) == 0
+
+    # Signals exist and have safe defaults
+    assert "decomposition" in state.gathered_signals
+    assert "ownership" in state.gathered_signals
+    assert state.gathered_signals["ownership"]["overall_bus_factor"] == 1
+
+
+@pytest.mark.asyncio
+async def test_investigation_with_target_symbol_only_resolves_file(db_session: AsyncSession):
+    """Verify that when only target_symbol is provided, the engine discovers the owning file and succeeds."""
+    from app.models.source_file import SourceFile
+    from app.models.symbol import Symbol, SymbolKind
+
+    repo = Repository(
+        owner="testowner",
+        name="symrepo",
+        full_name="testowner/symrepo",
+        default_branch="main",
+    )
+    db_session.add(repo)
+    await db_session.commit()
+    await db_session.refresh(repo)
+
+    sf = SourceFile(
+        repository_id=repo.id,
+        path="backend/app/auth/session.py",
+        language="python",
+        content_hash="1234567890abcdef",
+    )
+    db_session.add(sf)
+    await db_session.commit()
+    await db_session.refresh(sf)
+
+    sym = Symbol(
+        repository_id=repo.id,
+        file_id=sf.id,
+        name="SessionManager",
+        kind=SymbolKind.CLASS,
+        line_start=10,
+        line_end=50,
+    )
+    db_session.add(sym)
+    await db_session.commit()
+
+    inv = Investigation(
+        repository_id=repo.id,
+        query="Upgrade session token timeout handling",
+    )
+    db_session.add(inv)
+    await db_session.commit()
+    await db_session.refresh(inv)
+
+    engine = InvestigationEngine(llm_provider=MockLLMProvider())
+    state = await engine.run(
+        investigation_id=inv.id,
+        db=db_session,
+        target_path=None,
+        target_symbol="SessionManager",
+    )
+
+    assert state.step == InvestigationStep.COMPLETED
+    assert inv.status == InvestigationStatus.COMPLETED
+    assert "backend/app/auth/session.py" in state.intent.target_files
+
+
+@pytest.mark.asyncio
+async def test_investigation_infers_files_from_query_when_target_file_omitted(db_session: AsyncSession):
+    """Verify that when target_path is omitted, query keywords automatically resolve to matching repository files."""
+    from app.models.source_file import SourceFile
+
+    repo = Repository(
+        owner="testowner",
+        name="inferrepo",
+        full_name="testowner/inferrepo",
+        default_branch="main",
+    )
+    db_session.add(repo)
+    await db_session.commit()
+    await db_session.refresh(repo)
+
+    sf1 = SourceFile(
+        repository_id=repo.id,
+        path="backend/app/payments/gateway.py",
+        language="python",
+        content_hash="abcdef1234567890",
+    )
+    db_session.add(sf1)
+    await db_session.commit()
+
+    inv = Investigation(
+        repository_id=repo.id,
+        query="Refactor gateway timeout and retry handling",
+    )
+    db_session.add(inv)
+    await db_session.commit()
+    await db_session.refresh(inv)
+
+    engine = InvestigationEngine(llm_provider=MockLLMProvider())
+    state = await engine.run(
+        investigation_id=inv.id,
+        db=db_session,
+        target_path=None,
+        target_symbol=None,
+    )
+
+    assert state.step == InvestigationStep.COMPLETED
+    assert inv.status == InvestigationStatus.COMPLETED
+    assert "backend/app/payments/gateway.py" in state.intent.target_files
+
+
+@pytest.mark.asyncio
+async def test_investigation_resolves_llm_file_for_openai_query(db_session: AsyncSession):
+    """Verify that 'Move to openai based llms' resolves backend/app/investigation/llm.py and populates ownership."""
+    from app.models.source_file import SourceFile
+    from app.models.symbol import Symbol, SymbolKind
+    from app.models.commit import Commit
+    from app.models.commit_file_change import CommitFileChange, ChangeType
+
+    repo = Repository(
+        owner="ShlokRamteke",
+        name="CodeAtlas",
+        full_name="ShlokRamteke/CodeAtlas",
+        default_branch="main",
+    )
+    db_session.add(repo)
+    await db_session.commit()
+    await db_session.refresh(repo)
+
+    sf = SourceFile(
+        repository_id=repo.id,
+        path="backend/app/investigation/llm.py",
+        language="python",
+        content_hash="feedbeef12345678",
+    )
+    db_session.add(sf)
+    await db_session.commit()
+    await db_session.refresh(sf)
+
+    sym = Symbol(
+        repository_id=repo.id,
+        file_id=sf.id,
+        name="OpenAILLMProvider",
+        kind=SymbolKind.CLASS,
+        line_start=15,
+        line_end=80,
+    )
+    db_session.add(sym)
+
+    commit = Commit(
+        repository_id=repo.id,
+        commit_hash="c0ffee1234567890c0ffee1234567890c0ffee12",
+        author_name="Shlok Dev",
+        author_email="shlok@example.com",
+        committed_at=datetime.now(timezone.utc),
+        message="feat: add openai llm provider",
+    )
+    db_session.add(commit)
+    await db_session.commit()
+    await db_session.refresh(commit)
+
+    cfc = CommitFileChange(
+        commit_id=commit.id,
+        file_path="backend/app/investigation/llm.py",
+        change_type=ChangeType.ADDED,
+        insertions=200,
+        deletions=0,
+    )
+    db_session.add(cfc)
+    await db_session.commit()
+
+    inv = Investigation(
+        repository_id=repo.id,
+        query="Move to openai based llms",
+    )
+    db_session.add(inv)
+    await db_session.commit()
+    await db_session.refresh(inv)
+
+    engine = InvestigationEngine(llm_provider=MockLLMProvider())
+    state = await engine.run(
+        investigation_id=inv.id,
+        db=db_session,
+        target_path=None,
+        target_symbol=None,
+    )
+
+    assert state.step == InvestigationStep.COMPLETED
+    assert inv.status == InvestigationStatus.COMPLETED
+    assert "backend/app/investigation/llm.py" in state.intent.target_files
+
+    own_sig = state.gathered_signals.get("ownership")
+    assert own_sig is not None
+    assert own_sig["overall_bus_factor"] >= 1
+    assert len(own_sig["recommended_reviewers"]) >= 1
+    assert own_sig["recommended_reviewers"][0]["author_name"] == "Shlok Dev"
+
+
+
+

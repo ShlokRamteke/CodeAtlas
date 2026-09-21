@@ -207,7 +207,7 @@ Action Verbs: {json.dumps(intent.action_verbs)}
 </pre_extracted_targets>
 
 <context_preview>
-{context_preview[:800]}
+{context_preview[:4000]}
 </context_preview>"""
 
     return PLANNER_SYSTEM_PROMPT, user_message

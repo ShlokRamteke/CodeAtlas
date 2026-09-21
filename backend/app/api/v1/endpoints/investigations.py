@@ -9,7 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.db import get_db
-from app.investigation import ChangeDecomposer, IntentNormalizer, InvestigationEngine
+from app.investigation import (
+    ChangeDecomposer,
+    CodeOwnershipAnalyzer,
+    IntentNormalizer,
+    InvestigationEngine,
+)
 from app.investigation.concurrent_overlap import ConcurrentOverlapDetector
 from app.investigation.distillation import GLOBAL_OMISSION_REGISTRY, TokenBudgetDistiller
 from app.models.dependency import CodeDependency
@@ -17,6 +22,7 @@ from app.models.investigation import Investigation
 from app.models.repository import Repository
 from app.schemas.investigation import (
     ChangeDecompositionReportSchema,
+    CodeOwnershipReportSchema,
     ConcurrentOverlapReportSchema,
     InvestigationCreate,
     InvestigationProjectionResponse,
@@ -136,9 +142,21 @@ async def run_investigation(
         )
 
     engine = InvestigationEngine()
-    target_path = run_req.target_path if run_req else None
-    target_symbol = run_req.target_symbol if run_req else None
-    diff = run_req.diff if run_req else None
+    target_path = (
+        run_req.target_path.strip()
+        if run_req and run_req.target_path and run_req.target_path.strip()
+        else None
+    )
+    target_symbol = (
+        run_req.target_symbol.strip()
+        if run_req and run_req.target_symbol and run_req.target_symbol.strip()
+        else None
+    )
+    diff = (
+        run_req.diff.strip()
+        if run_req and run_req.diff and run_req.diff.strip()
+        else None
+    )
 
     await engine.run(
         investigation_id=inv.id,
@@ -189,6 +207,10 @@ def _reconstruct_brief_data(inv: Investigation) -> dict:
             signals["co_change"] = meta
         elif e.source_id in ("concurrent-branch-overlap", "concurrent-branch-overlap-report"):
             signals["concurrent_overlaps"] = meta
+        elif e.source_id in ("change-decomposition", "change-decomposition-report"):
+            signals["decomposition"] = meta
+        elif e.source_id in ("code-ownership", "code-ownership-report"):
+            signals["ownership"] = meta
         elif e.source_id.startswith("inv-") or meta.get("governing_status"):
             constraints.append(
                 {
@@ -206,12 +228,21 @@ def _reconstruct_brief_data(inv: Investigation) -> dict:
             )
 
     for e in inv.evidence:
-        src_val = e.source_type.value if hasattr(e.source_type, "value") else str(e.source_type)
-        if e.path and e.path not in target_files and src_val == "code":
+        if e.path and e.path not in target_files:
             target_files.append(e.path)
         meta = e.extra_metadata or {}
         if e.source_id == "proposed-code-changes" or "code_changes" in meta:
             code_changes.extend(meta.get("code_changes", []))
+
+    if not target_files:
+        if "blast_radius" in signals and signals["blast_radius"].get("target_files"):
+            target_files.extend(signals["blast_radius"]["target_files"])
+        elif "ownership" in signals and signals["ownership"].get("target_files"):
+            target_files.extend(signals["ownership"]["target_files"])
+        elif "decomposition" in signals and signals["decomposition"].get("target_files"):
+            target_files.extend(signals["decomposition"]["target_files"])
+        elif "change_risk" in signals and signals["change_risk"].get("kamei_metrics", {}).get("target_files"):
+            target_files.extend(signals["change_risk"]["kamei_metrics"]["target_files"])
 
     guarding_sig = signals.get("guarding_tests", {})
     if guarding_sig.get("untested_files"):
@@ -458,3 +489,44 @@ async def get_investigation_decomposition(
         dependency_edges=static_edges,
     )
     return ChangeDecompositionReportSchema(**report.to_dict())
+
+
+@router.get(
+    "/{investigation_id}/ownership",
+    response_model=CodeOwnershipReportSchema,
+)
+async def get_investigation_ownership(
+    investigation_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+) -> CodeOwnershipReportSchema:
+    """Retrieve code ownership concentration and reviewer recommendations for an investigation."""
+    query = (
+        select(Investigation)
+        .where(Investigation.id == investigation_id)
+        .options(selectinload(Investigation.evidence))
+    )
+    result = await db.execute(query)
+    inv = result.scalar_one_or_none()
+    if not inv:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Investigation not found",
+        )
+
+    # 1. Check if ownership report was cached in evidence
+    for e in inv.evidence:
+        if e.source_id == "code-ownership" and e.extra_metadata:
+            return CodeOwnershipReportSchema(**e.extra_metadata)
+
+    # 2. Otherwise run analyzer live on target files and blast radius
+    brief_data = _reconstruct_brief_data(inv)
+    target_files = brief_data.get("target_files", [])
+    blast_files = brief_data.get("signals", {}).get("blast_radius", {}).get("transitive_files", [])
+
+    report = await CodeOwnershipAnalyzer.query_and_analyze(
+        db=db,
+        repository_id=inv.repository_id,
+        target_files=target_files,
+        blast_radius_files=blast_files,
+    )
+    return CodeOwnershipReportSchema(**report.to_dict())

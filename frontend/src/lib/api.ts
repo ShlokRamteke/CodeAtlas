@@ -34,7 +34,12 @@ import type {
   ConcurrentPROverlap,
   ChangeCluster,
   ChangeDecompositionReport,
+  CodeOwnershipReport,
+  FileOwnership,
+  ReviewerRecommendation,
+  AuthorCommitStat,
 } from "@codeatlas/contracts";
+
 
 
 
@@ -720,6 +725,46 @@ export async function fetchInvestigationDecomposition(
         rationale: c.rationale || "",
         recommendedOrder: c.recommended_order || 1,
       })),
+      summary: raw.summary || "",
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function fetchInvestigationOwnership(
+  investigationId: string
+): Promise<CodeOwnershipReport | null> {
+  try {
+    const url = `${API_BASE}/api/v1/investigations/${investigationId}/ownership`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return null;
+    const raw = await res.json();
+    return {
+      target_files: raw.target_files || [],
+      blast_radius_files: raw.blast_radius_files || [],
+      file_ownerships: (raw.file_ownerships || []).map((fo: any) => ({
+        file_path: fo.file_path,
+        total_commits: fo.total_commits || 0,
+        primary_owner: fo.primary_owner || null,
+        co_owners: fo.co_owners || [],
+        all_contributors: fo.all_contributors || [],
+        ownership_level: fo.ownership_level || "DIFFUSED",
+        bus_factor: fo.bus_factor || 1,
+      })),
+      recommended_reviewers: (raw.recommended_reviewers || []).map((r: any) => ({
+        author_name: r.author_name,
+        author_email: r.author_email,
+        score: r.score || 0.0,
+        role: r.role || "COMPONENT_EXPERT",
+        rationale: r.rationale || "",
+        target_files_owned: r.target_files_owned || [],
+        blast_radius_files_owned: r.blast_radius_files_owned || [],
+        commits_count: r.commits_count || 0,
+        days_since_last_commit: r.days_since_last_commit,
+      })),
+      overall_bus_factor: raw.overall_bus_factor || 1,
+      knowledge_loss_warnings: raw.knowledge_loss_warnings || [],
       summary: raw.summary || "",
     };
   } catch (error) {
