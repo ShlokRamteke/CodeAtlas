@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import List, Optional, Set
 
 
@@ -205,9 +205,7 @@ class IntentNormalizer:
                 matches_stem = len(stem) >= 3 and bool(
                     re.search(rf"\b{re.escape(stem.lower())}\b", query.lower())
                 )
-                matches_subpath = (
-                    len(parts) > 1 and "/".join(parts[-2:]).lower() in query.lower()
-                )
+                matches_subpath = len(parts) > 1 and "/".join(parts[-2:]).lower() in query.lower()
 
                 if (matches_basename or matches_stem or matches_subpath) and kf not in files:
                     files.append(kf)
@@ -218,8 +216,8 @@ class IntentNormalizer:
             if len(parts) > 1 and parts[0] not in components:
                 components.append(parts[0])
 
-        # 7. Ambiguity check
-        is_ambiguous = len(files) == 0 and len(symbols) == 0 and len(verbs) == 0
+        # 7. Ambiguity check: ambiguous if no concrete target files or symbols could be determined
+        is_ambiguous = len(files) == 0 and len(symbols) == 0
 
         # 8. Generate concise distilled summary
         verb_phrase = "/".join(verbs) if verbs else "investigate"

@@ -105,23 +105,90 @@ class InvestigationEngine:
             intent=intent,
         )
 
-    async def plan(self, state: InvestigationState) -> InvestigationPlan:
+    async def plan(
+        self,
+        state: InvestigationState,
+        known_files: Optional[List[str]] = None,
+    ) -> InvestigationPlan:
         """Step 2: Investigation Planning.
 
         Uses LLM only if intent is ambiguous and model calls remain within budget.
         """
         state.step = InvestigationStep.PLAN
 
-        if state.intent and state.intent.is_ambiguous and state.can_call_model:
+        # Ambiguous if flagged ambiguous or if no target files could be deterministically extracted
+        is_ambiguous = bool(
+            state.intent and (state.intent.is_ambiguous or not state.intent.target_files)
+        )
+
+        if is_ambiguous and state.can_call_model:
             try:
+                if known_files:
+                    keywords = [
+                        tok
+                        for tok in re.findall(r"\b[a-zA-Z0-9_-]{3,}\b", state.query.lower())
+                        if tok not in COMMON_STOPWORDS and tok not in ACTION_VERBS
+                    ]
+                    domain_hints = [
+                        "service",
+                        "model",
+                        "rag",
+                        "llm",
+                        "ai",
+                        "config",
+                        "api",
+                        "controller",
+                        "client",
+                        "auth",
+                        "payment",
+                        "db",
+                        "worker",
+                    ]
+
+                    def file_priority(f: str) -> tuple[int, str]:
+                        f_lower = f.lower()
+                        has_kw = any(kw in f_lower for kw in keywords)
+                        has_hint = any(h in f_lower for h in domain_hints)
+                        if has_kw:
+                            return (0, f)
+                        if has_hint:
+                            return (1, f)
+                        return (2, f)
+
+                    sorted_files = sorted(known_files, key=file_priority)
+                    preview = f"Query: {state.query}\nRepository files:\n" + "\n".join(
+                        sorted_files[:120]
+                    )
+                else:
+                    preview = f"Query: {state.query}"
+
                 plan, tokens = await self.llm.plan_investigation(
                     intent=state.intent,
-                    context_preview=f"Query: {state.query}",
+                    context_preview=preview,
                 )
                 state.record_model_call(
                     prompt_tokens=tokens.get("prompt_tokens", 0),
                     completion_tokens=tokens.get("completion_tokens", 0),
                 )
+
+                # Propagate identified targets to intent so downstream stages (gather, ownership, changes) use them
+                if plan.target_files and state.intent:
+                    for tf in plan.target_files:
+                        if known_files:
+                            if tf in known_files and tf not in state.intent.target_files:
+                                state.intent.target_files.append(tf)
+                        elif tf not in state.intent.target_files:
+                            state.intent.target_files.append(tf)
+                    if not state.intent.target_files:
+                        for tf in plan.target_files[:5]:
+                            if tf not in state.intent.target_files:
+                                state.intent.target_files.append(tf)
+
+                if plan.target_symbols and state.intent:
+                    for ts in plan.target_symbols:
+                        if ts not in state.intent.target_symbols:
+                            state.intent.target_symbols.append(ts)
+
                 state.plan = plan
                 return plan
             except Exception as e:
@@ -153,8 +220,16 @@ class InvestigationEngine:
         evidence_items: List[Dict[str, Any]] = []
         signals: Dict[str, Any] = {}
 
-        target_files = state.intent.target_files if state.intent else []
-        target_symbols = state.intent.target_symbols if state.intent else []
+        target_files = (
+            state.intent.target_files
+            if (state.intent and state.intent.target_files)
+            else (state.plan.target_files if state.plan else [])
+        )
+        target_symbols = (
+            state.intent.target_symbols
+            if (state.intent and state.intent.target_symbols)
+            else (state.plan.target_symbols if state.plan else [])
+        )
 
         # 1. Gather code evidence
         if code_snippets:
@@ -1204,7 +1279,7 @@ class InvestigationEngine:
                     logger.debug(f"Could not match symbols by query tokens: {e}")
 
         try:
-            await self.plan(state)
+            await self.plan(state, known_files=known_files)
             inv.status = InvestigationStatus.GATHERING
             await db.commit()
 
