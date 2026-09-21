@@ -693,21 +693,23 @@ class InvestigationEngine:
         )
         signals["ownership"] = ownership_report.to_dict()
 
-        if ownership_report.recommended_reviewers or ownership_report.knowledge_loss_warnings:
-            rev_snippets = [
-                f"{r.author_name} ({r.role}, score {r.score:.2f}): {r.rationale}"
-                for r in ownership_report.recommended_reviewers[:3]
-            ]
-            ev_ownership = {
-                "id": f"ev-ownership-{len(evidence_items) + 1}",
-                "source_type": EvidenceSourceType.COMMIT,
-                "source_id": "code-ownership",
-                "title": f"Code Ownership & Reviewers (Bus Factor: {ownership_report.overall_bus_factor})",
-                "snippet": f"{ownership_report.summary} Recommended: {'; '.join(rev_snippets)}",
-                "confidence": 1.0,
-                "extra_metadata": ownership_report.to_dict(),
-            }
-            evidence_items.append(ev_ownership)
+        rev_snippets = [
+            f"{r.author_name} ({r.role}, score {r.score:.2f}): {r.rationale}"
+            for r in ownership_report.recommended_reviewers[:3]
+        ]
+        ev_ownership = {
+            "id": f"ev-ownership-{len(evidence_items) + 1}",
+            "source_type": EvidenceSourceType.COMMIT,
+            "source_id": "code-ownership",
+            "title": f"Code Ownership & Reviewers (Bus Factor: {ownership_report.overall_bus_factor})",
+            "snippet": (
+                f"{ownership_report.summary}"
+                + (f" Recommended: {'; '.join(rev_snippets)}" if rev_snippets else "")
+            ),
+            "confidence": 1.0,
+            "extra_metadata": ownership_report.to_dict(),
+        }
+        evidence_items.append(ev_ownership)
 
         state.gathered_evidence = evidence_items
 

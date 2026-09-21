@@ -195,6 +195,8 @@ def _reconstruct_brief_data(inv: Investigation) -> dict:
             signals["co_change"] = meta
         elif e.source_id in ("concurrent-branch-overlap", "concurrent-branch-overlap-report"):
             signals["concurrent_overlaps"] = meta
+        elif e.source_id in ("change-decomposition", "change-decomposition-report"):
+            signals["decomposition"] = meta
         elif e.source_id in ("code-ownership", "code-ownership-report"):
             signals["ownership"] = meta
         elif e.source_id.startswith("inv-") or meta.get("governing_status"):
@@ -214,12 +216,21 @@ def _reconstruct_brief_data(inv: Investigation) -> dict:
             )
 
     for e in inv.evidence:
-        src_val = e.source_type.value if hasattr(e.source_type, "value") else str(e.source_type)
-        if e.path and e.path not in target_files and src_val == "code":
+        if e.path and e.path not in target_files:
             target_files.append(e.path)
         meta = e.extra_metadata or {}
         if e.source_id == "proposed-code-changes" or "code_changes" in meta:
             code_changes.extend(meta.get("code_changes", []))
+
+    if not target_files:
+        if "blast_radius" in signals and signals["blast_radius"].get("target_files"):
+            target_files.extend(signals["blast_radius"]["target_files"])
+        elif "ownership" in signals and signals["ownership"].get("target_files"):
+            target_files.extend(signals["ownership"]["target_files"])
+        elif "decomposition" in signals and signals["decomposition"].get("target_files"):
+            target_files.extend(signals["decomposition"]["target_files"])
+        elif "change_risk" in signals and signals["change_risk"].get("kamei_metrics", {}).get("target_files"):
+            target_files.extend(signals["change_risk"]["kamei_metrics"]["target_files"])
 
     guarding_sig = signals.get("guarding_tests", {})
     if guarding_sig.get("untested_files"):

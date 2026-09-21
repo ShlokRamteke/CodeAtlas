@@ -30,12 +30,14 @@ import {
   Split,
   GitBranch,
   Users,
+  Loader2,
 } from "lucide-react";
 import type {
   InvestigationResponse,
   Repository,
   InvestigationProjectionResponse,
   ReferenceDetailResponse,
+  CodeOwnershipReport,
 } from "@codeatlas/contracts";
 import {
   createInvestigation,
@@ -75,6 +77,49 @@ export function PreChangeInvestigationViewer({
   const [copied, setCopied] = useState(false);
   const [inspectRef, setInspectRef] = useState<ReferenceDetailResponse | null>(null);
   const [loadingRef, setLoadingRef] = useState(false);
+
+  // Ownership state
+  const [ownershipReport, setOwnershipReport] = useState<CodeOwnershipReport | null>(null);
+  const [loadingOwnership, setLoadingOwnership] = useState(false);
+
+  // Load ownership report for selected investigation
+  useEffect(() => {
+    if (!selectedInv) {
+      setOwnershipReport(null);
+      return;
+    }
+
+    const ownershipEv = selectedInv.evidence?.find(
+      (e) => e.sourceId === "code-ownership" || e.sourceId === "code-ownership-report"
+    );
+    if (ownershipEv && ownershipEv.metadata) {
+      const meta = ownershipEv.metadata as any;
+      setOwnershipReport({
+        target_files: meta.target_files || meta.targetFiles || [],
+        blast_radius_files: meta.blast_radius_files || meta.blastRadiusFiles || [],
+        file_ownerships: meta.file_ownerships || meta.fileOwnerships || [],
+        recommended_reviewers: meta.recommended_reviewers || meta.recommendedReviewers || [],
+        overall_bus_factor: meta.overall_bus_factor ?? meta.overallBusFactor ?? 1,
+        knowledge_loss_warnings: meta.knowledge_loss_warnings || meta.knowledgeLossWarnings || [],
+        summary: meta.summary || "",
+      });
+      return;
+    }
+
+    let cancelled = false;
+    async function loadOwnership() {
+      setLoadingOwnership(true);
+      const rep = await fetchInvestigationOwnership(selectedInv!.id);
+      if (!cancelled) {
+        setOwnershipReport(rep);
+        setLoadingOwnership(false);
+      }
+    }
+    loadOwnership();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedInv?.id, selectedInv?.evidence]);
 
   // Load repository investigations
   useEffect(() => {
@@ -995,17 +1040,36 @@ export function PreChangeInvestigationViewer({
 
               {/* Code Ownership & Reviewer Recommender Section */}
               {(() => {
+                if (loadingOwnership && !ownershipReport) {
+                  return (
+                    <div className="p-6 rounded-xl bg-slate-900/70 border border-slate-800 space-y-3 animate-pulse">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-cyan-400" />
+                        <h4 className="text-sm font-bold text-white">
+                          Code Ownership &amp; Recommended Reviewers
+                        </h4>
+                        <Loader2 className="w-3.5 h-3.5 text-cyan-400 animate-spin ml-auto" />
+                      </div>
+                      <p className="text-xs text-slate-400">
+                        Analyzing historical commit ownership and reviewer recommendations...
+                      </p>
+                    </div>
+                  );
+                }
+
                 const ownershipEv = selectedInv.evidence?.find(
                   (e) => e.sourceId === "code-ownership" || e.sourceId === "code-ownership-report"
                 );
-                const ownershipMeta = (ownershipEv?.metadata || {}) as any;
+                const ownershipMeta = (ownershipReport || ownershipEv?.metadata || {}) as any;
                 const reviewers = ownershipMeta.recommended_reviewers || ownershipMeta.recommendedReviewers || [];
                 const fileOwnerships = ownershipMeta.file_ownerships || ownershipMeta.fileOwnerships || [];
                 const busFactor = ownershipMeta.overall_bus_factor ?? ownershipMeta.overallBusFactor ?? 1;
                 const warnings = ownershipMeta.knowledge_loss_warnings || ownershipMeta.knowledgeLossWarnings || [];
-                const summary = ownershipMeta.summary || "";
-
-                if (!ownershipEv && reviewers.length === 0 && fileOwnerships.length === 0) return null;
+                const summary =
+                  ownershipMeta.summary ||
+                  (reviewers.length > 0
+                    ? ""
+                    : "Analyzed code ownership and reviewer recommendations for target files.");
 
                 return (
                   <div className="p-6 rounded-xl bg-slate-900/70 border border-slate-800 space-y-4">
@@ -1056,7 +1120,7 @@ export function PreChangeInvestigationViewer({
                     )}
 
                     {/* Recommended Reviewers Cards */}
-                    {reviewers.length > 0 && (
+                    {reviewers.length > 0 ? (
                       <div className="space-y-3 pt-1">
                         <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                           Qualified Domain Reviewers
@@ -1139,6 +1203,10 @@ export function PreChangeInvestigationViewer({
                             );
                           })}
                         </div>
+                      </div>
+                    ) : (
+                      <div className="p-3.5 rounded-lg bg-slate-950/40 border border-slate-800/60 text-xs text-slate-400">
+                        No individual reviewer recommendations identified. Authorship is diffused or commit history has not yet been indexed for target files.
                       </div>
                     )}
 
