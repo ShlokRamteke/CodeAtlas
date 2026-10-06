@@ -430,12 +430,14 @@ export async function fetchRepositoryArchitecture(
 export async function fetchRepositorySymbols(
   repositoryId: string,
   name?: string,
-  kind?: string
+  kind?: string,
+  role?: string
 ): Promise<SymbolItem[]> {
   try {
     const params = new URLSearchParams();
     if (name) params.append("name", name);
     if (kind) params.append("kind", kind);
+    if (role) params.append("role", role);
     const res = await fetch(
       `${API_BASE}/api/v1/repositories/${repositoryId}/symbols?${params.toString()}`,
       { cache: "no-store" }
@@ -452,6 +454,7 @@ export async function fetchRepositorySymbols(
       lineEnd: s.line_end,
       signature: s.signature,
       docstring: s.docstring,
+      architecturalRole: s.architectural_role,
       createdAt: s.created_at,
     }));
   } catch (error) {
