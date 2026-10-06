@@ -29,12 +29,15 @@ import {
   X,
   Split,
   GitBranch,
+  Users,
+  Loader2,
 } from "lucide-react";
 import type {
   InvestigationResponse,
   Repository,
   InvestigationProjectionResponse,
   ReferenceDetailResponse,
+  CodeOwnershipReport,
 } from "@codeatlas/contracts";
 import {
   createInvestigation,
@@ -43,6 +46,7 @@ import {
   previewInvestigationIntent,
   fetchInvestigationProjection,
   fetchInvestigationReference,
+  fetchInvestigationOwnership,
 } from "@/lib/api";
 
 interface PreChangeInvestigationViewerProps {
@@ -73,6 +77,49 @@ export function PreChangeInvestigationViewer({
   const [copied, setCopied] = useState(false);
   const [inspectRef, setInspectRef] = useState<ReferenceDetailResponse | null>(null);
   const [loadingRef, setLoadingRef] = useState(false);
+
+  // Ownership state
+  const [ownershipReport, setOwnershipReport] = useState<CodeOwnershipReport | null>(null);
+  const [loadingOwnership, setLoadingOwnership] = useState(false);
+
+  // Load ownership report for selected investigation
+  useEffect(() => {
+    if (!selectedInv) {
+      setOwnershipReport(null);
+      return;
+    }
+
+    const ownershipEv = selectedInv.evidence?.find(
+      (e) => e.sourceId === "code-ownership" || e.sourceId === "code-ownership-report"
+    );
+    if (ownershipEv && ownershipEv.metadata) {
+      const meta = ownershipEv.metadata as any;
+      setOwnershipReport({
+        target_files: meta.target_files || meta.targetFiles || [],
+        blast_radius_files: meta.blast_radius_files || meta.blastRadiusFiles || [],
+        file_ownerships: meta.file_ownerships || meta.fileOwnerships || [],
+        recommended_reviewers: meta.recommended_reviewers || meta.recommendedReviewers || [],
+        overall_bus_factor: meta.overall_bus_factor ?? meta.overallBusFactor ?? 1,
+        knowledge_loss_warnings: meta.knowledge_loss_warnings || meta.knowledgeLossWarnings || [],
+        summary: meta.summary || "",
+      });
+      return;
+    }
+
+    let cancelled = false;
+    async function loadOwnership() {
+      setLoadingOwnership(true);
+      const rep = await fetchInvestigationOwnership(selectedInv!.id);
+      if (!cancelled) {
+        setOwnershipReport(rep);
+        setLoadingOwnership(false);
+      }
+    }
+    loadOwnership();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedInv?.id, selectedInv?.evidence]);
 
   // Load repository investigations
   useEffect(() => {
@@ -984,6 +1031,250 @@ export function PreChangeInvestigationViewer({
                               </div>
                             );
                           })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Code Ownership & Reviewer Recommender Section */}
+              {(() => {
+                if (loadingOwnership && !ownershipReport) {
+                  return (
+                    <div className="p-6 rounded-xl bg-slate-900/70 border border-slate-800 space-y-3 animate-pulse">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-cyan-400" />
+                        <h4 className="text-sm font-bold text-white">
+                          Code Ownership &amp; Recommended Reviewers
+                        </h4>
+                        <Loader2 className="w-3.5 h-3.5 text-cyan-400 animate-spin ml-auto" />
+                      </div>
+                      <p className="text-xs text-slate-400">
+                        Analyzing historical commit ownership and reviewer recommendations...
+                      </p>
+                    </div>
+                  );
+                }
+
+                const ownershipEv = selectedInv.evidence?.find(
+                  (e) => e.sourceId === "code-ownership" || e.sourceId === "code-ownership-report"
+                );
+                const ownershipMeta = (ownershipReport || ownershipEv?.metadata || {}) as any;
+                const reviewers = ownershipMeta.recommended_reviewers || ownershipMeta.recommendedReviewers || [];
+                const fileOwnerships = ownershipMeta.file_ownerships || ownershipMeta.fileOwnerships || [];
+                const busFactor = ownershipMeta.overall_bus_factor ?? ownershipMeta.overallBusFactor ?? 1;
+                const warnings = ownershipMeta.knowledge_loss_warnings || ownershipMeta.knowledgeLossWarnings || [];
+                const summary =
+                  ownershipMeta.summary ||
+                  (reviewers.length > 0
+                    ? ""
+                    : "Analyzed code ownership and reviewer recommendations for target files.");
+
+                return (
+                  <div className="p-6 rounded-xl bg-slate-900/70 border border-slate-800 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-cyan-400" />
+                        <h4 className="text-sm font-bold text-white">
+                          Code Ownership &amp; Recommended Reviewers
+                        </h4>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-xs font-bold px-2.5 py-0.5 rounded border uppercase font-mono ${
+                            busFactor === 1
+                              ? "bg-red-500/10 text-red-400 border-red-500/30"
+                              : busFactor === 2
+                              ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                              : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                          }`}
+                        >
+                          Bus Factor: {busFactor}
+                        </span>
+                        <span className="text-xs font-mono text-slate-400">
+                          ({reviewers.length} reviewer{reviewers.length === 1 ? "" : "s"})
+                        </span>
+                      </div>
+                    </div>
+
+                    {summary && (
+                      <div className="p-3 rounded-lg border bg-slate-950/60 border-slate-800/80 text-xs text-slate-300 leading-relaxed">
+                        {summary}
+                      </div>
+                    )}
+
+                    {/* Ownership & Knowledge Loss Warnings */}
+                    {warnings.length > 0 && (
+                      <div className="space-y-2">
+                        {warnings.map((w: string, wi: number) => (
+                          <div
+                            key={wi}
+                            className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-950/20 border border-amber-800/40 text-xs text-amber-300"
+                          >
+                            <AlertCircle className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
+                            <span>{w}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Recommended Reviewers Cards */}
+                    {reviewers.length > 0 ? (
+                      <div className="space-y-3 pt-1">
+                        <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                          Qualified Domain Reviewers
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {reviewers.map((r: any, idx: number) => {
+                            const name = r.author_name ?? r.authorName ?? "Unknown";
+                            const email = r.author_email ?? r.authorEmail ?? "";
+                            const role = r.role ?? "COMPONENT_EXPERT";
+                            const score = r.score ?? 0.0;
+                            const rationale = r.rationale ?? "";
+                            const daysAgo = r.days_since_last_commit ?? r.daysSinceLastCommit;
+                            const targetFiles = r.target_files_owned ?? r.targetFilesOwned ?? [];
+                            const blastFiles = r.blast_radius_files_owned ?? r.blastRadiusFilesOwned ?? [];
+
+                            const roleBadgeClass =
+                              role === "PRIMARY_OWNER"
+                                ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/30"
+                                : role === "BLAST_RADIUS_GUARDIAN"
+                                ? "bg-purple-500/10 text-purple-400 border-purple-500/30"
+                                : "bg-blue-500/10 text-blue-400 border-blue-500/30";
+
+                            return (
+                              <div
+                                key={idx}
+                                className="p-3.5 rounded-lg bg-slate-950/60 border border-slate-800/80 space-y-2.5 hover:border-slate-700 transition-colors"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-200 shrink-0">
+                                      {name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="text-xs font-semibold text-white truncate">
+                                        {name}
+                                      </div>
+                                      {email && (
+                                        <div className="text-[11px] font-mono text-slate-500 truncate">
+                                          {email}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <span
+                                      className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border uppercase ${roleBadgeClass}`}
+                                    >
+                                      {role.replace(/_/g, " ")}
+                                    </span>
+                                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                                      Score: {(score * 100).toFixed(0)}%
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {rationale && (
+                                  <p className="text-xs text-slate-300 italic bg-slate-900/60 p-2 rounded border border-slate-800/50">
+                                    "{rationale}"
+                                  </p>
+                                )}
+
+                                <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-400 gap-1 pt-1 border-t border-slate-800/60">
+                                  <span>
+                                    {daysAgo !== null && daysAgo !== undefined
+                                      ? `Last active ${daysAgo}d ago`
+                                      : "Active recently"}
+                                  </span>
+                                  {targetFiles.length > 0 && (
+                                    <span className="text-cyan-400/90 font-mono">
+                                      {targetFiles.length} target file{targetFiles.length === 1 ? "" : "s"}
+                                    </span>
+                                  )}
+                                  {blastFiles.length > 0 && (
+                                    <span className="text-purple-400/90 font-mono">
+                                      {blastFiles.length} affected caller{blastFiles.length === 1 ? "" : "s"}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3.5 rounded-lg bg-slate-950/40 border border-slate-800/60 text-xs text-slate-400">
+                        No individual reviewer recommendations identified. Authorship is diffused or commit history has not yet been indexed for target files.
+                      </div>
+                    )}
+
+                    {/* File Ownership Breakdown Table */}
+                    {fileOwnerships.length > 0 && (
+                      <div className="space-y-2 pt-2">
+                        <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                          File Authorship Breakdown
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs border border-slate-800 rounded-lg overflow-hidden">
+                            <thead className="bg-slate-950/80 text-slate-400 border-b border-slate-800 font-mono text-[11px]">
+                              <tr>
+                                <th className="p-2.5">File Path</th>
+                                <th className="p-2.5">Primary Owner</th>
+                                <th className="p-2.5">Ownership Share</th>
+                                <th className="p-2.5">Level</th>
+                                <th className="p-2.5">Bus Factor</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/60 bg-slate-900/40">
+                              {fileOwnerships.map((fo: any, idx: number) => {
+                                const fpath = fo.file_path ?? fo.filePath ?? "";
+                                const po = fo.primary_owner ?? fo.primaryOwner;
+                                const poName = po ? (po.author_name ?? po.authorName ?? "Unknown") : "None";
+                                const poPct = po ? (po.ownership_percentage ?? po.ownershipPercentage ?? 0.0) : 0;
+                                const level = fo.ownership_level ?? fo.ownershipLevel ?? "DIFFUSED";
+                                const fBus = fo.bus_factor ?? fo.busFactor ?? 1;
+
+                                const levelColor =
+                                  level === "HIGH"
+                                    ? "text-emerald-400"
+                                    : level === "MEDIUM"
+                                    ? "text-blue-400"
+                                    : "text-amber-400";
+
+                                return (
+                                  <tr key={idx} className="hover:bg-slate-800/30 transition-colors">
+                                    <td className="p-2.5 font-mono text-slate-300 truncate max-w-xs">
+                                      {fpath}
+                                    </td>
+                                    <td className="p-2.5 text-white font-medium">
+                                      {poName}
+                                    </td>
+                                    <td className="p-2.5">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-16 bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                          <div
+                                            className="bg-cyan-400 h-1.5 rounded-full"
+                                            style={{ width: `${Math.min(100, Math.max(0, poPct))}%` }}
+                                          />
+                                        </div>
+                                        <span className="font-mono text-slate-300 text-[11px]">
+                                          {poPct.toFixed(0)}%
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className={`p-2.5 font-mono text-[11px] font-semibold ${levelColor}`}>
+                                      {level}
+                                    </td>
+                                    <td className="p-2.5 font-mono text-slate-400 text-[11px]">
+                                      {fBus}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
                         </div>
                       </div>
                     )}

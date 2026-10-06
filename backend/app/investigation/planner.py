@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 import uuid
 from collections import defaultdict
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.history.change_risk import (
@@ -30,11 +31,16 @@ from app.history.guarding_tests import (
 from app.investigation.blast_radius import BlastRadiusAnalyzer
 from app.investigation.concurrent_overlap import ConcurrentOverlapDetector
 from app.investigation.decomposition import ChangeDecomposer
-from app.investigation.intent import IntentNormalizer
+from app.investigation.intent import (
+    ACTION_VERBS,
+    COMMON_STOPWORDS,
+    IntentNormalizer,
+)
 from app.investigation.invariants import (
     InvariantSynthesizer,
 )
 from app.investigation.llm import LLMProvider, get_default_llm_provider
+from app.investigation.ownership import CodeOwnershipAnalyzer
 from app.investigation.state import (
     ClaimClassification,
     InvestigationClaim,
@@ -99,23 +105,90 @@ class InvestigationEngine:
             intent=intent,
         )
 
-    async def plan(self, state: InvestigationState) -> InvestigationPlan:
+    async def plan(
+        self,
+        state: InvestigationState,
+        known_files: Optional[List[str]] = None,
+    ) -> InvestigationPlan:
         """Step 2: Investigation Planning.
 
         Uses LLM only if intent is ambiguous and model calls remain within budget.
         """
         state.step = InvestigationStep.PLAN
 
-        if state.intent and state.intent.is_ambiguous and state.can_call_model:
+        # Ambiguous if flagged ambiguous or if no target files could be deterministically extracted
+        is_ambiguous = bool(
+            state.intent and (state.intent.is_ambiguous or not state.intent.target_files)
+        )
+
+        if is_ambiguous and state.can_call_model:
             try:
+                if known_files:
+                    keywords = [
+                        tok
+                        for tok in re.findall(r"\b[a-zA-Z0-9_-]{3,}\b", state.query.lower())
+                        if tok not in COMMON_STOPWORDS and tok not in ACTION_VERBS
+                    ]
+                    domain_hints = [
+                        "service",
+                        "model",
+                        "rag",
+                        "llm",
+                        "ai",
+                        "config",
+                        "api",
+                        "controller",
+                        "client",
+                        "auth",
+                        "payment",
+                        "db",
+                        "worker",
+                    ]
+
+                    def file_priority(f: str) -> tuple[int, str]:
+                        f_lower = f.lower()
+                        has_kw = any(kw in f_lower for kw in keywords)
+                        has_hint = any(h in f_lower for h in domain_hints)
+                        if has_kw:
+                            return (0, f)
+                        if has_hint:
+                            return (1, f)
+                        return (2, f)
+
+                    sorted_files = sorted(known_files, key=file_priority)
+                    preview = f"Query: {state.query}\nRepository files:\n" + "\n".join(
+                        sorted_files[:120]
+                    )
+                else:
+                    preview = f"Query: {state.query}"
+
                 plan, tokens = await self.llm.plan_investigation(
                     intent=state.intent,
-                    context_preview=f"Query: {state.query}",
+                    context_preview=preview,
                 )
                 state.record_model_call(
                     prompt_tokens=tokens.get("prompt_tokens", 0),
                     completion_tokens=tokens.get("completion_tokens", 0),
                 )
+
+                # Propagate identified targets to intent so downstream stages (gather, ownership, changes) use them
+                if plan.target_files and state.intent:
+                    for tf in plan.target_files:
+                        if known_files:
+                            if tf in known_files and tf not in state.intent.target_files:
+                                state.intent.target_files.append(tf)
+                        elif tf not in state.intent.target_files:
+                            state.intent.target_files.append(tf)
+                    if not state.intent.target_files:
+                        for tf in plan.target_files[:5]:
+                            if tf not in state.intent.target_files:
+                                state.intent.target_files.append(tf)
+
+                if plan.target_symbols and state.intent:
+                    for ts in plan.target_symbols:
+                        if ts not in state.intent.target_symbols:
+                            state.intent.target_symbols.append(ts)
+
                 state.plan = plan
                 return plan
             except Exception as e:
@@ -147,8 +220,16 @@ class InvestigationEngine:
         evidence_items: List[Dict[str, Any]] = []
         signals: Dict[str, Any] = {}
 
-        target_files = state.intent.target_files if state.intent else []
-        target_symbols = state.intent.target_symbols if state.intent else []
+        target_files = (
+            state.intent.target_files
+            if (state.intent and state.intent.target_files)
+            else (state.plan.target_files if state.plan else [])
+        )
+        target_symbols = (
+            state.intent.target_symbols
+            if (state.intent and state.intent.target_symbols)
+            else (state.plan.target_symbols if state.plan else [])
+        )
 
         # 1. Gather code evidence
         if code_snippets:
@@ -345,15 +426,15 @@ class InvestigationEngine:
                 evidence_items.append(ev)
 
         # 4. Compute deterministic blast radius, risk, and co-change signals
-        if target_files:
-            # Query static dependencies for repository
-            dep_query = select(CodeDependency).where(
-                CodeDependency.repository_id == state.repository_id
-            )
-            dep_res = await db.execute(dep_query)
-            db_deps = dep_res.scalars().all()
-            static_edges = [(d.source_path, d.target_path) for d in db_deps]
+        # Query static dependencies for repository
+        dep_query = select(CodeDependency).where(
+            CodeDependency.repository_id == state.repository_id
+        )
+        dep_res = await db.execute(dep_query)
+        db_deps = dep_res.scalars().all()
+        static_edges = [(d.source_path, d.target_path) for d in db_deps]
 
+        if target_files:
             # Query source files to discover all test files in repository
             sf_query = select(SourceFile.path).where(
                 SourceFile.repository_id == state.repository_id
@@ -682,7 +763,36 @@ class InvestigationEngine:
             }
             evidence_items.append(ev_decomp)
 
+        # Code ownership & reviewer recommendation
+        ownership_report = await CodeOwnershipAnalyzer.query_and_analyze(
+            db=db,
+            repository_id=state.repository_id,
+            target_files=target_files,
+            blast_radius_files=blast_files,
+            current_author=None,
+        )
+        signals["ownership"] = ownership_report.to_dict()
+
+        rev_snippets = [
+            f"{r.author_name} ({r.role}, score {r.score:.2f}): {r.rationale}"
+            for r in ownership_report.recommended_reviewers[:3]
+        ]
+        ev_ownership = {
+            "id": f"ev-ownership-{len(evidence_items) + 1}",
+            "source_type": EvidenceSourceType.COMMIT,
+            "source_id": "code-ownership",
+            "title": f"Code Ownership & Reviewers (Bus Factor: {ownership_report.overall_bus_factor})",
+            "snippet": (
+                f"{ownership_report.summary}"
+                + (f" Recommended: {'; '.join(rev_snippets)}" if rev_snippets else "")
+            ),
+            "confidence": 1.0,
+            "extra_metadata": ownership_report.to_dict(),
+        }
+        evidence_items.append(ev_ownership)
+
         state.gathered_evidence = evidence_items
+
         state.gathered_signals = signals
         state.gathered_context = {
             "target_files": target_files,
@@ -755,6 +865,16 @@ class InvestigationEngine:
                     f"({', '.join(c['files'])}). Suggested PR: '{c['suggested_pr_title']}'. "
                     f"Branch: '{c['suggested_branch_name']}'. Rationale: {c['rationale']}\n"
                 )
+
+        ownership_sig = state.gathered_signals.get("ownership", {})
+        if ownership_sig.get("recommended_reviewers"):
+            context_str += (
+                f"Code Ownership (Bus Factor: {ownership_sig.get('overall_bus_factor', 1)}):\n"
+            )
+            for rev in ownership_sig["recommended_reviewers"][:3]:
+                context_str += f"- Recommended Reviewer: {rev['author_name']} ({rev['role']}, score: {rev['score']}): {rev['rationale']}\n"
+            for warn in ownership_sig.get("knowledge_loss_warnings", [])[:2]:
+                context_str += f"- Ownership Alert: {warn}\n"
 
         try:
             summary, claims, tokens, code_changes = await self.llm.reason_investigation(
@@ -930,6 +1050,17 @@ class InvestigationEngine:
                     f"PR #{c['recommended_order']} ({c['name']}): branch `{c['suggested_branch_name']}` -> {c['suggested_pr_title']}."
                 )
 
+        # Code ownership and reviewer recommendations
+        ownership_sig = state.gathered_signals.get("ownership", {})
+        if ownership_sig.get("recommended_reviewers"):
+            top_rev = ownership_sig["recommended_reviewers"][0]
+            recommended_checks.append(
+                f"Request code review from domain expert {top_rev['author_name']} ({top_rev['role']})."
+            )
+        for warn in ownership_sig.get("knowledge_loss_warnings", []):
+            if warn not in unknowns:
+                unknowns.append(warn)
+
         if state.gathered_signals.get("change_risk", {}).get("shannon_entropy", 0) > 1.5:
             recommended_checks.append("High churn entropy detected: ensure changes remain modular.")
 
@@ -1046,6 +1177,25 @@ class InvestigationEngine:
         inv.status = InvestigationStatus.PLANNING
         await db.commit()
 
+        # Populate known repository files and symbols to assist intent normalization
+        known_files: List[str] = []
+        known_symbols: List[str] = []
+        try:
+            sf_query = select(SourceFile.path).where(SourceFile.repository_id == inv.repository_id)
+            sf_res = await db.execute(sf_query)
+            known_files = [r for r in sf_res.scalars().all()]
+
+            sym_query = (
+                select(Symbol.name)
+                .join(SourceFile, Symbol.file_id == SourceFile.id)
+                .where(SourceFile.repository_id == inv.repository_id)
+                .limit(500)
+            )
+            sym_res = await db.execute(sym_query)
+            known_symbols = [r for r in sym_res.scalars().all()]
+        except Exception as e:
+            logger.debug(f"Could not load repository files/symbols for intent normalization: {e}")
+
         state = await self.initialize_state(
             investigation_id=inv.id,
             repository_id=inv.repository_id,
@@ -1053,10 +1203,83 @@ class InvestigationEngine:
             target_path=target_path,
             target_symbol=target_symbol,
             diff=diff,
+            known_files=known_files,
+            known_symbols=known_symbols,
         )
 
+        # If target_symbol was provided or detected but no target_files, resolve the file(s) owning the symbol
+        if state.intent and not state.intent.target_files and state.intent.target_symbols:
+            try:
+                sym_file_stmt = (
+                    select(SourceFile.path)
+                    .join(Symbol, Symbol.file_id == SourceFile.id)
+                    .where(
+                        SourceFile.repository_id == inv.repository_id,
+                        Symbol.name.in_(state.intent.target_symbols),
+                    )
+                    .limit(5)
+                )
+                sym_file_res = await db.execute(sym_file_stmt)
+                for sp in sym_file_res.scalars().all():
+                    if sp not in state.intent.target_files:
+                        state.intent.target_files.append(sp)
+            except Exception as e:
+                logger.debug(f"Could not resolve file from symbol: {e}")
+
+        # If still no target_files detected, match query keywords against known repository file paths & symbols
+        if state.intent and not state.intent.target_files:
+            query_tokens = [
+                tok
+                for tok in re.findall(r"\b[a-zA-Z0-9_-]{3,}\b", inv.query.lower())
+                if tok not in COMMON_STOPWORDS and tok not in ACTION_VERBS
+            ]
+            if known_files:
+                for tok in query_tokens:
+                    tok_root = tok[:-1] if tok.endswith("s") and len(tok) > 3 else tok
+                    for kf in known_files:
+                        kf_lower = kf.lower()
+                        stem = kf_lower.split("/")[-1].split(".")[0]
+                        if (
+                            tok in kf_lower
+                            or tok_root in kf_lower
+                            or stem in tok
+                            or (len(stem) >= 3 and stem in query_tokens)
+                        ) and kf not in state.intent.target_files:
+                            state.intent.target_files.append(kf)
+                        if len(state.intent.target_files) >= 5:
+                            break
+                    if len(state.intent.target_files) >= 5:
+                        break
+
+            # If still no target_files, match query tokens against Symbol names in repository
+            if not state.intent.target_files and query_tokens:
+                try:
+                    sym_conditions = []
+                    for tok in query_tokens[:5]:
+                        tok_root = tok[:-1] if tok.endswith("s") and len(tok) > 3 else tok
+                        sym_conditions.append(Symbol.name.ilike(f"%{tok}%"))
+                        if tok_root != tok:
+                            sym_conditions.append(Symbol.name.ilike(f"%{tok_root}%"))
+
+                    if sym_conditions:
+                        sym_match_stmt = (
+                            select(SourceFile.path)
+                            .join(Symbol, Symbol.file_id == SourceFile.id)
+                            .where(
+                                SourceFile.repository_id == inv.repository_id,
+                                or_(*sym_conditions),
+                            )
+                            .limit(5)
+                        )
+                        sym_matches = await db.execute(sym_match_stmt)
+                        for sp in sym_matches.scalars().all():
+                            if sp not in state.intent.target_files:
+                                state.intent.target_files.append(sp)
+                except Exception as e:
+                    logger.debug(f"Could not match symbols by query tokens: {e}")
+
         try:
-            await self.plan(state)
+            await self.plan(state, known_files=known_files)
             inv.status = InvestigationStatus.GATHERING
             await db.commit()
 

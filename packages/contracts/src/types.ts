@@ -876,6 +876,52 @@ export interface ChangeDecompositionReport {
   summary: string;
 }
 
+export interface AuthorCommitStat {
+  author_name: string;
+  author_email: string;
+  commit_count: number;
+  lines_added: number;
+  lines_deleted: number;
+  raw_churn: number;
+  decayed_churn: number;
+  ownership_percentage: number;
+  last_committed_at?: string | null;
+  days_since_last_commit?: number | null;
+}
+
+export interface FileOwnership {
+  file_path: string;
+  total_commits: number;
+  primary_owner?: AuthorCommitStat | null;
+  co_owners: AuthorCommitStat[];
+  all_contributors: AuthorCommitStat[];
+  ownership_level: 'HIGH' | 'MEDIUM' | 'DIFFUSED';
+  bus_factor: number;
+}
+
+export interface ReviewerRecommendation {
+  author_name: string;
+  author_email: string;
+  score: number;
+  role: 'PRIMARY_OWNER' | 'COMPONENT_EXPERT' | 'BLAST_RADIUS_GUARDIAN';
+  rationale: string;
+  target_files_owned: string[];
+  blast_radius_files_owned: string[];
+  commits_count: number;
+  days_since_last_commit?: number | null;
+}
+
+export interface CodeOwnershipReport {
+  target_files: string[];
+  blast_radius_files: string[];
+  file_ownerships: FileOwnership[];
+  recommended_reviewers: ReviewerRecommendation[];
+  overall_bus_factor: number;
+  knowledge_loss_warnings: string[];
+  summary: string;
+}
+
+
 
 
 
