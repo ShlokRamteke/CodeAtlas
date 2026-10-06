@@ -23,7 +23,7 @@ from app.models.issue import Issue, IssueState
 from app.models.pull_request import PullRequest, PullRequestState
 from app.models.repository import Repository
 from app.models.source_file import SourceFile
-from app.models.symbol import Symbol, SymbolKind
+from app.models.symbol import ArchitecturalRole, Symbol, SymbolKind
 
 __all__ = [
     "Base",
@@ -31,6 +31,7 @@ __all__ = [
     "SourceFile",
     "Symbol",
     "SymbolKind",
+    "ArchitecturalRole",
     "CodeDependency",
     "DependencyKind",
     "Commit",

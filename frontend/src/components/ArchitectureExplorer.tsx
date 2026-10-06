@@ -374,6 +374,7 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
   const [symbols, setSymbols] = useState<SymbolItem[]>([]);
   const [symbolQuery, setSymbolQuery] = useState("");
   const [kindFilter, setKindFilter] = useState<string>("");
+  const [roleFilter, setRoleFilter] = useState<string>("");
   const [dependencies, setDependencies] = useState<CodeDependencyItem[]>([]);
   const [projectContext, setProjectContext] = useState<ProjectContext | null>(null);
   const [selectedContextComp, setSelectedContextComp] = useState<string>("");
@@ -421,10 +422,11 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
       fetchRepositorySymbols(
         repository.id,
         symbolQuery || undefined,
-        kindFilter || undefined
+        kindFilter || undefined,
+        roleFilter || undefined
       ).then(setSymbols);
     }
-  }, [activeTab, symbolQuery, kindFilter, repository.id]);
+  }, [activeTab, symbolQuery, kindFilter, roleFilter, repository.id]);
 
   useEffect(() => {
     if (activeTab === "project_context") {
@@ -945,6 +947,19 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
                 <option value="type">Types</option>
                 <option value="method">Methods</option>
               </select>
+              <select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value)}
+                className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
+              >
+                <option value="">All Architectural Roles</option>
+                <option value="controller">Controllers</option>
+                <option value="service">Services</option>
+                <option value="repository">Repositories</option>
+                <option value="entity">Entities</option>
+                <option value="middleware">Middleware</option>
+                <option value="utility">Utilities</option>
+              </select>
             </div>
 
             {/* Symbols Table */}
@@ -953,6 +968,7 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
                 <thead className="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800">
                   <tr>
                     <th className="p-3">Symbol</th>
+                    <th className="p-3">Role</th>
                     <th className="p-3">Kind</th>
                     <th className="p-3">Signature</th>
                     <th className="p-3 text-right">Lines</th>
@@ -961,7 +977,7 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
                 <tbody className="divide-y divide-slate-800/60 bg-slate-950/40">
                   {symbols.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="p-6 text-center text-slate-500">
+                      <td colSpan={5} className="p-6 text-center text-slate-500">
                         No symbols match your filter.
                       </td>
                     </tr>
@@ -969,6 +985,29 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
                     symbols.map((sym) => (
                       <tr key={sym.id} className="hover:bg-slate-800/30 transition font-mono">
                         <td className="p-3 font-semibold text-white">{sym.name}</td>
+                        <td className="p-3">
+                          {sym.architecturalRole ? (
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold border ${
+                                sym.architecturalRole === "controller"
+                                  ? "bg-purple-500/10 text-purple-300 border-purple-500/30"
+                                  : sym.architecturalRole === "service"
+                                  ? "bg-blue-500/10 text-blue-300 border-blue-500/30"
+                                  : sym.architecturalRole === "repository"
+                                  ? "bg-amber-500/10 text-amber-300 border-amber-500/30"
+                                  : sym.architecturalRole === "entity"
+                                  ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/30"
+                                  : sym.architecturalRole === "middleware"
+                                  ? "bg-rose-500/10 text-rose-300 border-rose-500/30"
+                                  : "bg-slate-800 text-slate-300 border-slate-700"
+                              }`}
+                            >
+                              {sym.architecturalRole}
+                            </span>
+                          ) : (
+                            <span className="text-slate-600">—</span>
+                          )}
+                        </td>
                         <td className="p-3">
                           <span className="px-2 py-0.5 rounded-full text-[10px] uppercase font-bold bg-slate-800 text-indigo-300 border border-indigo-500/20">
                             {sym.kind}

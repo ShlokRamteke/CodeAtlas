@@ -7,7 +7,9 @@ and C4 container boundary detection with calibrated fallback.
 
 from __future__ import annotations
 
+from app.models.symbol import ArchitecturalRole
 from app.semantic.client import MockSystemOneClient, SystemOneClient
+from app.semantic.symbol_classifier import SymbolRoleClassifier
 from app.semantic.systemone import (
     ChoiceAnswer,
     ChoiceQuestion,
@@ -25,6 +27,7 @@ from app.semantic.systemone import (
 )
 
 __all__ = [
+    "ArchitecturalRole",
     "ChoiceAnswer",
     "ChoiceQuestion",
     "DecisionResult",
@@ -34,6 +37,7 @@ __all__ = [
     "QuestionType",
     "ScoreAnswer",
     "ScoreQuestion",
+    "SymbolRoleClassifier",
     "SystemOneAnswer",
     "SystemOneClient",
     "SystemOneQuestion",

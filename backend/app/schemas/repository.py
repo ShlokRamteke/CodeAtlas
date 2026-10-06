@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict
 
 from app.models.dependency import DependencyKind
 from app.models.repository import RepositoryStatus
-from app.models.symbol import SymbolKind
+from app.models.symbol import ArchitecturalRole, SymbolKind
 
 
 class RepositoryBase(BaseModel):
@@ -47,6 +47,7 @@ class SymbolRead(BaseModel):
     line_end: int
     signature: Optional[str] = None
     docstring: Optional[str] = None
+    architectural_role: Optional[ArchitecturalRole] = None
 
 
 class CodeDependencyRead(BaseModel):
@@ -119,6 +120,7 @@ class ContextEntitySchema(BaseModel):
     change_count: int = 0
     active_authors: List[str] = []
     related_adrs: List[str] = []
+    architectural_role: Optional[str] = None
 
 
 class ContextRelationshipSchema(BaseModel):

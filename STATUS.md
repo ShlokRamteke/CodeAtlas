@@ -6,11 +6,11 @@ Phase 5 — Semantic Indexing & Decision Models
 
 ## Current Task
 
-PH5-01 Complete &mdash; System One Client & Protocol Adapter
+PH5-02 Complete &mdash; Architectural Symbol Role Classifier (AST Indexing)
 
 ## Status
 
-PH5-01 COMPLETE / READY FOR PH5-02
+PH5-02 COMPLETE / READY FOR PH5-03
 
 
 
@@ -180,10 +180,19 @@ developer understand a proposed change before implementation.
   - Concrete import resolution (`RelationshipAnalyzer.resolve_import_path`): resolves `@/`, `~/`, relative `../`, and Python module imports to target files in the repository.
   - C4 Component Reference Resolver (`_find_component_for_path`): maps import targets directly to C4 component IDs and populates component dependencies, ensuring connected Mermaid `C4Component` and `C4Container` relationship edges.
   - 100% automated test pass rate across 148 pytest tests and ruff clean.
+- **Phase 5 — Task PH5-02 (Architectural Symbol Role Classifier)**:
+  - Defined `ArchitecturalRole` enum (`controller`, `service`, `repository`, `entity`, `middleware`, `utility`) in `app.models.symbol` and `@codeatlas/contracts`.
+  - Added `architectural_role` column to `Symbol` model with Alembic migration `0007_add_symbol_architectural_role`.
+  - Extended Tree-sitter AST parser (`ASTCodeParser`) to extract symbol decorators and method names across Python and TypeScript/JavaScript.
+  - Implemented `SymbolRoleClassifier` in `app.semantic.symbol_classifier` using `/v1/systemone` `ChoiceQuestion` batch evaluations with calibrated confidence gating ($P \ge 0.85$) and fast deterministic heuristic rule fallback.
+  - Integrated batch symbol classification directly into `IngestionEngine` and propagated `architectural_role` onto canonical `ContextEntity` model and schemas.
+  - Added `role` query parameter filter to `GET /api/v1/repositories/{id}/symbols`.
+  - Enriched C4 component export with aggregated `symbol_roles` counts and `dominant_role` tagging.
+  - 100% automated test pass rate across 161 pytest tests (13 new unit and integration tests), ruff clean, and clean contracts/frontend typecheck.
 
 ## Remaining
 
-- **Phase 5**: Semantic Indexing & Decision Models (PH5-02 symbol roles, PH5-03 invariant mining, PH5-04 commit intent, PH5-05 C4 container classifier, PH5-06 local serving).
+- **Phase 5**: Semantic Indexing & Decision Models (PH5-03 invariant mining, PH5-04 commit intent, PH5-05 C4 container classifier, PH5-06 local serving).
 - **Phase 6**: SaaS Experience & Core (Repository overview, health indicators, async indexing workers, GitHub App).
 - **Phase 7**: Model Context Protocol (MCP) Integration.
 - **Phase 8**: Evaluation & Production Hardening.
@@ -194,7 +203,7 @@ None known.
 
 ## Next Action
 
-Start Task PH5-02: Architectural Symbol Role Classifier (AST Indexing).
+Start Task PH5-03: Semantic Constraint & Invariant Mining (Documentation Indexing).
 
 ## Session Rule
 

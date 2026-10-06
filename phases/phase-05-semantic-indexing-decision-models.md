@@ -50,11 +50,11 @@ Enriched ProjectContext & C4 Architecture Models
 - [x] Mock decision provider for fast unit/integration testing without running local model server in CI.
 
 ### PH5-02: Architectural Symbol Role Classifier (AST Indexing)
-- [ ] Define `ArchitecturalRole` enum (`controller`, `service`, `repository`, `entity`, `middleware`, `utility`).
-- [ ] Extend `tree_sitter_parser.py` and `relationship_analyzer.py` to batch-evaluate class/function symbols.
-- [ ] Extract symbol signature, decorators, method names, and docstring as decision state.
-- [ ] Persist `architectural_role` on `ContextEntity` model and database schemas.
-- [ ] Expose symbol role in symbol query endpoints and C4 component exports.
+- [x] Define `ArchitecturalRole` enum (`controller`, `service`, `repository`, `entity`, `middleware`, `utility`).
+- [x] Extend `tree_sitter_parser.py` and `relationship_analyzer.py` to batch-evaluate class/function symbols.
+- [x] Extract symbol signature, decorators, method names, and docstring as decision state.
+- [x] Persist `architectural_role` on `ContextEntity` model and database schemas.
+- [x] Expose symbol role in symbol query endpoints and C4 component exports.
 
 ### PH5-03: Semantic Constraint & Invariant Mining (Documentation Indexing)
 - [ ] Extend `engineering_context_parser.py` to evaluate natural-language document sentences in markdown (`README.md`, `ARCHITECTURE.md`, `ADRs`).

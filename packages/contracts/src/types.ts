@@ -36,6 +36,8 @@ export interface SourceFile {
 
 export type SymbolKind = 'function' | 'class' | 'interface' | 'type' | 'variable' | 'constant' | 'module' | 'method';
 
+export type ArchitecturalRole = 'controller' | 'service' | 'repository' | 'entity' | 'middleware' | 'utility';
+
 export interface SymbolItem {
   id: string;
   fileId: string;
@@ -46,6 +48,7 @@ export interface SymbolItem {
   lineEnd: number;
   signature?: string | null;
   docstring?: string | null;
+  architecturalRole?: ArchitecturalRole | null;
   createdAt: string;
 }
 
@@ -74,6 +77,7 @@ export interface ContextEntity {
   changeCount?: number;
   activeAuthors?: string[];
   relatedAdrs?: string[];
+  architecturalRole?: ArchitecturalRole | string;
 }
 
 export interface ContextRelationship {
@@ -949,6 +953,10 @@ export interface C4Component {
   file_count?: number;
   fileCount?: number;
   dependencies: string[];
+  symbol_roles?: Record<string, number>;
+  symbolRoles?: Record<string, number>;
+  dominant_role?: string | null;
+  dominantRole?: string | null;
 }
 
 export interface C4Container {

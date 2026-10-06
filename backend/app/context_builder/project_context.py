@@ -22,6 +22,7 @@ class ContextEntity:
     change_count: int = 0
     active_authors: List[str] = field(default_factory=list)
     related_adrs: List[str] = field(default_factory=list)
+    architectural_role: Optional[str] = None
 
 
 @dataclass

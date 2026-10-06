@@ -77,6 +77,18 @@ async def test_repository_ingest_and_query_endpoints(client: AsyncClient) -> Non
     assert len(filtered) == 1
     assert filtered[0]["name"] == "PaymentService"
     assert filtered[0]["kind"] == "class"
+    assert filtered[0]["architectural_role"] == "service"
+
+    # Filter symbols by architectural role
+    role_service_res = await client.get(f"/api/v1/repositories/{repo_id}/symbols?role=service")
+    assert role_service_res.status_code == 200
+    service_symbols = role_service_res.json()
+    assert any(s["name"] == "PaymentService" for s in service_symbols)
+
+    role_entity_res = await client.get(f"/api/v1/repositories/{repo_id}/symbols?role=entity")
+    assert role_entity_res.status_code == 200
+    entity_symbols = role_entity_res.json()
+    assert any(s["name"] == "Payment" for s in entity_symbols)
 
     # 4. Query dependencies
     deps_res = await client.get(f"/api/v1/repositories/{repo_id}/dependencies")

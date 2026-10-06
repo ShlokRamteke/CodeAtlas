@@ -691,3 +691,72 @@ def test_c4_fullstack_monorepo():
     # Container relationships include frontend calling backend
     cont_mmd = model.to_mermaid_container()
     assert "Rel(container_frontend, container_backend" in cont_mmd
+
+
+def test_c4_component_symbol_roles_aggregation():
+    """Verify that symbol architectural roles are aggregated onto C4 components."""
+    entities = [
+        ContextEntity(
+            id="f1",
+            name="backend/app/api/users.py",
+            kind="file",
+            path="backend/app/api/users.py",
+            language="Python",
+        ),
+        ContextEntity(
+            id="s1",
+            name="get_users",
+            kind="symbol",
+            path="backend/app/api/users.py",
+            signature="def get_users():",
+            architectural_role="controller",
+        ),
+        ContextEntity(
+            id="s2",
+            name="create_user",
+            kind="symbol",
+            path="backend/app/api/users.py",
+            signature="def create_user():",
+            architectural_role="controller",
+        ),
+        ContextEntity(
+            id="f2",
+            name="backend/app/repositories/user_repo.py",
+            kind="file",
+            path="backend/app/repositories/user_repo.py",
+            language="Python",
+        ),
+        ContextEntity(
+            id="s3",
+            name="UserRepository",
+            kind="symbol",
+            path="backend/app/repositories/user_repo.py",
+            signature="class UserRepository:",
+            architectural_role="repository",
+        ),
+    ]
+
+    ctx = ProjectContext(
+        target_type="repository",
+        target_id="repo-roles",
+        target_name="role-test-repo",
+        summary="Role test app",
+        entities=entities,
+        relationships=[],
+    )
+
+    model = C4ArchitectureExporter.export_from_project_context(ctx, repo_name="role-test-repo")
+
+    # Find component handling users API
+    api_comp = next((c for c in model.components if "api" in c.id or "user" in c.id), None)
+    assert api_comp is not None
+    assert "controller" in api_comp.symbol_roles
+    assert api_comp.symbol_roles["controller"] == 2
+    assert api_comp.dominant_role == "controller"
+
+    # Find repo component
+    repo_comp = next((c for c in model.components if "repo" in c.id), None)
+    assert repo_comp is not None
+    assert "repository" in repo_comp.symbol_roles
+    assert repo_comp.symbol_roles["repository"] == 1
+    assert repo_comp.dominant_role == "repository"

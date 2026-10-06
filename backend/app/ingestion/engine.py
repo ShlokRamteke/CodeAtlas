@@ -6,7 +6,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +17,7 @@ from app.models.source_file import SourceFile
 from app.models.symbol import Symbol, SymbolKind
 from app.parser.ast_parser import ASTCodeParser, ParsedFileResult
 from app.parser.relationship_analyzer import ArchitectureGraph, RelationshipAnalyzer
+from app.semantic.symbol_classifier import SymbolRoleClassifier
 
 # Ignore common build and binary directories
 IGNORED_DIRS = {
@@ -105,10 +106,15 @@ def redact_secrets(code: str) -> str:
 class IngestionEngine:
     """Deterministic repository ingestion and symbol indexing engine."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        symbol_classifier: Optional[SymbolRoleClassifier] = None,
+    ) -> None:
         self.session = session
         self.parser = ASTCodeParser()
         self.analyzer = RelationshipAnalyzer()
+        self.symbol_classifier = symbol_classifier or SymbolRoleClassifier()
 
     @staticmethod
     def compute_hash(content: str) -> str:
@@ -190,13 +196,21 @@ class IngestionEngine:
             self.session.add(source_file)
             await self.session.flush()
 
-            # Add symbols
-            for sym in parsed.symbols:
+            # Add symbols with architectural roles
+            role_decisions = await self.symbol_classifier.classify_symbols_batch(
+                parsed.symbols, parsed.path
+            )
+
+            for idx, sym in enumerate(parsed.symbols):
                 kind_val = SymbolKind.FUNCTION
                 try:
                     kind_val = SymbolKind(sym.kind)
                 except ValueError:
                     kind_val = SymbolKind.FUNCTION
+
+                q_id = f"q_{idx}_{sym.name}"
+                role_decision = role_decisions.get(q_id)
+                role_val = role_decision.value if role_decision else None
 
                 symbol_record = Symbol(
                     id=uuid.uuid4(),
@@ -208,6 +222,7 @@ class IngestionEngine:
                     line_end=sym.line_end,
                     signature=sym.signature,
                     docstring=sym.docstring,
+                    architectural_role=role_val,
                 )
                 self.session.add(symbol_record)
                 total_symbols += 1
