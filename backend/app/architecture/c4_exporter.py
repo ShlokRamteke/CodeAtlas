@@ -112,6 +112,8 @@ def is_architectural_code_file(path: str, language: Optional[str] = None) -> boo
         return False
     if name in {"license", "copying", "readme", "dockerfile", "makefile", "procfile"}:
         return False
+    if any(name.endswith(sfx) for sfx in [".config.js", ".config.ts", ".config.mjs", ".config.cjs", "rc.js", "rc.ts"]):
+        return False
     if ext in NON_CODE_EXTENSIONS:
         return False
     if ext in CODE_EXTENSIONS:
@@ -653,6 +655,27 @@ class C4ArchitectureModel:
 
         # Render relationships
         rendered_rels = set()
+
+        # Connect Person to primary entrypoint component if person connects to this container
+        for r in self.relationships:
+            if r.source_id in [p.id for p in self.persons] and r.target_id == target_container.id:
+                entry_comp = next(
+                    (c for c in target_container.components if any(k in c.source_path.lower() for k in ["app", "router", "route", "page", "main", "index", "controller"])),
+                    target_container.components[0] if target_container.components else None,
+                )
+                if entry_comp:
+                    p_obj = next(p for p in self.persons if p.id == r.source_id)
+                    p_sid = _sanitize_id(p_obj.id)
+                    if p_sid not in declared_node_ids:
+                        declared_node_ids.add(p_sid)
+                        lines.append(f'  Person({p_sid}, "{_sanitize_text(p_obj.name)}", "{_sanitize_text(p_obj.description)}")')
+                    entry_sid = _sanitize_id(entry_comp.id)
+                    edge_key = (p_sid, entry_sid)
+                    if edge_key not in rendered_rels:
+                        rendered_rels.add(edge_key)
+                        tech = f', "{_sanitize_text(r.technology)}"' if r.technology else ""
+                        lines.append(f'  Rel({p_sid}, {entry_sid}, "{_sanitize_text(r.description)}"{tech})')
+
         for r in self.relationships:
             s_shape = resolve_endpoint_to_shape(r.source_id)
             t_shape = resolve_endpoint_to_shape(r.target_id)
@@ -911,19 +934,26 @@ class C4ArchitectureExporter:
                 cont_type = "web_app"
                 top_dir = "frontend"
 
-                if len(parts) >= 3:
-                    if parts[0].lower() == "src":
-                        comp_path = "/".join(parts[:2])
-                        comp_name = parts[1].title()
-                    else:
-                        comp_path = "/".join(parts[:2])
-                        comp_name = " / ".join(parts[:2]).title()
-                elif len(parts) == 2:
-                    comp_path = parts[0]
-                    comp_name = "App Pages" if parts[0].lower() == "app" else parts[0].title()
+                comp_root = parts[0].lower()
+                if comp_root == "src" and len(parts) >= 2:
+                    comp_root = parts[1].lower()
+                    comp_path = f"src/{parts[1]}"
                 else:
+                    comp_path = parts[0]
+
+                if comp_root == "app":
+                    comp_name = "App Router (Pages & Routes)"
+                elif comp_root == "components":
+                    comp_name = "UI Components"
+                elif comp_root == "hooks":
+                    comp_name = "State & Lifecycle Hooks"
+                elif comp_root in ["lib", "utils"]:
+                    comp_name = "Utilities & Libraries"
+                elif len(parts) == 1:
                     comp_path = f.path
                     comp_name = p.stem.title()
+                else:
+                    comp_name = comp_root.title()
 
             elif repo_layout == "backend_app":
                 cont_id = "container_backend"

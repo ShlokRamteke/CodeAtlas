@@ -478,8 +478,9 @@ def test_c4_pure_frontend_nextjs_repository_detection():
     assert "TypeScript" in frontend_cont.technology
     assert "Backend API" not in frontend_cont.description
 
-    # 2. Components belong to container_frontend
-    assert len(model.components) >= 3
+    # 2. Components belong to container_frontend and exclude root configs
+    comp_names = {c.name for c in model.components}
+    assert "Next.Config" not in comp_names
     for comp in model.components:
         assert comp.container_id == "container_frontend"
 
@@ -491,4 +492,11 @@ def test_c4_pure_frontend_nextjs_repository_detection():
     assert "Lib Service" not in mmd
     assert "Pulls Git history and issues" not in mmd
     assert "Rel(person_dev, container_frontend" in mmd
+
+    # 4. Mermaid component diagram connects person to primary app component
+    comp_mmd = model.to_mermaid_component()
+    assert "Container_Boundary" in comp_mmd
+    assert "comp_app" in comp_mmd
+    assert "Rel(person_dev, comp_app" in comp_mmd
+
 
