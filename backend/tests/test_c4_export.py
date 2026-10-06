@@ -504,12 +504,36 @@ def test_c4_pure_frontend_nextjs_repository_detection():
 def test_c4_component_diagram_with_alias_references():
     """Verify that alias imports (@/components, @/lib) generate connected edges in C4Component."""
     entities = [
-        ContextEntity(id="f1", name="app/page.tsx", kind="file", path="app/page.tsx", language="TypeScript"),
-        ContextEntity(id="s1", name="ConvertPage", kind="symbol", path="app/page.tsx", signature="export default function ConvertPage()"),
-        ContextEntity(id="f2", name="components/dropzone.tsx", kind="file", path="components/dropzone.tsx", language="TypeScript"),
-        ContextEntity(id="s2", name="Dropzone", kind="symbol", path="components/dropzone.tsx", signature="export function Dropzone()"),
-        ContextEntity(id="f3", name="lib/utils.ts", kind="file", path="lib/utils.ts", language="TypeScript"),
-        ContextEntity(id="s3", name="cn", kind="symbol", path="lib/utils.ts", signature="export function cn()"),
+        ContextEntity(
+            id="f1", name="app/page.tsx", kind="file", path="app/page.tsx", language="TypeScript"
+        ),
+        ContextEntity(
+            id="s1",
+            name="ConvertPage",
+            kind="symbol",
+            path="app/page.tsx",
+            signature="export default function ConvertPage()",
+        ),
+        ContextEntity(
+            id="f2",
+            name="components/dropzone.tsx",
+            kind="file",
+            path="components/dropzone.tsx",
+            language="TypeScript",
+        ),
+        ContextEntity(
+            id="s2",
+            name="Dropzone",
+            kind="symbol",
+            path="components/dropzone.tsx",
+            signature="export function Dropzone()",
+        ),
+        ContextEntity(
+            id="f3", name="lib/utils.ts", kind="file", path="lib/utils.ts", language="TypeScript"
+        ),
+        ContextEntity(
+            id="s3", name="cn", kind="symbol", path="lib/utils.ts", signature="export function cn()"
+        ),
     ]
 
     relationships = [
@@ -561,11 +585,37 @@ def test_c4_component_diagram_with_alias_references():
 def test_c4_pure_backend_express_repository():
     """Verify that a pure Express / Node.js backend repo generates only container_backend."""
     entities = [
-        ContextEntity(id="f1", name="server/controllers/formController.js", kind="file", path="server/controllers/formController.js", language="JavaScript"),
-        ContextEntity(id="s1", name="submitForm", kind="symbol", path="server/controllers/formController.js", signature="exports.submitForm"),
-        ContextEntity(id="f2", name="server/models/Form.js", kind="file", path="server/models/Form.js", language="JavaScript"),
-        ContextEntity(id="f3", name="server/middleware/adminAuth.js", kind="file", path="server/middleware/adminAuth.js", language="JavaScript"),
-        ContextEntity(id="f4", name="package.json", kind="file", path="package.json", language="JSON"),
+        ContextEntity(
+            id="f1",
+            name="server/controllers/formController.js",
+            kind="file",
+            path="server/controllers/formController.js",
+            language="JavaScript",
+        ),
+        ContextEntity(
+            id="s1",
+            name="submitForm",
+            kind="symbol",
+            path="server/controllers/formController.js",
+            signature="exports.submitForm",
+        ),
+        ContextEntity(
+            id="f2",
+            name="server/models/Form.js",
+            kind="file",
+            path="server/models/Form.js",
+            language="JavaScript",
+        ),
+        ContextEntity(
+            id="f3",
+            name="server/middleware/adminAuth.js",
+            kind="file",
+            path="server/middleware/adminAuth.js",
+            language="JavaScript",
+        ),
+        ContextEntity(
+            id="f4", name="package.json", kind="file", path="package.json", language="JSON"
+        ),
     ]
 
     ctx = ProjectContext(
@@ -600,9 +650,27 @@ def test_c4_pure_backend_express_repository():
 def test_c4_fullstack_monorepo():
     """Verify that a monorepo with both frontend and backend directories creates both containers."""
     entities = [
-        ContextEntity(id="f1", name="frontend/src/components/button.tsx", kind="file", path="frontend/src/components/button.tsx", language="TypeScript"),
-        ContextEntity(id="f2", name="backend/app/api/endpoints.py", kind="file", path="backend/app/api/endpoints.py", language="Python"),
-        ContextEntity(id="f3", name="backend/app/models/user.py", kind="file", path="backend/app/models/user.py", language="Python"),
+        ContextEntity(
+            id="f1",
+            name="frontend/src/components/button.tsx",
+            kind="file",
+            path="frontend/src/components/button.tsx",
+            language="TypeScript",
+        ),
+        ContextEntity(
+            id="f2",
+            name="backend/app/api/endpoints.py",
+            kind="file",
+            path="backend/app/api/endpoints.py",
+            language="Python",
+        ),
+        ContextEntity(
+            id="f3",
+            name="backend/app/models/user.py",
+            kind="file",
+            path="backend/app/models/user.py",
+            language="Python",
+        ),
     ]
 
     ctx = ProjectContext(
@@ -623,5 +691,3 @@ def test_c4_fullstack_monorepo():
     # Container relationships include frontend calling backend
     cont_mmd = model.to_mermaid_container()
     assert "Rel(container_frontend, container_backend" in cont_mmd
-
-

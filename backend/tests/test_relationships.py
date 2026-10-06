@@ -111,7 +111,5 @@ def test_resolve_import_path_aliases_and_relatives() -> None:
     assert res4 == "backend/app/models/user.py"
 
     # Unresolved fallback
-    res5 = RelationshipAnalyzer.resolve_import_path(
-        "app/page.tsx", "@/external/library", all_files
-    )
+    res5 = RelationshipAnalyzer.resolve_import_path("app/page.tsx", "@/external/library", all_files)
     assert res5 == "external/library"

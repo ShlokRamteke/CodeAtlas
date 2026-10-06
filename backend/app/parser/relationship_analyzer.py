@@ -236,7 +236,9 @@ class RelationshipAnalyzer:
                             target_path=resolved_target,
                             type="imports",
                             confidence=1.0 if is_resolved else 0.85,
-                            resolution_method="ast_import_resolver" if is_resolved else "tree_sitter_ast",
+                            resolution_method="ast_import_resolver"
+                            if is_resolved
+                            else "tree_sitter_ast",
                         )
                     )
                     if resolved_target not in comp.dependencies:

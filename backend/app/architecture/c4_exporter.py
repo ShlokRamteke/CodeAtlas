@@ -113,7 +113,10 @@ def is_architectural_code_file(path: str, language: Optional[str] = None) -> boo
         return False
     if name in {"license", "copying", "readme", "dockerfile", "makefile", "procfile"}:
         return False
-    if any(name.endswith(sfx) for sfx in [".config.js", ".config.ts", ".config.mjs", ".config.cjs", "rc.js", "rc.ts"]):
+    if any(
+        name.endswith(sfx)
+        for sfx in [".config.js", ".config.ts", ".config.mjs", ".config.cjs", "rc.js", "rc.ts"]
+    ):
         return False
     if ext in NON_CODE_EXTENSIONS:
         return False
@@ -245,7 +248,8 @@ def _detect_container_technology(
         has_next = any(
             "next.config" in getattr(item, "path", getattr(item, "source_path", str(item))).lower()
             or "app/page" in getattr(item, "path", getattr(item, "source_path", str(item))).lower()
-            or "app/layout" in getattr(item, "path", getattr(item, "source_path", str(item))).lower()
+            or "app/layout"
+            in getattr(item, "path", getattr(item, "source_path", str(item))).lower()
             for item in container_items
         )
         if has_next:
@@ -324,10 +328,7 @@ def _detect_repository_layout(all_entities: List[Any]) -> str:
         "remix.config.js",
         "astro.config.mjs",
     }
-    is_frontend_config = any(
-        Path(p).name.lower() in frontend_config_files
-        for p in all_paths_lower
-    )
+    is_frontend_config = any(Path(p).name.lower() in frontend_config_files for p in all_paths_lower)
     frontend_dir_signals = {"components", "hooks", "screens", "views", "styles", "widgets"}
     has_frontend_dirs = bool((top_dirs | dir_segments) & frontend_dir_signals)
     has_jsx_tsx = any(p.endswith(".tsx") or p.endswith(".jsx") for p in all_paths_lower)
@@ -363,7 +364,11 @@ def _detect_repository_layout(all_entities: List[Any]) -> str:
     ):
         return "frontend_app"
 
-    if (has_explicit_backend or has_backend_dirs or has_backend_app_dir) and not has_explicit_frontend and not has_frontend_dirs:
+    if (
+        (has_explicit_backend or has_backend_dirs or has_backend_app_dir)
+        and not has_explicit_frontend
+        and not has_frontend_dirs
+    ):
         return "backend_app"
 
     if has_explicit_frontend:
@@ -392,58 +397,59 @@ def _infer_component_info(
         cont_id = "container_frontend"
         cont_name = "Frontend Web Application"
         cont_type = "web_app"
-        top_dir = "frontend"
     elif repo_layout == "backend_app":
         cont_id = "container_backend"
         cont_name = "Backend API & Services"
         cont_type = "api"
-        top_dir = "backend"
     elif repo_layout == "monorepo_packages":
         pkg = parts[1] if len(parts) >= 2 else "core"
         cont_id = f"container_{_sanitize_id(pkg)}"
         cont_name = f"{pkg.title()} Package"
         cont_type = "library" if any(k in parts[0] for k in ["pack", "lib", "share"]) else "api"
-        top_dir = parts[0]
     else:
         top = parts[0].lower() if len(parts) > 1 else ""
         stem = p.stem.lower()
-        if top in ["frontend", "web", "client", "ui"] or (len(parts) == 1 and stem in ["index", "client", "ui", "web"]):
+        if top in ["frontend", "web", "client", "ui"] or (
+            len(parts) == 1 and stem in ["index", "client", "ui", "web"]
+        ):
             cont_id = "container_frontend"
             cont_name = "Frontend Application"
             cont_type = "web_app"
-            top_dir = "frontend"
-        elif top in ["backend", "server", "api"] or (len(parts) == 1 and stem in ["server", "api", "backend", "main"]):
+        elif top in ["backend", "server", "api"] or (
+            len(parts) == 1 and stem in ["server", "api", "backend", "main"]
+        ):
             cont_id = "container_backend"
             cont_name = "Backend API & Services"
             cont_type = "api"
-            top_dir = "backend"
         elif top in ["packages", "contracts", "shared", "libs"]:
             cont_id = "container_contracts"
             cont_name = "Shared Packages & Libraries"
             cont_type = "library"
-            top_dir = top
         elif top == "app":
             if any(file_path.endswith(ext) for ext in [".py", ".go", ".rs", ".rb"]):
                 cont_id = "container_backend"
                 cont_name = "Backend API & Services"
                 cont_type = "api"
-                top_dir = "backend"
             else:
                 cont_id = "container_frontend"
                 cont_name = "Frontend Application"
                 cont_type = "web_app"
-                top_dir = "frontend"
         else:
             cont_id = "container_core"
             cont_name = "Core Application"
             cont_type = "api"
-            top_dir = "root"
 
     # 2. Determine component path and name
     subparts = list(parts)
     wrapper_prefix = ""
     if len(subparts) > 1 and subparts[0].lower() in [
-        "frontend", "backend", "server", "client", "web", "ui", "packages"
+        "frontend",
+        "backend",
+        "server",
+        "client",
+        "web",
+        "ui",
+        "packages",
     ]:
         wrapper_prefix = subparts[0]
         subparts = subparts[1:]
@@ -464,7 +470,9 @@ def _infer_component_info(
         comp_path = "/".join(comp_path_parts)
 
         layer_names = {
-            "app": "App Router (Pages & Routes)" if cont_type == "web_app" else "Core Application Services",
+            "app": "App Router (Pages & Routes)"
+            if cont_type == "web_app"
+            else "Core Application Services",
             "pages": "Pages & Routes",
             "routes": "API Endpoints & Routing",
             "endpoints": "API Endpoints & Routing",
@@ -758,8 +766,14 @@ class C4ArchitectureModel:
         container_ids = {c.id for c in self.containers}
         connected_system_ids = set()
         for r in self.relationships:
-            src_c = next((comp.container_id for comp in self.components if comp.id == r.source_id), r.source_id)
-            tgt_c = next((comp.container_id for comp in self.components if comp.id == r.target_id), r.target_id)
+            src_c = next(
+                (comp.container_id for comp in self.components if comp.id == r.source_id),
+                r.source_id,
+            )
+            tgt_c = next(
+                (comp.container_id for comp in self.components if comp.id == r.target_id),
+                r.target_id,
+            )
             if src_c in container_ids and tgt_c not in container_ids:
                 connected_system_ids.add(_sanitize_id(tgt_c))
             elif tgt_c in container_ids and src_c not in container_ids:
@@ -882,7 +896,22 @@ class C4ArchitectureModel:
         for r in self.relationships:
             if r.source_id in [p.id for p in self.persons] and r.target_id == target_container.id:
                 entry_comp = next(
-                    (c for c in target_container.components if any(k in c.source_path.lower() for k in ["app", "router", "route", "page", "main", "index", "controller"])),
+                    (
+                        c
+                        for c in target_container.components
+                        if any(
+                            k in c.source_path.lower()
+                            for k in [
+                                "app",
+                                "router",
+                                "route",
+                                "page",
+                                "main",
+                                "index",
+                                "controller",
+                            ]
+                        )
+                    ),
                     target_container.components[0] if target_container.components else None,
                 )
                 if entry_comp:
@@ -890,13 +919,17 @@ class C4ArchitectureModel:
                     p_sid = _sanitize_id(p_obj.id)
                     if p_sid not in declared_node_ids:
                         declared_node_ids.add(p_sid)
-                        lines.append(f'  Person({p_sid}, "{_sanitize_text(p_obj.name)}", "{_sanitize_text(p_obj.description)}")')
+                        lines.append(
+                            f'  Person({p_sid}, "{_sanitize_text(p_obj.name)}", "{_sanitize_text(p_obj.description)}")'
+                        )
                     entry_sid = _sanitize_id(entry_comp.id)
                     edge_key = (p_sid, entry_sid)
                     if edge_key not in rendered_rels:
                         rendered_rels.add(edge_key)
                         tech = f', "{_sanitize_text(r.technology)}"' if r.technology else ""
-                        lines.append(f'  Rel({p_sid}, {entry_sid}, "{_sanitize_text(r.description)}"{tech})')
+                        lines.append(
+                            f'  Rel({p_sid}, {entry_sid}, "{_sanitize_text(r.description)}"{tech})'
+                        )
 
         for r in self.relationships:
             s_shape = resolve_endpoint_to_shape(r.source_id)
@@ -1212,10 +1245,7 @@ class C4ArchitectureExporter:
             or "supabase" in f.path.lower()
             for f in files
         )
-        has_db_model = any(
-            "model" in f.path.lower() or "db" in f.path.lower()
-            for f in files
-        )
+        has_db_model = any("model" in f.path.lower() or "db" in f.path.lower() for f in files)
         has_db = has_db_client or (has_db_model and repo_layout != "frontend_app")
 
         if has_db:
@@ -1252,11 +1282,8 @@ class C4ArchitectureExporter:
 
         # External systems
         has_github_integration = any(
-            "github" in f.path.lower() or "octokit" in f.path.lower()
-            for f in files
-        ) or any(
-            "github" in getattr(s, "name", "").lower() for s in symbols
-        )
+            "github" in f.path.lower() or "octokit" in f.path.lower() for f in files
+        ) or any("github" in getattr(s, "name", "").lower() for s in symbols)
 
         ext_github = C4System(
             id="sys_github",
@@ -1309,14 +1336,20 @@ class C4ArchitectureExporter:
         target_person_cont = (
             "container_frontend"
             if "container_frontend" in containers_map
-            else ("container_backend" if "container_backend" in containers_map else "container_core")
+            else (
+                "container_backend" if "container_backend" in containers_map else "container_core"
+            )
         )
         relationships.append(
             C4Relationship(
                 source_id="person_dev",
                 target_id=target_person_cont,
-                description="Uses" if target_person_cont == "container_frontend" else "Interacts with",
-                technology="HTTPS / Browser" if target_person_cont == "container_frontend" else "HTTPS / REST API",
+                description="Uses"
+                if target_person_cont == "container_frontend"
+                else "Interacts with",
+                technology="HTTPS / Browser"
+                if target_person_cont == "container_frontend"
+                else "HTTPS / REST API",
                 relationship_type="uses",
             )
         )
@@ -1344,7 +1377,9 @@ class C4ArchitectureExporter:
             )
 
         if has_github_integration:
-            gh_caller = "container_backend" if "container_backend" in containers_map else target_person_cont
+            gh_caller = (
+                "container_backend" if "container_backend" in containers_map else target_person_cont
+            )
             relationships.append(
                 C4Relationship(
                     source_id=gh_caller,
@@ -1356,7 +1391,9 @@ class C4ArchitectureExporter:
             )
 
         if has_investigation:
-            inv_caller = "container_backend" if "container_backend" in containers_map else target_person_cont
+            inv_caller = (
+                "container_backend" if "container_backend" in containers_map else target_person_cont
+            )
             relationships.append(
                 C4Relationship(
                     source_id=inv_caller,
@@ -1446,7 +1483,6 @@ class C4ArchitectureExporter:
             if not is_architectural_code_file(comp_info.path):
                 continue
 
-            path_parts = Path(comp_info.path).parts
             cont_id, cont_name, cont_type, comp_path, comp_name = _infer_component_info(
                 comp_info.path, repo_layout
             )
@@ -1557,15 +1593,21 @@ class C4ArchitectureExporter:
         target_person_container = (
             "container_frontend"
             if "container_frontend" in containers_map
-            else ("container_backend" if "container_backend" in containers_map else "container_core")
+            else (
+                "container_backend" if "container_backend" in containers_map else "container_core"
+            )
         )
         if target_person_container in containers_map:
             relationships.append(
                 C4Relationship(
                     source_id="person_dev",
                     target_id=target_person_container,
-                    description="Uses" if target_person_container == "container_frontend" else "Interacts with",
-                    technology="HTTPS / Browser" if target_person_container == "container_frontend" else "HTTPS / REST API",
+                    description="Uses"
+                    if target_person_container == "container_frontend"
+                    else "Interacts with",
+                    technology="HTTPS / Browser"
+                    if target_person_container == "container_frontend"
+                    else "HTTPS / REST API",
                     relationship_type="uses",
                 )
             )
