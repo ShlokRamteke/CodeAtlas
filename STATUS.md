@@ -174,6 +174,12 @@ developer understand a proposed change before implementation.
   - Formulated **ADR-019 (System One Non-Autoregressive Decision Models & `/v1/systemone` Protocol Adapter)**.
   - Added configuration settings in `app.core.config`: `DECISION_MODEL_URL`, `DECISION_MODEL_ENABLED`, `DECISION_MODEL_TIMEOUT`, `DECISION_CONFIDENCE_THRESHOLD`.
   - 100% automated test pass rate across 36 pytest tests, ruff lint/format clean.
+- **C4 Architecture Export & Dynamic Multi-Repo Adaptation (`feat/ph5-01-systemone-client`)**:
+  - `_detect_repository_layout`: dynamically detects `frontend_app`, `backend_app`, `monorepo`, `monorepo_packages`, and `standard` layouts based on repository directories, framework configurations, and code files.
+  - `_infer_component_info`: partitions files across any repository into semantic architectural components (`App Router (Pages & Routes)`, `UI Components`, `State & Lifecycle Hooks`, `Utilities & Libraries`, `Controllers`, `API Endpoints & Routing`, `Data Models & Schemas`, `Services`, `Middleware & Auth`), preventing phantom services and filtering out root configs/markdown.
+  - Concrete import resolution (`RelationshipAnalyzer.resolve_import_path`): resolves `@/`, `~/`, relative `../`, and Python module imports to target files in the repository.
+  - C4 Component Reference Resolver (`_find_component_for_path`): maps import targets directly to C4 component IDs and populates component dependencies, ensuring connected Mermaid `C4Component` and `C4Container` relationship edges.
+  - 100% automated test pass rate across 148 pytest tests and ruff clean.
 
 ## Remaining
 
