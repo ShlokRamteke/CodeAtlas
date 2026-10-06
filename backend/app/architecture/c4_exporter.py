@@ -38,6 +38,142 @@ def _sanitize_flowchart_label(val: str) -> str:
     return cleaned
 
 
+def _infer_file_technology(path: str, language: Optional[str] = None) -> str:
+    """Infer file programming language/runtime from language tag or file extension."""
+    if language:
+        lang = language.strip().lower()
+        if lang in ["javascript", "js"]:
+            return "JavaScript"
+        if lang in ["typescript", "ts"]:
+            return "TypeScript"
+        if lang == "python":
+            return "Python"
+        if lang == "go":
+            return "Go"
+        if lang == "rust":
+            return "Rust"
+        if lang in ["java", "kotlin"]:
+            return "Java"
+        if lang == "ruby":
+            return "Ruby"
+        if lang == "php":
+            return "PHP"
+        if lang in ["c#", "csharp"]:
+            return "C#"
+        return language.title()
+
+    ext = Path(path).suffix.lower()
+    if ext in [".js", ".mjs", ".cjs", ".jsx"]:
+        return "JavaScript"
+    if ext in [".ts", ".tsx"]:
+        return "TypeScript"
+    if ext == ".py":
+        return "Python"
+    if ext == ".go":
+        return "Go"
+    if ext == ".rs":
+        return "Rust"
+    if ext in [".java", ".kt"]:
+        return "Java"
+    if ext == ".rb":
+        return "Ruby"
+    if ext == ".php":
+        return "PHP"
+    if ext in [".cs"]:
+        return "C#"
+    if ext in [".html", ".css", ".scss", ".sass", ".vue", ".svelte"]:
+        return "Web"
+    return "Unknown"
+
+
+def _detect_container_technology(
+    container_type: str,
+    container_items: List[Any],
+) -> str:
+    """Dynamically determine container technology based on its actual files and languages."""
+    if not container_items:
+        return "Multi-language"
+
+    tech_counts: Dict[str, int] = {}
+    has_jsx = False
+    has_tsx = False
+    has_fastapi = False
+    has_flask = False
+    has_express = False
+
+    for item in container_items:
+        p_str = getattr(item, "path", getattr(item, "source_path", str(item))).lower()
+        lang = getattr(item, "language", getattr(item, "technology", None))
+        tech = _infer_file_technology(p_str, lang)
+        if tech != "Unknown":
+            tech_counts[tech] = tech_counts.get(tech, 0) + 1
+
+        if p_str.endswith(".jsx"):
+            has_jsx = True
+        if p_str.endswith(".tsx"):
+            has_tsx = True
+        if "fastapi" in p_str:
+            has_fastapi = True
+        if "flask" in p_str:
+            has_flask = True
+        if "express" in p_str:
+            has_express = True
+
+    if not tech_counts:
+        return "Multi-language"
+
+    sorted_techs = sorted(tech_counts.items(), key=lambda x: x[1], reverse=True)
+    top_tech, _ = sorted_techs[0]
+
+    # Mixed TypeScript and JavaScript
+    if {"TypeScript", "JavaScript"}.issubset(set(tech_counts.keys())):
+        primary_lang = "TypeScript / JavaScript"
+    else:
+        primary_lang = top_tech
+
+    if container_type == "web_app":
+        if has_tsx or has_jsx:
+            return f"React / {primary_lang}"
+        return f"{primary_lang} / Web"
+
+    if container_type == "api":
+        if top_tech == "JavaScript":
+            return "Node.js / Express" if has_express else "Node.js / JavaScript"
+        if top_tech == "TypeScript":
+            return "Node.js / TypeScript"
+        if top_tech == "Python":
+            if has_fastapi:
+                return "FastAPI / Python"
+            if has_flask:
+                return "Flask / Python"
+            return "Python"
+        if top_tech == "Go":
+            return "Go"
+        if top_tech == "Rust":
+            return "Rust"
+        if top_tech == "Java":
+            return "Java / Spring Boot"
+        return f"{primary_lang} / REST API"
+
+    if container_type == "library":
+        return f"{primary_lang}"
+
+    return primary_lang
+
+
+def _detect_container_description(container_type: str, cont_tech: str) -> str:
+    """Generate dynamic container description without hardcoding project specifics."""
+    if container_type == "web_app":
+        return "Client application, user interface, and frontend views"
+    if container_type == "api":
+        return f"Backend API, business logic, and server services ({cont_tech})"
+    if container_type == "library":
+        return "Shared contracts, utility libraries, and reusable models"
+    if container_type == "database":
+        return "Persistent data storage for application state and records"
+    return "Core application business logic and execution components"
+
+
 @dataclass
 class C4Person:
     id: str
@@ -547,7 +683,10 @@ class C4ArchitectureExporter:
         for s in symbols:
             sym_count_by_file[s.path] = sym_count_by_file.get(s.path, 0) + 1
 
-        # Classify files into containers & components
+        # Collect files by container ID
+        container_files_by_id: Dict[str, List[Any]] = {}
+        container_meta_by_id: Dict[str, Dict[str, str]] = {}
+
         for f in files:
             p = Path(f.path)
             parts = p.parts
@@ -556,43 +695,32 @@ class C4ArchitectureExporter:
             top_dir = parts[0].lower() if parts else "root"
             if top_dir in ["frontend", "web", "client", "ui"]:
                 cont_id = "container_frontend"
-                cont_name = "Frontend Web Application"
-                cont_tech = "Next.js / TypeScript / React"
+                cont_name = "Frontend Application"
                 cont_type = "web_app"
-                cont_desc = "Single-page responsive user interface and visualization dashboard"
             elif top_dir in ["backend", "server", "api", "app"]:
                 cont_id = "container_backend"
                 cont_name = "Backend API & Services"
-                cont_tech = "FastAPI / Python 3.11"
                 cont_type = "api"
-                cont_desc = (
-                    "Core REST API, AST parsing, historical intelligence, and investigation engine"
-                )
             elif top_dir in ["packages", "contracts", "shared"]:
                 cont_id = "container_contracts"
-                cont_name = "Shared Contracts & Schemas"
-                cont_tech = "TypeScript / Type Definitions"
+                cont_name = "Shared Packages & Libraries"
                 cont_type = "library"
-                cont_desc = "Shared API contracts and typed data models"
             else:
                 cont_id = "container_core"
                 cont_name = "Core Application"
-                cont_tech = f.language or "Multi-language"
                 cont_type = "api"
-                cont_desc = "Core repository application code"
 
-            if cont_id not in containers_map:
-                containers_map[cont_id] = C4Container(
-                    id=cont_id,
-                    name=cont_name,
-                    technology=cont_tech,
-                    description=cont_desc,
-                    container_type=cont_type,
-                    path=top_dir,
-                )
+            if cont_id not in container_files_by_id:
+                container_files_by_id[cont_id] = []
+                container_meta_by_id[cont_id] = {
+                    "name": cont_name,
+                    "type": cont_type,
+                    "path": top_dir,
+                }
+            container_files_by_id[cont_id].append(f)
 
             # Component detection heuristic
-            # Group by 2 directory levels (e.g. backend/app/investigation or frontend/src/components)
+            # Group by 2 directory levels (e.g. backend/app/investigation or server/controllers)
             if len(parts) >= 3:
                 comp_path = "/".join(parts[:3])
                 comp_name = " / ".join(parts[1:3]).title()
@@ -605,10 +733,7 @@ class C4ArchitectureExporter:
 
             comp_id = f"comp_{_sanitize_id(comp_path)}"
             if comp_id not in components_map:
-                # Infer component technology
-                comp_tech = (
-                    f.language or "TypeScript" if "ts" in f.path or "tsx" in f.path else "Python"
-                )
+                comp_tech = _infer_file_technology(f.path, f.language)
                 components_map[comp_id] = C4Component(
                     id=comp_id,
                     name=comp_name,
@@ -625,27 +750,55 @@ class C4ArchitectureExporter:
             comp.file_count += 1
             comp.symbol_count += sym_count_by_file.get(f.path, len(f.signature or ""))
 
+        # Build dynamic containers based on actual member files
+        for cont_id, c_files in container_files_by_id.items():
+            meta = container_meta_by_id[cont_id]
+            cont_tech = _detect_container_technology(meta["type"], c_files)
+            cont_desc = _detect_container_description(meta["type"], cont_tech)
+            containers_map[cont_id] = C4Container(
+                id=cont_id,
+                name=meta["name"],
+                technology=cont_tech,
+                description=cont_desc,
+                container_type=meta["type"],
+                path=meta["path"],
+            )
+
         # If no containers formed (e.g. empty files), create standard defaults
         if not containers_map:
             containers_map["container_core"] = C4Container(
                 id="container_core",
                 name="Core Service",
-                technology="Python / TypeScript",
+                technology="Multi-language",
                 description="Primary repository components",
                 container_type="api",
             )
 
         # Attach database container if relational models exist
         has_db = any(
-            "model" in f.path.lower() or "db" in f.path.lower() or "alembic" in f.path.lower()
+            "model" in f.path.lower()
+            or "db" in f.path.lower()
+            or "alembic" in f.path.lower()
+            or "prisma" in f.path.lower()
+            or "mongoose" in f.path.lower()
             for f in files
         )
         if has_db:
+            db_tech = "Relational Database"
+            if any("mongo" in f.path.lower() or "mongoose" in f.path.lower() for f in files):
+                db_tech = "MongoDB"
+            elif any("postgres" in f.path.lower() or "pg" in f.path.lower() for f in files):
+                db_tech = "PostgreSQL"
+            elif any("sqlite" in f.path.lower() for f in files):
+                db_tech = "SQLite"
+            elif any("mysql" in f.path.lower() for f in files):
+                db_tech = "MySQL"
+
             containers_map["container_db"] = C4Container(
                 id="container_db",
-                name="Relational Database",
-                technology="PostgreSQL 16 + pgvector",
-                description="Stores repository metadata, AST symbols, commits, and investigation cache",
+                name="Application Database",
+                technology=db_tech,
+                description=f"Persistent data storage for application state and records ({db_tech})",
                 container_type="database",
             )
 
@@ -825,43 +978,28 @@ class C4ArchitectureExporter:
             if top in ["frontend", "web", "ui", "client"]:
                 cont_id = "container_frontend"
                 cont_name = "Frontend Application"
-                cont_tech = "Next.js / TypeScript"
                 cont_type = "web_app"
-                cont_desc = "Client web application"
             elif top in ["backend", "server", "api", "app"]:
                 cont_id = "container_backend"
                 cont_name = "Backend Services"
-                cont_tech = "FastAPI / Python"
                 cont_type = "api"
-                cont_desc = "Server API and intelligence processing"
             elif top in ["packages", "contracts", "shared"]:
                 cont_id = "container_contracts"
                 cont_name = "Contracts & Shared Packages"
-                cont_tech = "TypeScript"
                 cont_type = "library"
-                cont_desc = "Shared interfaces and contracts"
             else:
                 cont_id = "container_core"
                 cont_name = "Core Services"
-                cont_tech = "Multi-language"
                 cont_type = "api"
-                cont_desc = "Core application components"
 
-            if cont_id not in containers_map:
-                containers_map[cont_id] = C4Container(
-                    id=cont_id,
-                    name=cont_name,
-                    technology=cont_tech,
-                    description=cont_desc,
-                    container_type=cont_type,
-                    path=top,
-                )
+            # Dynamic component technology
+            comp_tech = _infer_file_technology(comp_info.path)
 
             c4_comp = C4Component(
                 id=f"comp_{_sanitize_id(comp_info.path)}",
                 name=comp_info.name,
                 container_id=cont_id,
-                technology=cont_tech,
+                technology=comp_tech,
                 description=f"Component handling {comp_info.name}",
                 source_path=comp_info.path,
                 symbol_count=comp_info.symbol_count,
@@ -869,7 +1007,22 @@ class C4ArchitectureExporter:
                 dependencies=comp_info.dependencies,
             )
             components_list.append(c4_comp)
+
+            if cont_id not in containers_map:
+                containers_map[cont_id] = C4Container(
+                    id=cont_id,
+                    name=cont_name,
+                    technology=comp_tech,
+                    description=_detect_container_description(cont_type, comp_tech),
+                    container_type=cont_type,
+                    path=top,
+                )
             containers_map[cont_id].components.append(c4_comp)
+
+        # Re-evaluate container technology based on all its components
+        for cont in containers_map.values():
+            cont.technology = _detect_container_technology(cont.container_type, cont.components)
+            cont.description = _detect_container_description(cont.container_type, cont.technology)
 
         if not containers_map:
             containers_map["container_core"] = C4Container(

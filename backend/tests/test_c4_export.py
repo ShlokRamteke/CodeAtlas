@@ -269,3 +269,61 @@ def test_mermaid_flowchart_edge_label_sanitization():
     assert "(" not in flowchart.split("-->|")[1].split("|")[0]
     assert ")" not in flowchart.split("-->|")[1].split("|")[0]
     assert "->" not in flowchart.split("-->|")[1].split("|")[0]
+
+
+def test_c4_dynamic_javascript_repository_detection():
+    """Verify that a JavaScript repository dynamically detects Node.js / JavaScript, not FastAPI."""
+    entities = [
+        ContextEntity(
+            id="f1",
+            name="server/clearLegacyData.js",
+            kind="file",
+            path="server/clearLegacyData.js",
+            language="JavaScript",
+        ),
+        ContextEntity(
+            id="f2",
+            name="server/controllers/formController.js",
+            kind="file",
+            path="server/controllers/formController.js",
+            language="JavaScript",
+        ),
+        ContextEntity(
+            id="f3",
+            name="server/middleware/adminAuth.js",
+            kind="file",
+            path="server/middleware/adminAuth.js",
+            language="JavaScript",
+        ),
+        ContextEntity(
+            id="f4",
+            name="server/models/Conversation.js",
+            kind="file",
+            path="server/models/Conversation.js",
+            language="JavaScript",
+        ),
+    ]
+
+    ctx = ProjectContext(
+        target_type="repository",
+        target_id="repo-js",
+        target_name="JSServerApp",
+        summary="A pure JavaScript Node.js application",
+        entities=entities,
+        relationships=[],
+    )
+
+    model = C4ArchitectureExporter.export_from_project_context(ctx, repo_name="JSServerApp")
+
+    # Find backend container
+    backend_cont = next((c for c in model.containers if c.id == "container_backend"), None)
+    assert backend_cont is not None
+    assert backend_cont.technology == "Node.js / JavaScript"
+    assert "Python" not in backend_cont.technology
+    assert "FastAPI" not in backend_cont.technology
+    assert "AST parsing" not in backend_cont.description
+
+    # Find component technologies
+    for comp in model.components:
+        assert comp.technology == "JavaScript"
+        assert comp.technology != "Python"
