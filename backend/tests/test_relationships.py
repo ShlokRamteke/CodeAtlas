@@ -74,3 +74,42 @@ def test_architecture_graph_generation() -> None:
     rel_types = {r.type for r in graph.relationships}
     assert "tested_by" in rel_types
     assert "imports" in rel_types
+
+
+def test_resolve_import_path_aliases_and_relatives() -> None:
+    all_files = [
+        "app/page.tsx",
+        "components/dropzone.tsx",
+        "components/ui/button.tsx",
+        "hooks/use-convert.ts",
+        "lib/utils.ts",
+        "backend/app/models/user.py",
+        "backend/app/api/endpoints.py",
+    ]
+
+    # Alias @/ resolution
+    res1 = RelationshipAnalyzer.resolve_import_path(
+        "app/page.tsx", "@/components/dropzone", all_files
+    )
+    assert res1 == "components/dropzone.tsx"
+
+    res2 = RelationshipAnalyzer.resolve_import_path(
+        "components/dropzone.tsx", "@/lib/utils", all_files
+    )
+    assert res2 == "lib/utils.ts"
+
+    # Relative ../ resolution
+    res3 = RelationshipAnalyzer.resolve_import_path(
+        "components/dropzone.tsx", "./ui/button", all_files
+    )
+    assert res3 == "components/ui/button.tsx"
+
+    # Python module notation
+    res4 = RelationshipAnalyzer.resolve_import_path(
+        "backend/app/api/endpoints.py", "app.models.user", all_files
+    )
+    assert res4 == "backend/app/models/user.py"
+
+    # Unresolved fallback
+    res5 = RelationshipAnalyzer.resolve_import_path("app/page.tsx", "@/external/library", all_files)
+    assert res5 == "external/library"

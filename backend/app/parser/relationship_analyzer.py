@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -80,6 +81,98 @@ class RelationshipAnalyzer:
 
         return None
 
+    @staticmethod
+    def resolve_import_path(
+        source_path: str,
+        target_import: str,
+        all_paths: List[str],
+    ) -> str:
+        """Resolve an import path (relative, alias @/, ~/, or module notation) to a concrete repo file path."""
+        if not target_import:
+            return target_import
+
+        clean_tgt = target_import.strip()
+        all_paths_set = set(all_paths)
+        all_paths_lower_map = {p.lower(): p for p in all_paths}
+
+        candidates: List[str] = []
+
+        # 1. Alias handling (@/, ~/, #/, $lib/)
+        if clean_tgt.startswith(("@/", "~/", "#/", "$lib/")):
+            stripped = clean_tgt.split("/", 1)[1] if "/" in clean_tgt else clean_tgt
+            candidates.append(stripped)
+            candidates.append(f"src/{stripped}")
+            candidates.append(f"app/{stripped}")
+            candidates.append(f"frontend/{stripped}")
+            candidates.append(f"frontend/src/{stripped}")
+            candidates.append(f"client/{stripped}")
+            candidates.append(f"client/src/{stripped}")
+        # 2. Relative import handling (./, ../)
+        elif clean_tgt.startswith("."):
+            src_parent = Path(source_path).parent
+            try:
+                resolved_rel = os.path.normpath(str(src_parent / clean_tgt)).replace("\\", "/")
+                candidates.append(resolved_rel)
+            except Exception:
+                pass
+        # 3. Python module style (app.models.user)
+        elif "." in clean_tgt and not any(
+            clean_tgt.endswith(ext)
+            for ext in [".js", ".ts", ".jsx", ".tsx", ".py", ".css", ".json", ".mjs"]
+        ):
+            py_path = clean_tgt.replace(".", "/")
+            candidates.append(py_path)
+            candidates.append(f"{py_path}.py")
+            candidates.append(f"backend/{py_path}.py")
+            candidates.append(f"backend/{py_path}")
+        else:
+            candidates.append(clean_tgt)
+            candidates.append(f"src/{clean_tgt}")
+            candidates.append(f"app/{clean_tgt}")
+
+        # Check each candidate against all_paths
+        common_exts = [
+            "",
+            ".tsx",
+            ".ts",
+            ".jsx",
+            ".js",
+            ".py",
+            ".go",
+            ".rs",
+            ".vue",
+            ".svelte",
+            ".mjs",
+            ".cjs",
+            "/index.tsx",
+            "/index.ts",
+            "/index.jsx",
+            "/index.js",
+            "/__init__.py",
+        ]
+        for cand in candidates:
+            cand_norm = cand.replace("\\", "/").lstrip("/")
+            for ext in common_exts:
+                test_path = f"{cand_norm}{ext}"
+                if test_path in all_paths_set:
+                    return test_path
+                test_lower = test_path.lower()
+                if test_lower in all_paths_lower_map:
+                    return all_paths_lower_map[test_lower]
+
+        # Suffix matching: e.g. components/dropzone matches convert-zone/components/dropzone.tsx
+        for cand in candidates:
+            cand_norm = cand.replace("\\", "/").lstrip("/").lower()
+            if not cand_norm:
+                continue
+            for p in all_paths:
+                p_lower = p.lower()
+                p_without_ext = str(Path(p_lower).with_suffix(""))
+                if p_without_ext.endswith(cand_norm) or cand_norm in p_without_ext:
+                    return p
+
+        return candidates[0] if candidates else target_import
+
     def analyze_repository(self, parsed_files: List[ParsedFileResult]) -> ArchitectureGraph:
         all_paths = [f.path for f in parsed_files]
         languages: Dict[str, int] = {}
@@ -133,18 +226,23 @@ class RelationshipAnalyzer:
             for dep in f.dependencies:
                 if dep.kind in ["internal", "relative"]:
                     # Clean relative import to find candidate target
-                    target_path = dep.target_path
+                    resolved_target = self.resolve_import_path(f.path, dep.target_path, all_paths)
+                    is_resolved = resolved_target in all_paths
                     relationships.append(
                         RelationshipEdge(
                             source_name=p.stem,
                             source_path=f.path,
-                            target_name=Path(target_path).stem,
-                            target_path=target_path,
+                            target_name=Path(resolved_target).stem,
+                            target_path=resolved_target,
                             type="imports",
+                            confidence=1.0 if is_resolved else 0.85,
+                            resolution_method="ast_import_resolver"
+                            if is_resolved
+                            else "tree_sitter_ast",
                         )
                     )
-                    if target_path not in comp.dependencies:
-                        comp.dependencies.append(target_path)
+                    if resolved_target not in comp.dependencies:
+                        comp.dependencies.append(resolved_target)
 
         # Add tested_by relationships
         for target, test_file in test_links.items():
