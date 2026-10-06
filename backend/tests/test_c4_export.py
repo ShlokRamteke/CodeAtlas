@@ -149,6 +149,9 @@ def test_mermaid_c4_context_diagram(sample_project_context: ProjectContext):
     assert "System(" in mmd
     assert "System_Ext(" in mmd
     assert "Rel(" in mmd
+    # Ensure person connects to the system, not unknown container shapes
+    assert "Rel(person_dev, testapp" in mmd
+    assert "container_core" not in mmd
 
 
 def test_mermaid_c4_container_diagram(sample_project_context: ProjectContext):
@@ -220,3 +223,49 @@ def test_empty_context_handling():
     assert "C4Context" in model.to_mermaid_context()
     assert "flowchart TB" in model.to_mermaid_flowchart()
     assert len(model.to_markdown_document()) > 100
+
+
+def test_mermaid_flowchart_edge_label_sanitization():
+    entities = [
+        ContextEntity(
+            id="f1",
+            name="backend/app/reset.py",
+            kind="file",
+            path="backend/app/reset.py",
+            language="Python",
+        ),
+        ContextEntity(
+            id="f2",
+            name="backend/tests/test_reset.py",
+            kind="file",
+            path="backend/tests/test_reset.py",
+            language="Python",
+        ),
+    ]
+    relationships = [
+        CtxRel(
+            source_name="reset",
+            source_path="backend/app/reset.py",
+            target_name="test_reset",
+            target_path="backend/tests/test_reset.py",
+            type="tested_by",
+            confidence=1.0,
+            resolution_method="pytest_ast",
+        ),
+    ]
+    ctx = ProjectContext(
+        target_type="repository",
+        target_id="repo-2",
+        target_name="TestApp",
+        summary="Testing edge label sanitization",
+        entities=entities,
+        relationships=relationships,
+    )
+    model = C4ArchitectureExporter.export_from_project_context(ctx, repo_name="TestApp")
+    flowchart = model.to_mermaid_flowchart("TB")
+
+    # Verify no unquoted parentheses or raw arrows in edge labels
+    assert "-->|" in flowchart
+    assert "(" not in flowchart.split("-->|")[1].split("|")[0]
+    assert ")" not in flowchart.split("-->|")[1].split("|")[0]
+    assert "->" not in flowchart.split("-->|")[1].split("|")[0]

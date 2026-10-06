@@ -167,9 +167,10 @@ developer understand a proposed change before implementation.
 
 ## Remaining
 
-- **Phase 5**: SaaS Experience & Core (Repository overview, health indicators, async indexing workers, GitHub App).
-- **Phase 6**: Model Context Protocol (MCP) Integration.
-- **Phase 7**: Evaluation & Production Hardening.
+- **Phase 5**: Semantic Indexing & Decision Models (System One `/v1/systemone` client, symbol roles, invariant mining, commit intent, C4 container classifier).
+- **Phase 6**: SaaS Experience & Core (Repository overview, health indicators, async indexing workers, GitHub App).
+- **Phase 7**: Model Context Protocol (MCP) Integration.
+- **Phase 8**: Evaluation & Production Hardening.
 
 ## Blockers
 
@@ -177,7 +178,7 @@ None known.
 
 ## Next Action
 
-Start Phase 5 (SaaS Experience & Core).
+Start Phase 5 (Task PH5-01: System One Client & `/v1/systemone` Protocol Adapter).
 
 ## Session Rule
 

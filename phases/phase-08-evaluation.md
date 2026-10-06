@@ -1,4 +1,4 @@
-# Phase 7 — Evaluation & Production Hardening
+# Phase 8 — Evaluation & Production Hardening
 
 ## Goal
 

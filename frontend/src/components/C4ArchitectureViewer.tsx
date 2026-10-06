@@ -19,9 +19,12 @@ import {
   FolderTree,
   Code2,
   RefreshCw,
+  Eye,
 } from "lucide-react";
 import type { C4ArchitectureExport } from "@codeatlas/contracts";
 import { fetchRepositoryC4Architecture, exportRepositoryArchitectureUrl } from "@/lib/api";
+import { MermaidViewer } from "./MermaidViewer";
+import { MarkdownRenderer } from "./MarkdownRenderer";
 
 interface C4ArchitectureViewerProps {
   repositoryId: string;
@@ -41,6 +44,7 @@ export function C4ArchitectureViewer({
   const [activeDiagramLevel, setActiveDiagramLevel] = useState<
     "context" | "container" | "component" | "flowchart" | "markdown"
   >("flowchart");
+  const [markdownViewMode, setMarkdownViewMode] = useState<"rendered" | "source">("rendered");
   const [copiedDiagram, setCopiedDiagram] = useState(false);
   const [copiedMarkdown, setCopiedMarkdown] = useState(false);
   const [expandedContainer, setExpandedContainer] = useState<string | null>(null);
@@ -84,6 +88,21 @@ export function C4ArchitectureViewer({
         return c4Data.markdown_export || c4Data.markdownExport || "";
       default:
         return d.flowchart_mermaid || d.flowchartMermaid || "";
+    }
+  };
+
+  const getDiagramTitle = (): string => {
+    switch (activeDiagramLevel) {
+      case "flowchart":
+        return "System Dependency Flowchart";
+      case "context":
+        return "C4 Level 1: System Context Diagram";
+      case "container":
+        return "C4 Level 2: Container Diagram";
+      case "component":
+        return "C4 Level 3: Component Diagram";
+      default:
+        return "Architecture Diagram";
     }
   };
 
@@ -281,28 +300,69 @@ export function C4ArchitectureViewer({
             </button>
           </div>
 
-          {/* Copy Button */}
-          <button
-            onClick={() => handleCopy(getCurrentDiagramCode(), setCopiedDiagram)}
-            className="flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-xs text-slate-200 transition"
-          >
-            {copiedDiagram ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-            {copiedDiagram ? "Copied Code" : activeDiagramLevel === "markdown" ? "Copy Markdown" : "Copy Mermaid"}
-          </button>
-        </div>
+          {/* Controls for Markdown view */}
+          {activeDiagramLevel === "markdown" && (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center rounded-lg bg-slate-900 p-0.5 border border-slate-800 text-xs">
+                <button
+                  onClick={() => setMarkdownViewMode("rendered")}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition ${
+                    markdownViewMode === "rendered"
+                      ? "bg-indigo-600 text-white font-medium"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  Rendered Document
+                </button>
+                <button
+                  onClick={() => setMarkdownViewMode("source")}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition ${
+                    markdownViewMode === "source"
+                      ? "bg-indigo-600 text-white font-medium"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <Code2 className="w-3.5 h-3.5" />
+                  Raw Source
+                </button>
+              </div>
 
-        {/* Diagram Code / Markdown View */}
-        <div className="p-4 bg-slate-950 font-mono text-xs text-slate-300 max-h-[500px] overflow-y-auto leading-relaxed">
-          {activeDiagramLevel === "markdown" ? (
-            <pre className="whitespace-pre-wrap font-sans text-xs text-slate-300">
-              {c4Data.markdown_export || c4Data.markdownExport}
-            </pre>
-          ) : (
-            <pre className="whitespace-pre-wrap text-emerald-400/90 text-xs">
-              {getCurrentDiagramCode()}
-            </pre>
+              <button
+                onClick={() =>
+                  handleCopy(c4Data.markdown_export || c4Data.markdownExport || "", setCopiedMarkdown)
+                }
+                className="flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-xs text-slate-200 transition"
+              >
+                {copiedMarkdown ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5" />
+                )}
+                {copiedMarkdown ? "Copied" : "Copy Markdown"}
+              </button>
+            </div>
           )}
         </div>
+
+        {/* Display Pane */}
+        {activeDiagramLevel === "markdown" ? (
+          <div className="p-5 bg-slate-950 max-h-[650px] overflow-y-auto">
+            {markdownViewMode === "rendered" ? (
+              <MarkdownRenderer content={c4Data.markdown_export || c4Data.markdownExport || ""} />
+            ) : (
+              <pre className="whitespace-pre-wrap font-mono text-xs text-slate-300 leading-relaxed">
+                {c4Data.markdown_export || c4Data.markdownExport}
+              </pre>
+            )}
+          </div>
+        ) : (
+          <MermaidViewer
+            chart={getCurrentDiagramCode()}
+            title={getDiagramTitle()}
+            className="border-0 rounded-none bg-slate-950"
+          />
+        )}
       </div>
 
       {/* 4. Container & Component Catalog */}
