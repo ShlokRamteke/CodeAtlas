@@ -1,4 +1,4 @@
-# Phase 6 — MCP Integration
+# Phase 7 — MCP Integration
 
 ## Goal
 

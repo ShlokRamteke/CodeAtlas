@@ -18,6 +18,26 @@ def _sanitize_id(val: str) -> str:
     return sanitized or "node"
 
 
+def _sanitize_text(val: str) -> str:
+    """Sanitize string for Mermaid string literals in C4 macros."""
+    if not val:
+        return ""
+    return val.replace('"', "'").replace("\n", " ").strip()
+
+
+def _sanitize_flowchart_label(val: str) -> str:
+    """Sanitize label string for Mermaid flowchart edges (|label|)."""
+    if not val:
+        return ""
+    # Strip characters that break Mermaid flowchart edge parsing:
+    # pipes, quotes, parentheses, brackets, braces, arrows
+    cleaned = val.replace("|", "/").replace('"', "'").replace("\n", " ")
+    cleaned = re.sub(r"[\(\)\[\]\{\}]", "", cleaned)
+    cleaned = re.sub(r"-+>+", " to ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
+
+
 @dataclass
 class C4Person:
     id: str
@@ -90,17 +110,23 @@ class C4ArchitectureModel:
             "C4Context",
             f"  title System Context Diagram for {self.system_name}",
         ]
+        declared_node_ids: set[str] = set()
+
         # Persons
         for p in self.persons:
             tag = "Person_Ext" if p.external else "Person"
             sid = _sanitize_id(p.id)
-            lines.append(f'  {tag}({sid}, "{p.name}", "{p.description}")')
+            declared_node_ids.add(sid)
+            lines.append(
+                f'  {tag}({sid}, "{_sanitize_text(p.name)}", "{_sanitize_text(p.description)}")'
+            )
 
         # Main system
         main_sys_id = _sanitize_id(self.system_name.lower())
-        lines.append(f'  Enterprise_Boundary(b0, "{self.system_name} Boundary") {{')
+        declared_node_ids.add(main_sys_id)
+        lines.append(f'  Enterprise_Boundary(b0, "{_sanitize_text(self.system_name)} Boundary") {{')
         lines.append(
-            f'    System({main_sys_id}, "{self.system_name}", "{self.system_description}")'
+            f'    System({main_sys_id}, "{_sanitize_text(self.system_name)}", "{_sanitize_text(self.system_description)}")'
         )
         lines.append("  }")
 
@@ -108,21 +134,36 @@ class C4ArchitectureModel:
         for s in self.systems:
             if s.id != main_sys_id and s.name != self.system_name:
                 sid = _sanitize_id(s.id)
+                declared_node_ids.add(sid)
                 tag = "System_Ext" if s.external else "System"
-                lines.append(f'  {tag}({sid}, "{s.name}", "{s.description}")')
+                lines.append(
+                    f'  {tag}({sid}, "{_sanitize_text(s.name)}", "{_sanitize_text(s.description)}")'
+                )
+
+        # Internal IDs (containers and components) that map to the main system
+        internal_ids = {c.id for c in self.containers} | {comp.id for comp in self.components}
 
         # Context relationships
         seen_edges = set()
         for r in self.relationships:
-            # Only render edges involving persons or external systems or the main system
-            src = _sanitize_id(r.source_id)
-            tgt = _sanitize_id(r.target_id)
-            # Normalize to container or system level
-            edge_key = (src, tgt)
-            if edge_key not in seen_edges:
-                seen_edges.add(edge_key)
-                tech = f', "{r.technology}"' if r.technology else ""
-                lines.append(f'  Rel({src}, {tgt}, "{r.description}"{tech})')
+            # Normalize internal endpoints to main_sys_id
+            src = main_sys_id if r.source_id in internal_ids else _sanitize_id(r.source_id)
+            tgt = main_sys_id if r.target_id in internal_ids else _sanitize_id(r.target_id)
+
+            if src != tgt and src in declared_node_ids and tgt in declared_node_ids:
+                edge_key = (src, tgt)
+                if edge_key not in seen_edges:
+                    seen_edges.add(edge_key)
+                    tech = f', "{_sanitize_text(r.technology)}"' if r.technology else ""
+                    lines.append(f'  Rel({src}, {tgt}, "{_sanitize_text(r.description)}"{tech})')
+
+        # Fallback relationship from primary person to main system if not already linked
+        if self.persons and not any(
+            src == _sanitize_id(self.persons[0].id) and tgt == main_sys_id
+            for (src, tgt) in seen_edges
+        ):
+            p0_id = _sanitize_id(self.persons[0].id)
+            lines.append(f'  Rel({p0_id}, {main_sys_id}, "Uses", "HTTPS / Browser")')
 
         return "\n".join(lines)
 
@@ -132,33 +173,40 @@ class C4ArchitectureModel:
             "C4Container",
             f"  title Container Diagram for {self.system_name}",
         ]
+        declared_node_ids: set[str] = set()
+
         for p in self.persons:
             tag = "Person_Ext" if p.external else "Person"
             sid = _sanitize_id(p.id)
-            lines.append(f'  {tag}({sid}, "{p.name}", "{p.description}")')
+            declared_node_ids.add(sid)
+            lines.append(
+                f'  {tag}({sid}, "{_sanitize_text(p.name)}", "{_sanitize_text(p.description)}")'
+            )
 
-        lines.append(f'  Container_Boundary(b_containers, "{self.system_name}") {{')
+        lines.append(f'  Container_Boundary(b_containers, "{_sanitize_text(self.system_name)}") {{')
         for c in self.containers:
             cid = _sanitize_id(c.id)
+            declared_node_ids.add(cid)
             if c.container_type == "database":
                 tag = "ContainerDb"
             elif c.container_type == "worker":
                 tag = "ContainerQueue"
             else:
                 tag = "Container"
-            lines.append(f'    {tag}({cid}, "{c.name}", "{c.technology}", "{c.description}")')
+            lines.append(
+                f'    {tag}({cid}, "{_sanitize_text(c.name)}", "{_sanitize_text(c.technology)}", "{_sanitize_text(c.description)}")'
+            )
         lines.append("  }")
 
         for s in self.systems:
             if s.external:
                 sid = _sanitize_id(s.id)
-                lines.append(f'  System_Ext({sid}, "{s.name}", "{s.description}")')
+                declared_node_ids.add(sid)
+                lines.append(
+                    f'  System_Ext({sid}, "{_sanitize_text(s.name)}", "{_sanitize_text(s.description)}")'
+                )
 
-        # Container-level relationships
-        container_ids = {c.id for c in self.containers}
-        external_ids = {s.id for s in self.systems} | {p.id for p in self.persons}
         rendered_rels = set()
-
         for r in self.relationships:
             src = r.source_id
             tgt = r.target_id
@@ -166,29 +214,24 @@ class C4ArchitectureModel:
             src_c = next((comp.container_id for comp in self.components if comp.id == src), src)
             tgt_c = next((comp.container_id for comp in self.components if comp.id == tgt), tgt)
 
-            if (
-                src_c != tgt_c
-                and (src_c in container_ids or src_c in external_ids)
-                and (tgt_c in container_ids or tgt_c in external_ids)
-            ):
-                edge_key = (src_c, tgt_c)
+            s_id = _sanitize_id(src_c)
+            t_id = _sanitize_id(tgt_c)
+
+            if s_id != t_id and s_id in declared_node_ids and t_id in declared_node_ids:
+                edge_key = (s_id, t_id)
                 if edge_key not in rendered_rels:
                     rendered_rels.add(edge_key)
-                    s_id = _sanitize_id(src_c)
-                    t_id = _sanitize_id(tgt_c)
-                    tech = f', "{r.technology}"' if r.technology else ""
-                    lines.append(f'  Rel({s_id}, {t_id}, "{r.description}"{tech})')
+                    tech = f', "{_sanitize_text(r.technology)}"' if r.technology else ""
+                    lines.append(f'  Rel({s_id}, {t_id}, "{_sanitize_text(r.description)}"{tech})')
 
         return "\n".join(lines)
 
     def to_mermaid_component(self, container_id: Optional[str] = None) -> str:
         """Generate Mermaid C4Component diagram for a specific or primary container."""
-        # Find target container
         target_container = None
         if container_id:
             target_container = next((c for c in self.containers if c.id == container_id), None)
         if not target_container:
-            # Pick first container with components
             target_container = next(
                 (c for c in self.containers if c.components),
                 self.containers[0] if self.containers else None,
@@ -199,52 +242,88 @@ class C4ArchitectureModel:
 
         lines = [
             "C4Component",
-            f"  title Component Diagram for {target_container.name}",
-            f'  Container_Boundary(b_comp_{_sanitize_id(target_container.id)}, "{target_container.name}") {{',
+            f"  title Component Diagram for {self.system_name} - {target_container.name}",
+            f'  Container_Boundary(b_comp_{_sanitize_id(target_container.id)}, "{_sanitize_text(target_container.name)}") {{',
         ]
 
-        target_comp_ids = set()
+        declared_node_ids: set[str] = set()
+        target_comp_ids: set[str] = set()
+
         for comp in target_container.components:
             cid = _sanitize_id(comp.id)
             target_comp_ids.add(comp.id)
+            declared_node_ids.add(cid)
             desc = (
                 f"{comp.file_count} files, {comp.symbol_count} symbols. {comp.description}".strip()
             )
-            lines.append(f'    Component({cid}, "{comp.name}", "{comp.technology}", "{desc}")')
+            lines.append(
+                f'    Component({cid}, "{_sanitize_text(comp.name)}", "{_sanitize_text(comp.technology)}", "{_sanitize_text(desc)}")'
+            )
         lines.append("  }")
 
-        # Neighboring containers / external systems connected to these components
-        external_connected = set()
+        # Map external connected endpoints to either neighboring containers or external systems
+        comp_to_container = {comp.id: comp.container_id for comp in self.components}
+
+        def resolve_endpoint_to_shape(endpoint_id: str) -> Optional[tuple[str, str, str, str]]:
+            if endpoint_id in target_comp_ids:
+                return ("Component", _sanitize_id(endpoint_id), "", "")
+            cont_id = comp_to_container.get(endpoint_id, endpoint_id)
+            cont = next((c for c in self.containers if c.id == cont_id), None)
+            if cont and cont.id != target_container.id:
+                return ("Container", _sanitize_id(cont.id), cont.name, cont.technology or "")
+            sys = next((s for s in self.systems if s.id == endpoint_id), None)
+            if sys:
+                return ("System_Ext", _sanitize_id(sys.id), sys.name, sys.description or "")
+            person = next((p for p in self.persons if p.id == endpoint_id), None)
+            if person:
+                return ("Person", _sanitize_id(person.id), person.name, person.description or "")
+            return None
+
+        # Discover external shapes connected to target_container components
+        external_shapes: dict[str, tuple[str, str, str, str]] = {}
         for r in self.relationships:
             if r.source_id in target_comp_ids and r.target_id not in target_comp_ids:
-                external_connected.add(r.target_id)
+                resolved = resolve_endpoint_to_shape(r.target_id)
+                if resolved and resolved[0] != "Component":
+                    external_shapes[resolved[1]] = resolved
             elif r.target_id in target_comp_ids and r.source_id not in target_comp_ids:
-                external_connected.add(r.source_id)
+                resolved = resolve_endpoint_to_shape(r.source_id)
+                if resolved and resolved[0] != "Component":
+                    external_shapes[resolved[1]] = resolved
 
-        for ext_id in external_connected:
-            cont = next((c for c in self.containers if c.id == ext_id), None)
-            if cont:
+        # Render external shapes
+        for sid, (shape_type, _, name, extra) in external_shapes.items():
+            declared_node_ids.add(sid)
+            if shape_type == "Container":
                 lines.append(
-                    f'  Container({_sanitize_id(cont.id)}, "{cont.name}", "{cont.technology}", "{cont.description}")'
+                    f'  Container({sid}, "{_sanitize_text(name)}", "{_sanitize_text(extra)}", "")'
                 )
-            else:
-                sys = next((s for s in self.systems if s.id == ext_id), None)
-                if sys:
-                    lines.append(
-                        f'  System_Ext({_sanitize_id(sys.id)}, "{sys.name}", "{sys.description}")'
-                    )
+            elif shape_type == "System_Ext":
+                lines.append(
+                    f'  System_Ext({sid}, "{_sanitize_text(name)}", "{_sanitize_text(extra)}")'
+                )
+            elif shape_type == "Person":
+                lines.append(
+                    f'  Person({sid}, "{_sanitize_text(name)}", "{_sanitize_text(extra)}")'
+                )
 
-        # Relationships
+        # Render relationships
         rendered_rels = set()
         for r in self.relationships:
-            if r.source_id in target_comp_ids or r.target_id in target_comp_ids:
-                edge_key = (r.source_id, r.target_id)
+            s_shape = resolve_endpoint_to_shape(r.source_id)
+            t_shape = resolve_endpoint_to_shape(r.target_id)
+            if not s_shape or not t_shape:
+                continue
+
+            s_id = s_shape[1]
+            t_id = t_shape[1]
+
+            if s_id != t_id and s_id in declared_node_ids and t_id in declared_node_ids:
+                edge_key = (s_id, t_id)
                 if edge_key not in rendered_rels:
                     rendered_rels.add(edge_key)
-                    s_id = _sanitize_id(r.source_id)
-                    t_id = _sanitize_id(r.target_id)
-                    tech = f', "{r.technology}"' if r.technology else ""
-                    lines.append(f'  Rel({s_id}, {t_id}, "{r.description}"{tech})')
+                    tech = f', "{_sanitize_text(r.technology)}"' if r.technology else ""
+                    lines.append(f'  Rel({s_id}, {t_id}, "{_sanitize_text(r.description)}"{tech})')
 
         return "\n".join(lines)
 
@@ -295,9 +374,10 @@ class C4ArchitectureModel:
             edge_key = (src, tgt)
             if edge_key not in rendered_edges:
                 rendered_edges.add(edge_key)
+                clean_lbl = _sanitize_flowchart_label(r.description or "")
                 label = (
-                    f"|{r.description}|"
-                    if r.description and r.description not in ["uses", "imports"]
+                    f"|{clean_lbl}|"
+                    if clean_lbl and clean_lbl.lower() not in ["uses", "imports"]
                     else ""
                 )
                 lines.append(f"    {src} -->{label} {tgt}")
@@ -684,11 +764,16 @@ class C4ArchitectureExporter:
                         if tgt_name not in components_map[src_comp_id].dependencies:
                             components_map[src_comp_id].dependencies.append(tgt_name)
 
+                    rel_label = (
+                        f"{rel.type.replace('_', ' ')}: {rel.source_name} to {rel.target_name}"
+                        if rel.source_name and rel.target_name
+                        else rel.type.replace("_", " ")
+                    )
                     relationships.append(
                         C4Relationship(
                             source_id=src_comp_id,
                             target_id=tgt_comp_id,
-                            description=f"{rel.type} ({rel.source_name} -> {rel.target_name})",
+                            description=rel_label,
                             technology=rel.resolution_method,
                             relationship_type=rel.type,
                         )
@@ -798,11 +883,16 @@ class C4ArchitectureExporter:
         # Relationships
         relationships: List[C4Relationship] = []
         for r in arch_graph.relationships:
+            rel_label = (
+                f"{r.type.replace('_', ' ')}: {r.source_name} to {r.target_name}"
+                if r.source_name and r.target_name
+                else r.type.replace("_", " ")
+            )
             relationships.append(
                 C4Relationship(
                     source_id=f"comp_{_sanitize_id(r.source_path)}",
                     target_id=f"comp_{_sanitize_id(r.target_path)}",
-                    description=f"{r.type} ({r.source_name} -> {r.target_name})",
+                    description=rel_label,
                     technology=r.resolution_method,
                     relationship_type=r.type,
                 )

@@ -113,7 +113,25 @@ A developer can provide a proposed change and receive a grounded, evidence-backe
 
 ---
 
-## Phase 5 — SaaS Experience & Core
+## Phase 5 — Semantic Indexing & Decision Models
+
+### Goal
+Enrich the deterministic repository index with fast, typed, non-autoregressive "System One" decision models (Laya / ModernBERT / `/v1/systemone` protocol) running locally on CPU at sub-40ms latency and zero per-token cloud costs.
+
+### Structured Tasks
+- **PH5-01 — System One Client & Protocol Adapter**: `/v1/systemone` async client, choice/score/noul support, calibrated probability parser, deterministic fallback.
+- **PH5-02 — Architectural Symbol Role Classification**: Symbol role tagging (controller, service, repository, entity, middleware, utility) persisting to `ContextEntity`.
+- **PH5-03 — Semantic Constraint & Invariant Mining**: Extracting natural-language architectural rules from docs into `DesignConstraint` records with domain tagging.
+- **PH5-04 — Git History Defect Intent Categorizer**: Tagging bug-fixing commits across git history to refine Kamei defect pressure calculations.
+- **PH5-05 — C4 Container & Subsystem Boundary Classifier**: Automatic classification of monorepo packages/services into C4 container roles.
+- **PH5-06 — Local Container Serving & Benchmark**: Podman container definition for `laya-serve` and CPU latency/throughput benchmark tests.
+
+### Done when
+Repositories can be indexed with rich architectural roles, semantic invariants, and container boundaries in sub-second local CPU passes with graceful fallback.
+
+---
+
+## Phase 6 — SaaS Experience & Core
 
 ### Goal
 Turn the change-investigation engine into a clear developer-facing web experience and secure multi-tenant SaaS product.
@@ -133,7 +151,7 @@ A developer can select a target, describe a proposed change, run an investigatio
 
 ---
 
-## Phase 6 — MCP Integration
+## Phase 7 — MCP Integration
 
 ### Goal
 Expose pre-change investigation capabilities to external AI coding assistants via Model Context Protocol (MCP).
@@ -152,7 +170,7 @@ External coding agents (Cursor, Claude Desktop, Windsurf) can invoke CodeAtlas t
 
 ---
 
-## Phase 7 — Evaluation & Production Hardening
+## Phase 8 — Evaluation & Production Hardening
 
 ### Goal
 Measure whether the system reliably improves pre-change understanding and harden the system for real production use.
@@ -178,9 +196,10 @@ The benchmark is repeatable, investigation quality is measurable, model usage is
 - `phases/phase-02-repository-understanding.md`
 - `phases/phase-03-historical-context.md`
 - `phases/phase-04-change-investigation.md`
-- `phases/phase-05-saas.md`
-- `phases/phase-06-mcp.md`
-- `phases/phase-07-evaluation.md`
+- `phases/phase-05-semantic-indexing-decision-models.md`
+- `phases/phase-06-saas.md`
+- `phases/phase-07-mcp.md`
+- `phases/phase-08-evaluation.md`
 
 ## Current Status
 
