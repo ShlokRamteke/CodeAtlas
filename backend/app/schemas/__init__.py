@@ -1,3 +1,12 @@
+from app.schemas.c4 import (
+    C4ArchitectureExportResponse,
+    C4ComponentSchema,
+    C4ContainerSchema,
+    C4DiagramsSchema,
+    C4PersonSchema,
+    C4RelationshipSchema,
+    C4SystemSchema,
+)
 from app.schemas.engineering import (
     ADRRead,
     DesignConstraintRead,
@@ -121,4 +130,11 @@ __all__ = [
     "IngestEngineeringDocsRequest",
     "IngestEngineeringDocsResponse",
     "EngineeringContextOverviewResponse",
+    "C4PersonSchema",
+    "C4SystemSchema",
+    "C4ComponentSchema",
+    "C4ContainerSchema",
+    "C4RelationshipSchema",
+    "C4DiagramsSchema",
+    "C4ArchitectureExportResponse",
 ]

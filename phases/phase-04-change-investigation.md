@@ -85,9 +85,11 @@ Pre-Change Investigation Brief
   - Detect knowledge loss risks (inactive primary authors) and single-point-of-failure alerts.
   - Integrate into `InvestigationEngine.gather()` (`signals["ownership"]` and `ev-ownership`), `reason()`, `synthesize()`, dual-format distillation (Human Markdown and Agent JSON), and Next.js UI interactive card.
   - REST endpoint: `GET /api/v1/investigations/{id}/ownership`.
-- [ ] **PH4-10: C4 Architecture & Dependency Export**
-  - Generate clean C4 container/component models and Mermaid diagram definitions from canonical `ProjectContext`.
-  - Provide automated, portable architectural export for engineering documentation.
+- [x] **PH4-10: C4 Architecture & Dependency Export** *(Completed)*
+  - Generate clean C4 container/component models and Mermaid diagram definitions (Context, Container, Component, Dependency Flowchart) from canonical `ProjectContext`.
+  - Provide automated, portable architectural export for engineering documentation in Markdown, Mermaid, and JSON formats.
+  - Endpoints: `GET /api/v1/repositories/{id}/architecture/c4` and `GET /api/v1/repositories/{id}/architecture/export`.
+  - Interactive C4 & Diagram Export viewer in Next.js UI (`C4ArchitectureViewer`).
 
 
 ### 2. Specialized Workflows

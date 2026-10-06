@@ -104,7 +104,7 @@ Turn current-system, historical, and engineering context into the core **Pre-Cha
 - **PH4-07 — Concurrent Branch Overlap & Merge Conflict Detector** *(Completed)*: In-flight branch inspection, open PR file overlap detection, and merge collision risk warnings.
 - **PH4-08 — Independent Change Decomposition** *(Completed)*: Weakly-connected component subgraph evaluation, modular PR suggestions, foundational sequencing, and branch naming.
 - **PH4-09 — Code Ownership & Reviewer Recommender** *(Completed)*: Historical blame concentration, exponential recency decay ($\tau = 180\text{d}$), bus factor quantification, knowledge loss risk warnings, and grounded reviewer recommendations.
-- **PH4-10 — C4 Architecture & Dependency Export**: Portable C4 component models and Mermaid architectural diagram exports.
+- **PH4-10 — C4 Architecture & Dependency Export** *(Completed)*: Portable C4 container and component models, Mermaid diagram exports (Context, Container, Component, Dependency Flowchart), and ARCHITECTURE.md generation.
 
 
 
