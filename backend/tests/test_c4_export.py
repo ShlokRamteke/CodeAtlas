@@ -395,3 +395,100 @@ def test_c4_filters_non_code_files_and_config():
     for cont in model.containers:
         assert "Json" not in cont.technology
         assert "json" not in cont.technology.lower()
+
+
+def test_c4_pure_frontend_nextjs_repository_detection():
+    """Verify that a Next.js App Router repository with app/, components/, hooks/, lib/
+    creates exactly ONE frontend container and NO phantom backend or per-folder services."""
+    entities = [
+        ContextEntity(
+            id="f1",
+            name="app/page.tsx",
+            kind="file",
+            path="app/page.tsx",
+            language="TypeScript",
+        ),
+        ContextEntity(
+            id="s1",
+            name="ConvertPage",
+            kind="symbol",
+            path="app/page.tsx",
+            signature="export default function ConvertPage()",
+        ),
+        ContextEntity(
+            id="f2",
+            name="components/dropzone.tsx",
+            kind="file",
+            path="components/dropzone.tsx",
+            language="TypeScript",
+        ),
+        ContextEntity(
+            id="s2",
+            name="Dropzone",
+            kind="symbol",
+            path="components/dropzone.tsx",
+            signature="export function Dropzone()",
+        ),
+        ContextEntity(
+            id="f3",
+            name="hooks/use-convert.ts",
+            kind="file",
+            path="hooks/use-convert.ts",
+            language="TypeScript",
+        ),
+        ContextEntity(
+            id="f4",
+            name="lib/utils.ts",
+            kind="file",
+            path="lib/utils.ts",
+            language="TypeScript",
+        ),
+        ContextEntity(
+            id="f5",
+            name="next.config.js",
+            kind="file",
+            path="next.config.js",
+            language="JavaScript",
+        ),
+    ]
+
+    ctx = ProjectContext(
+        target_type="repository",
+        target_id="repo-convert-zone",
+        target_name="convert-zone",
+        summary="Online file converter built with Next.js",
+        entities=entities,
+        relationships=[],
+    )
+
+    model = C4ArchitectureExporter.export_from_project_context(ctx, repo_name="convert-zone")
+
+    # 1. Exactly ONE container: container_frontend
+    container_ids = [c.id for c in model.containers]
+    assert container_ids == ["container_frontend"]
+    assert "container_backend" not in container_ids
+    assert "container_components" not in container_ids
+    assert "container_hooks" not in container_ids
+    assert "container_lib" not in container_ids
+    assert "container_core" not in container_ids
+
+    frontend_cont = model.containers[0]
+    assert frontend_cont.container_type == "web_app"
+    assert "Next.js" in frontend_cont.technology
+    assert "TypeScript" in frontend_cont.technology
+    assert "Backend API" not in frontend_cont.description
+
+    # 2. Components belong to container_frontend
+    assert len(model.components) >= 3
+    for comp in model.components:
+        assert comp.container_id == "container_frontend"
+
+    # 3. Mermaid container diagram has NO phantom backend or GitHub calls
+    mmd = model.to_mermaid_container()
+    assert "container_backend" not in mmd
+    assert "Components Service" not in mmd
+    assert "Hooks Service" not in mmd
+    assert "Lib Service" not in mmd
+    assert "Pulls Git history and issues" not in mmd
+    assert "Rel(person_dev, container_frontend" in mmd
+

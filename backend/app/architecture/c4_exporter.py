@@ -239,6 +239,14 @@ def _detect_container_technology(
         primary_lang = top_tech
 
     if container_type == "web_app":
+        has_next = any(
+            "next.config" in getattr(item, "path", getattr(item, "source_path", str(item))).lower()
+            or "app/page" in getattr(item, "path", getattr(item, "source_path", str(item))).lower()
+            or "app/layout" in getattr(item, "path", getattr(item, "source_path", str(item))).lower()
+            for item in container_items
+        )
+        if has_next:
+            return f"Next.js / {primary_lang}"
         if has_tsx or has_jsx:
             return f"React / {primary_lang}"
         return f"{primary_lang} / Web"
@@ -271,14 +279,95 @@ def _detect_container_technology(
 def _detect_container_description(container_type: str, cont_tech: str) -> str:
     """Generate dynamic container description without hardcoding project specifics."""
     if container_type == "web_app":
-        return "Client application, user interface, and frontend views"
+        return f"Client web application, user interface, and frontend views ({cont_tech})"
     if container_type == "api":
         return f"Backend API, business logic, and server services ({cont_tech})"
     if container_type == "library":
-        return "Shared contracts, utility libraries, and reusable models"
+        return f"Shared contracts, utility libraries, and reusable models ({cont_tech})"
     if container_type == "database":
-        return "Persistent data storage for application state and records"
-    return "Core application business logic and execution components"
+        return f"Persistent data storage for application state and records ({cont_tech})"
+    return f"Core application business logic and execution components ({cont_tech})"
+
+
+def _detect_repository_layout(all_entities: List[Any]) -> str:
+    """Detect overall architecture layout pattern of the repository.
+
+    Returns:
+    - 'monorepo': Explicit frontend and backend containers
+    - 'frontend_app': Unified client web application (Next.js, React, Vue, Vite, etc.)
+    - 'backend_app': Unified API/server application (Node/Express, FastAPI, Django, etc.)
+    - 'monorepo_packages': Multi-package monorepo (packages/* or services/*)
+    - 'standard': General multi-directory application
+    """
+    all_paths = [getattr(e, "path", str(e)) for e in all_entities]
+    all_paths_lower = [p.lower() for p in all_paths]
+    top_dirs = {Path(p).parts[0].lower() for p in all_paths if len(Path(p).parts) > 1}
+
+    has_explicit_frontend = bool(top_dirs & {"frontend", "client", "web", "ui"})
+    has_explicit_backend = bool(top_dirs & {"backend", "server", "api"})
+
+    if has_explicit_frontend and has_explicit_backend:
+        return "monorepo"
+
+    # Frontend app detection (Next.js, React, Vite, Vue, etc.)
+    frontend_config_files = {
+        "next.config.js",
+        "next.config.mjs",
+        "next.config.ts",
+        "vite.config.js",
+        "vite.config.ts",
+        "nuxt.config.ts",
+        "remix.config.js",
+        "astro.config.mjs",
+    }
+    is_frontend_config = any(
+        Path(p).name.lower() in frontend_config_files
+        for p in all_paths_lower
+    )
+    frontend_dir_signals = {"components", "hooks", "screens", "views", "styles", "widgets"}
+    has_frontend_dirs = bool(top_dirs & frontend_dir_signals)
+    has_jsx_tsx = any(p.endswith(".tsx") or p.endswith(".jsx") for p in all_paths_lower)
+
+    # In Next.js, app/ is the frontend App Router if it contains tsx/jsx or standard routes
+    has_nextjs_app_router = "app" in top_dirs and (
+        has_jsx_tsx
+        or any("app/page." in p or "app/layout." in p or "app/route." in p for p in all_paths_lower)
+    )
+
+    # Backend in app/ signal (Python FastAPI/Django/Flask, Go, etc.)
+    has_backend_app_dir = "app" in top_dirs and any(
+        (p.startswith("app/") or p.startswith("app\\"))
+        and any(p.endswith(ext) for ext in [".py", ".go", ".rs", ".rb", ".java", ".php"])
+        for p in all_paths_lower
+    )
+
+    if (
+        (is_frontend_config or has_frontend_dirs or has_nextjs_app_router or has_jsx_tsx)
+        and not has_explicit_backend
+        and not has_backend_app_dir
+    ):
+        return "frontend_app"
+
+    # Backend app detection
+    backend_dir_signals = {
+        "controllers",
+        "routes",
+        "models",
+        "middleware",
+        "handlers",
+        "resolvers",
+    }
+    has_backend_dirs = bool(top_dirs & backend_dir_signals)
+    if (has_explicit_backend or has_backend_dirs or has_backend_app_dir) and not has_explicit_frontend and not has_frontend_dirs:
+        return "backend_app"
+
+    if has_explicit_frontend:
+        return "frontend_app"
+
+    if bool(top_dirs & {"packages", "services", "libs"}):
+        return "monorepo_packages"
+
+    return "standard"
 
 
 @dataclass
@@ -441,13 +530,25 @@ class C4ArchitectureModel:
             )
         lines.append("  }")
 
+        # Determine which external systems are actually connected to containers
+        container_ids = {c.id for c in self.containers}
+        connected_system_ids = set()
+        for r in self.relationships:
+            src_c = next((comp.container_id for comp in self.components if comp.id == r.source_id), r.source_id)
+            tgt_c = next((comp.container_id for comp in self.components if comp.id == r.target_id), r.target_id)
+            if src_c in container_ids and tgt_c not in container_ids:
+                connected_system_ids.add(_sanitize_id(tgt_c))
+            elif tgt_c in container_ids and src_c not in container_ids:
+                connected_system_ids.add(_sanitize_id(src_c))
+
         for s in self.systems:
             if s.external:
                 sid = _sanitize_id(s.id)
-                declared_node_ids.add(sid)
-                lines.append(
-                    f'  System_Ext({sid}, "{_sanitize_text(s.name)}", "{_sanitize_text(s.description)}")'
-                )
+                if sid in connected_system_ids:
+                    declared_node_ids.add(sid)
+                    lines.append(
+                        f'  System_Ext({sid}, "{_sanitize_text(s.name)}", "{_sanitize_text(s.description)}")'
+                    )
 
         rendered_rels = set()
         for r in self.relationships:
@@ -798,46 +899,125 @@ class C4ArchitectureExporter:
         container_files_by_id: Dict[str, List[Any]] = {}
         container_meta_by_id: Dict[str, Dict[str, str]] = {}
 
+        repo_layout = _detect_repository_layout(all_entities)
+
         for f in files_to_process:
             p = Path(f.path)
             parts = p.parts
 
-            # Container detection heuristic
-            if len(parts) == 1:
-                stem = p.stem.lower()
-                if stem in ["server", "api", "backend", "app", "main"]:
-                    cont_id = "container_backend"
-                    cont_name = "Backend API & Services"
-                    cont_type = "api"
-                    top_dir = "server"
-                elif stem in ["index", "client", "ui", "web"]:
-                    cont_id = "container_frontend"
-                    cont_name = "Frontend Application"
-                    cont_type = "web_app"
-                    top_dir = "client"
+            if repo_layout == "frontend_app":
+                cont_id = "container_frontend"
+                cont_name = "Frontend Web Application"
+                cont_type = "web_app"
+                top_dir = "frontend"
+
+                if len(parts) >= 3:
+                    if parts[0].lower() == "src":
+                        comp_path = "/".join(parts[:2])
+                        comp_name = parts[1].title()
+                    else:
+                        comp_path = "/".join(parts[:2])
+                        comp_name = " / ".join(parts[:2]).title()
+                elif len(parts) == 2:
+                    comp_path = parts[0]
+                    comp_name = "App Pages" if parts[0].lower() == "app" else parts[0].title()
                 else:
-                    cont_id = "container_core"
-                    cont_name = "Core Application"
-                    cont_type = "api"
-                    top_dir = "root"
+                    comp_path = f.path
+                    comp_name = p.stem.title()
+
+            elif repo_layout == "backend_app":
+                cont_id = "container_backend"
+                cont_name = "Backend API & Services"
+                cont_type = "api"
+                top_dir = "backend"
+
+                if len(parts) >= 3:
+                    if parts[0].lower() in ["app", "src"]:
+                        comp_path = "/".join(parts[:2])
+                        comp_name = parts[1].title()
+                    else:
+                        comp_path = "/".join(parts[:2])
+                        comp_name = " / ".join(parts[:2]).title()
+                elif len(parts) == 2:
+                    comp_path = parts[0]
+                    comp_name = parts[0].title()
+                else:
+                    comp_path = f.path
+                    comp_name = p.stem.title()
+
+            elif repo_layout == "monorepo_packages":
+                pkg_name = parts[1] if len(parts) >= 2 else "core"
+                cont_id = f"container_{_sanitize_id(pkg_name)}"
+                cont_name = f"{pkg_name.title()} Package"
+                cont_type = "library" if "pack" in parts[0] or "lib" in parts[0] else "api"
+                top_dir = parts[0]
+
+                if len(parts) >= 3:
+                    comp_path = "/".join(parts[:3])
+                    comp_name = " / ".join(parts[1:3]).title()
+                elif len(parts) == 2:
+                    comp_path = "/".join(parts[:2])
+                    comp_name = parts[1].title()
+                else:
+                    comp_path = f.path
+                    comp_name = p.stem.title()
+
             else:
-                top_dir = parts[0].lower()
-                if top_dir in ["frontend", "web", "client", "ui"]:
-                    cont_id = "container_frontend"
-                    cont_name = "Frontend Application"
-                    cont_type = "web_app"
-                elif top_dir in ["backend", "server", "api", "app"]:
-                    cont_id = "container_backend"
-                    cont_name = "Backend API & Services"
-                    cont_type = "api"
-                elif top_dir in ["packages", "contracts", "shared", "libs"]:
-                    cont_id = "container_contracts"
-                    cont_name = "Shared Packages & Libraries"
-                    cont_type = "library"
+                # Monorepo or Standard multi-directory layout
+                if len(parts) == 1:
+                    stem = p.stem.lower()
+                    if stem in ["server", "api", "backend", "main"]:
+                        cont_id = "container_backend"
+                        cont_name = "Backend API & Services"
+                        cont_type = "api"
+                        top_dir = "server"
+                    elif stem in ["index", "client", "ui", "web"]:
+                        cont_id = "container_frontend"
+                        cont_name = "Frontend Application"
+                        cont_type = "web_app"
+                        top_dir = "client"
+                    else:
+                        cont_id = "container_core"
+                        cont_name = "Core Application"
+                        cont_type = "api"
+                        top_dir = "root"
                 else:
-                    cont_id = f"container_{_sanitize_id(top_dir)}"
-                    cont_name = f"{top_dir.title()} Service"
-                    cont_type = "api"
+                    top_dir = parts[0].lower()
+                    if top_dir in ["frontend", "web", "client", "ui"]:
+                        cont_id = "container_frontend"
+                        cont_name = "Frontend Application"
+                        cont_type = "web_app"
+                    elif top_dir in ["backend", "server", "api"]:
+                        cont_id = "container_backend"
+                        cont_name = "Backend API & Services"
+                        cont_type = "api"
+                    elif top_dir == "app":
+                        if any(f.path.endswith(ext) for ext in [".py", ".go", ".rs", ".rb"]):
+                            cont_id = "container_backend"
+                            cont_name = "Backend API & Services"
+                            cont_type = "api"
+                        else:
+                            cont_id = "container_frontend"
+                            cont_name = "Frontend Application"
+                            cont_type = "web_app"
+                    elif top_dir in ["packages", "contracts", "shared", "libs"]:
+                        cont_id = "container_contracts"
+                        cont_name = "Shared Packages & Libraries"
+                        cont_type = "library"
+                    else:
+                        cont_id = "container_core"
+                        cont_name = "Core Application"
+                        cont_type = "api"
+
+                if len(parts) >= 3:
+                    comp_path = "/".join(parts[:3])
+                    comp_name = " / ".join(parts[1:3]).title()
+                elif len(parts) == 2:
+                    comp_path = "/".join(parts[:2])
+                    comp_name = parts[1].title()
+                else:
+                    comp_path = f.path
+                    comp_name = p.stem.title()
 
             if cont_id not in container_files_by_id:
                 container_files_by_id[cont_id] = []
@@ -847,18 +1027,6 @@ class C4ArchitectureExporter:
                     "path": top_dir,
                 }
             container_files_by_id[cont_id].append(f)
-
-            # Component detection heuristic
-            # Group by 2 directory levels (e.g. backend/app/investigation or server/controllers)
-            if len(parts) >= 3:
-                comp_path = "/".join(parts[:3])
-                comp_name = " / ".join(parts[1:3]).title()
-            elif len(parts) == 2:
-                comp_path = "/".join(parts[:2])
-                comp_name = parts[1].title()
-            else:
-                comp_path = f.path
-                comp_name = p.stem.title()
 
             comp_id = f"comp_{_sanitize_id(comp_path)}"
             if comp_id not in components_map:
@@ -903,15 +1071,21 @@ class C4ArchitectureExporter:
                 container_type="api",
             )
 
-        # Attach database container if relational models exist
-        has_db = any(
-            "model" in f.path.lower()
-            or "db" in f.path.lower()
-            or "alembic" in f.path.lower()
-            or "prisma" in f.path.lower()
+        # Attach database container if models exist (and not a pure frontend app unless DB client detected)
+        has_db_client = any(
+            "prisma" in f.path.lower()
             or "mongoose" in f.path.lower()
+            or "alembic" in f.path.lower()
+            or "dexie" in f.path.lower()
+            or "supabase" in f.path.lower()
             for f in files
         )
+        has_db_model = any(
+            "model" in f.path.lower() or "db" in f.path.lower()
+            for f in files
+        )
+        has_db = has_db_client or (has_db_model and repo_layout != "frontend_app")
+
         if has_db:
             db_tech = "Relational Database"
             if any("mongo" in f.path.lower() or "mongoose" in f.path.lower() for f in files):
@@ -945,6 +1119,13 @@ class C4ArchitectureExporter:
                     comp_lookup_by_file[f.path] = comp.id
 
         # External systems
+        has_github_integration = any(
+            "github" in f.path.lower() or "octokit" in f.path.lower()
+            for f in files
+        ) or any(
+            "github" in getattr(s, "name", "").lower() for s in symbols
+        )
+
         ext_github = C4System(
             id="sys_github",
             name="GitHub API",
@@ -957,12 +1138,29 @@ class C4ArchitectureExporter:
             description="External AI models for reasoning and synthesis",
             external=True,
         )
-        developer_person = C4Person(
-            id="person_dev",
-            name="Software Engineer",
-            description="Investigates proposed code changes and inspects architecture",
-            external=False,
-        )
+
+        # Developer / User persona
+        if repo_layout == "frontend_app":
+            developer_person = C4Person(
+                id="person_dev",
+                name="User",
+                description="Interacts with the web application via browser",
+                external=False,
+            )
+        elif repo_layout == "backend_app":
+            developer_person = C4Person(
+                id="person_dev",
+                name="API Client / Developer",
+                description="Consumes REST / GraphQL API endpoints",
+                external=False,
+            )
+        else:
+            developer_person = C4Person(
+                id="person_dev",
+                name="Software Engineer",
+                description="Interacts with system workflows and applications",
+                external=False,
+            )
 
         systems = [ext_github]
         persons = [developer_person]
@@ -976,14 +1174,17 @@ class C4ArchitectureExporter:
             systems.append(ext_llm)
 
         # Standard high-level relationships
+        target_person_cont = (
+            "container_frontend"
+            if "container_frontend" in containers_map
+            else ("container_backend" if "container_backend" in containers_map else "container_core")
+        )
         relationships.append(
             C4Relationship(
                 source_id="person_dev",
-                target_id="container_frontend"
-                if "container_frontend" in containers_map
-                else "container_core",
-                description="Uses",
-                technology="HTTPS / Browser",
+                target_id=target_person_cont,
+                description="Uses" if target_person_cont == "container_frontend" else "Interacts with",
+                technology="HTTPS / Browser" if target_person_cont == "container_frontend" else "HTTPS / REST API",
                 relationship_type="uses",
             )
         )
@@ -993,7 +1194,7 @@ class C4ArchitectureExporter:
                 C4Relationship(
                     source_id="container_frontend",
                     target_id="container_backend",
-                    description="Fetches architecture and runs investigations",
+                    description="Fetches data and executes application workflows",
                     technology="JSON / REST API",
                     relationship_type="calls",
                 )
@@ -1004,32 +1205,35 @@ class C4ArchitectureExporter:
                 C4Relationship(
                     source_id="container_backend",
                     target_id="container_db",
-                    description="Reads and writes AST graph and history",
-                    technology="Asyncpg / SQLAlchemy",
+                    description="Reads and writes persistent data",
+                    technology=containers_map["container_db"].technology,
                     relationship_type="queries",
                 )
             )
 
-        if "container_backend" in containers_map:
+        if has_github_integration:
+            gh_caller = "container_backend" if "container_backend" in containers_map else target_person_cont
             relationships.append(
                 C4Relationship(
-                    source_id="container_backend",
+                    source_id=gh_caller,
                     target_id="sys_github",
-                    description="Pulls Git history and issues",
+                    description="Integrates with Git repository & issues",
                     technology="HTTPS REST API",
                     relationship_type="calls",
                 )
             )
-            if has_investigation:
-                relationships.append(
-                    C4Relationship(
-                        source_id="container_backend",
-                        target_id="sys_llm",
-                        description="Submits bounded reasoning prompts",
-                        technology="OpenRouter API",
-                        relationship_type="calls",
-                    )
+
+        if has_investigation:
+            inv_caller = "container_backend" if "container_backend" in containers_map else target_person_cont
+            relationships.append(
+                C4Relationship(
+                    source_id=inv_caller,
+                    target_id="sys_llm",
+                    description="Submits bounded reasoning prompts",
+                    technology="OpenRouter API",
+                    relationship_type="calls",
                 )
+            )
 
         # Map AST relationships into component-level C4 relationships
         seen_comp_rels = set()
@@ -1100,46 +1304,74 @@ class C4ArchitectureExporter:
         containers_map: Dict[str, C4Container] = {}
         components_list: List[C4Component] = []
 
+        repo_layout = _detect_repository_layout(arch_graph.major_components)
+
         for comp_info in arch_graph.major_components:
             if not is_architectural_code_file(comp_info.path):
                 continue
 
             path_parts = Path(comp_info.path).parts
-            if len(path_parts) == 1:
-                stem = Path(comp_info.path).stem.lower()
-                if stem in ["server", "api", "backend", "app", "main"]:
-                    cont_id = "container_backend"
-                    cont_name = "Backend Services"
-                    cont_type = "api"
-                    top = "server"
-                elif stem in ["index", "client", "ui", "web"]:
-                    cont_id = "container_frontend"
-                    cont_name = "Frontend Application"
-                    cont_type = "web_app"
-                    top = "client"
-                else:
-                    cont_id = "container_core"
-                    cont_name = "Core Services"
-                    cont_type = "api"
-                    top = "root"
+            if repo_layout == "frontend_app":
+                cont_id = "container_frontend"
+                cont_name = "Frontend Web Application"
+                cont_type = "web_app"
+                top = "frontend"
+            elif repo_layout == "backend_app":
+                cont_id = "container_backend"
+                cont_name = "Backend Services"
+                cont_type = "api"
+                top = "backend"
+            elif repo_layout == "monorepo_packages":
+                pkg_name = path_parts[1] if len(path_parts) >= 2 else "core"
+                cont_id = f"container_{_sanitize_id(pkg_name)}"
+                cont_name = f"{pkg_name.title()} Package"
+                cont_type = "library" if "pack" in path_parts[0] or "lib" in path_parts[0] else "api"
+                top = path_parts[0]
             else:
-                top = path_parts[0].lower()
-                if top in ["frontend", "web", "ui", "client"]:
-                    cont_id = "container_frontend"
-                    cont_name = "Frontend Application"
-                    cont_type = "web_app"
-                elif top in ["backend", "server", "api", "app"]:
-                    cont_id = "container_backend"
-                    cont_name = "Backend Services"
-                    cont_type = "api"
-                elif top in ["packages", "contracts", "shared", "libs"]:
-                    cont_id = "container_contracts"
-                    cont_name = "Contracts & Shared Packages"
-                    cont_type = "library"
+                if len(path_parts) == 1:
+                    stem = Path(comp_info.path).stem.lower()
+                    if stem in ["server", "api", "backend", "main"]:
+                        cont_id = "container_backend"
+                        cont_name = "Backend Services"
+                        cont_type = "api"
+                        top = "server"
+                    elif stem in ["index", "client", "ui", "web"]:
+                        cont_id = "container_frontend"
+                        cont_name = "Frontend Application"
+                        cont_type = "web_app"
+                        top = "client"
+                    else:
+                        cont_id = "container_core"
+                        cont_name = "Core Services"
+                        cont_type = "api"
+                        top = "root"
                 else:
-                    cont_id = f"container_{_sanitize_id(top)}"
-                    cont_name = f"{top.title()} Services"
-                    cont_type = "api"
+                    top = path_parts[0].lower()
+                    if top in ["frontend", "web", "ui", "client"]:
+                        cont_id = "container_frontend"
+                        cont_name = "Frontend Application"
+                        cont_type = "web_app"
+                    elif top in ["backend", "server", "api"]:
+                        cont_id = "container_backend"
+                        cont_name = "Backend Services"
+                        cont_type = "api"
+                    elif top == "app":
+                        if any(comp_info.path.endswith(ext) for ext in [".py", ".go", ".rs", ".rb"]):
+                            cont_id = "container_backend"
+                            cont_name = "Backend Services"
+                            cont_type = "api"
+                        else:
+                            cont_id = "container_frontend"
+                            cont_name = "Frontend Application"
+                            cont_type = "web_app"
+                    elif top in ["packages", "contracts", "shared", "libs"]:
+                        cont_id = "container_contracts"
+                        cont_name = "Contracts & Shared Packages"
+                        cont_type = "library"
+                    else:
+                        cont_id = "container_core"
+                        cont_name = "Core Services"
+                        cont_type = "api"
 
             # Dynamic component technology
             comp_tech = _infer_file_technology(comp_info.path)
@@ -1200,12 +1432,44 @@ class C4ArchitectureExporter:
                 )
             )
 
-        developer_person = C4Person(
-            id="person_dev",
-            name="Developer",
-            description="User of the system",
-            external=False,
+        # Persona
+        if repo_layout == "frontend_app":
+            developer_person = C4Person(
+                id="person_dev",
+                name="User",
+                description="Interacts with the web application via browser",
+                external=False,
+            )
+        elif repo_layout == "backend_app":
+            developer_person = C4Person(
+                id="person_dev",
+                name="API Client / Developer",
+                description="Consumes backend APIs and services",
+                external=False,
+            )
+        else:
+            developer_person = C4Person(
+                id="person_dev",
+                name="Developer",
+                description="User of the system",
+                external=False,
+            )
+
+        target_person_container = (
+            "container_frontend"
+            if "container_frontend" in containers_map
+            else ("container_backend" if "container_backend" in containers_map else "container_core")
         )
+        if target_person_container in containers_map:
+            relationships.append(
+                C4Relationship(
+                    source_id="person_dev",
+                    target_id=target_person_container,
+                    description="Uses" if target_person_container == "container_frontend" else "Interacts with",
+                    technology="HTTPS / Browser" if target_person_container == "container_frontend" else "HTTPS / REST API",
+                    relationship_type="uses",
+                )
+            )
 
         ext_github = C4System(
             id="sys_github",
