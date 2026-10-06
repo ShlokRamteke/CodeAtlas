@@ -1,5 +1,5 @@
 """add symbol architectural role column
-Revision ID: 0007_add_symbol_architectural_role
+Revision ID: 0007_symbol_arch_role
 Revises: 0006_pr_branches_files
 Create Date: 2026-10-06 19:00:00.000000
 """
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision: str = "0007_add_symbol_architectural_role"
+revision: str = "0007_symbol_arch_role"
 down_revision: str | None = "0006_pr_branches_files"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
