@@ -43,11 +43,11 @@ Enriched ProjectContext & C4 Architecture Models
 ## Tasks
 
 ### PH5-01: System One Client & Protocol Adapter
-- [ ] Implement `SystemOneClient` supporting the `/v1/systemone` specification (`POST /v1/systemone` with `state` and typed `questions`).
-- [ ] Support question types: `choice` (categorical), `noul` (boolean yes/no), `score` (ordered numeric).
-- [ ] Calibrated probability parser extracting confidence metrics.
-- [ ] Deterministic fallback mechanism when confidence $< 0.85$ or connection fails.
-- [ ] Mock decision provider for fast unit/integration testing without running local model server in CI.
+- [x] Implement `SystemOneClient` supporting the `/v1/systemone` specification (`POST /v1/systemone` with `state` and typed `questions`).
+- [x] Support question types: `choice` (categorical), `noul` (boolean yes/no), `score` (ordered numeric).
+- [x] Calibrated probability parser extracting confidence metrics.
+- [x] Deterministic fallback mechanism when confidence $< 0.85$ or connection fails.
+- [x] Mock decision provider for fast unit/integration testing without running local model server in CI.
 
 ### PH5-02: Architectural Symbol Role Classifier (AST Indexing)
 - [ ] Define `ArchitecturalRole` enum (`controller`, `service`, `repository`, `entity`, `middleware`, `utility`).

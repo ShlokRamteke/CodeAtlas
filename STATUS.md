@@ -2,15 +2,15 @@
 
 ## Current Phase
 
-Phase 4 — Change Investigation Engine
+Phase 5 — Semantic Indexing & Decision Models
 
 ## Current Task
 
-PH4-10 Complete &mdash; Phase 4 Investigation Engine Complete
+PH5-01 Complete &mdash; System One Client & Protocol Adapter
 
 ## Status
 
-PH4-10 COMPLETE / READY FOR PHASE 5
+PH5-01 COMPLETE / READY FOR PH5-02
 
 
 
@@ -164,10 +164,20 @@ developer understand a proposed change before implementation.
   - REST endpoints: added `GET /api/v1/repositories/{id}/architecture/c4` returning `C4ArchitectureExportResponse` and `GET /api/v1/repositories/{id}/architecture/export` streaming Markdown documents, Mermaid definitions, or C4 JSON payloads.
   - Contracts & Frontend UI: added `C4Person`, `C4System`, `C4Container`, `C4Component`, `C4Relationship`, `C4Diagrams`, and `C4ArchitectureExport` to `@codeatlas/contracts`. Implemented interactive `C4ArchitectureViewer` component in Next.js UI with diagram level switcher, copy code buttons, download links, container/component inventory, and invariant tables.
   - 100% automated test pass rate across 131 pytest tests, ruff clean, and Next.js frontend production build clean.
+- **Phase 5 — Task PH5-01 (System One Client & Protocol Adapter)**:
+  - Implemented `SystemOneClient` supporting the `/v1/systemone` specification (`POST /v1/systemone`) for fast, non-autoregressive decision models (Laya / ModernBERT) running on local CPU.
+  - Supported all 3 core decision primitives: `ChoiceQuestion` (categorical selection), `NoulQuestion` (probabilistic boolean yes/no), and `ScoreQuestion` (continuous/ordinal scale).
+  - Calibrated probability parsing with certainty distance calculation ($\max(P, 1 - P)$) and strict confidence threshold gating ($P \ge 0.85$).
+  - Graceful deterministic fallback handling on connection loss, server error, or low model confidence ($< 0.85$).
+  - Single-pass `evaluate_batch()` evaluating heterogeneous questions in a single forward pass without repeated network requests.
+  - Created `MockSystemOneClient` for fast, offline unit and CI testing.
+  - Formulated **ADR-019 (System One Non-Autoregressive Decision Models & `/v1/systemone` Protocol Adapter)**.
+  - Added configuration settings in `app.core.config`: `DECISION_MODEL_URL`, `DECISION_MODEL_ENABLED`, `DECISION_MODEL_TIMEOUT`, `DECISION_CONFIDENCE_THRESHOLD`.
+  - 100% automated test pass rate across 36 pytest tests, ruff lint/format clean.
 
 ## Remaining
 
-- **Phase 5**: Semantic Indexing & Decision Models (System One `/v1/systemone` client, symbol roles, invariant mining, commit intent, C4 container classifier).
+- **Phase 5**: Semantic Indexing & Decision Models (PH5-02 symbol roles, PH5-03 invariant mining, PH5-04 commit intent, PH5-05 C4 container classifier, PH5-06 local serving).
 - **Phase 6**: SaaS Experience & Core (Repository overview, health indicators, async indexing workers, GitHub App).
 - **Phase 7**: Model Context Protocol (MCP) Integration.
 - **Phase 8**: Evaluation & Production Hardening.
@@ -178,7 +188,7 @@ None known.
 
 ## Next Action
 
-Start Phase 5 (Task PH5-01: System One Client & `/v1/systemone` Protocol Adapter).
+Start Task PH5-02: Architectural Symbol Role Classifier (AST Indexing).
 
 ## Session Rule
 

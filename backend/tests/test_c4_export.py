@@ -269,3 +269,129 @@ def test_mermaid_flowchart_edge_label_sanitization():
     assert "(" not in flowchart.split("-->|")[1].split("|")[0]
     assert ")" not in flowchart.split("-->|")[1].split("|")[0]
     assert "->" not in flowchart.split("-->|")[1].split("|")[0]
+
+
+def test_c4_dynamic_javascript_repository_detection():
+    """Verify that a JavaScript repository dynamically detects Node.js / JavaScript, not FastAPI."""
+    entities = [
+        ContextEntity(
+            id="f1",
+            name="server/clearLegacyData.js",
+            kind="file",
+            path="server/clearLegacyData.js",
+            language="JavaScript",
+        ),
+        ContextEntity(
+            id="f2",
+            name="server/controllers/formController.js",
+            kind="file",
+            path="server/controllers/formController.js",
+            language="JavaScript",
+        ),
+        ContextEntity(
+            id="f3",
+            name="server/middleware/adminAuth.js",
+            kind="file",
+            path="server/middleware/adminAuth.js",
+            language="JavaScript",
+        ),
+        ContextEntity(
+            id="f4",
+            name="server/models/Conversation.js",
+            kind="file",
+            path="server/models/Conversation.js",
+            language="JavaScript",
+        ),
+    ]
+
+    ctx = ProjectContext(
+        target_type="repository",
+        target_id="repo-js",
+        target_name="JSServerApp",
+        summary="A pure JavaScript Node.js application",
+        entities=entities,
+        relationships=[],
+    )
+
+    model = C4ArchitectureExporter.export_from_project_context(ctx, repo_name="JSServerApp")
+
+    # Find backend container
+    backend_cont = next((c for c in model.containers if c.id == "container_backend"), None)
+    assert backend_cont is not None
+    assert backend_cont.technology == "Node.js / JavaScript"
+    assert "Python" not in backend_cont.technology
+    assert "FastAPI" not in backend_cont.technology
+    assert "AST parsing" not in backend_cont.description
+
+    # Find component technologies
+    for comp in model.components:
+        assert comp.technology == "JavaScript"
+        assert comp.technology != "Python"
+
+
+def test_c4_filters_non_code_files_and_config():
+    """Verify that root documentation, config, and lock files are not treated as C4 components or containers."""
+    entities = [
+        ContextEntity(
+            id="f1",
+            name="README.md",
+            kind="file",
+            path="README.md",
+            language="Markdown",
+        ),
+        ContextEntity(
+            id="f2",
+            name="skills-lock.json",
+            kind="file",
+            path="skills-lock.json",
+            language="JSON",
+        ),
+        ContextEntity(
+            id="f3",
+            name="vercel.json",
+            kind="file",
+            path="vercel.json",
+            language="JSON",
+        ),
+        ContextEntity(
+            id="f4",
+            name="server/controllers/formController.js",
+            kind="file",
+            path="server/controllers/formController.js",
+            language="JavaScript",
+        ),
+        ContextEntity(
+            id="f5",
+            name="server/models/Form.js",
+            kind="file",
+            path="server/models/Form.js",
+            language="JavaScript",
+        ),
+    ]
+
+    ctx = ProjectContext(
+        target_type="repository",
+        target_id="repo-filtered",
+        target_name="MyWebApp",
+        summary="Web app with root configs and server code",
+        entities=entities,
+        relationships=[],
+    )
+
+    model = C4ArchitectureExporter.export_from_project_context(ctx, repo_name="MyWebApp")
+
+    # 1. Non-code files must not be components
+    component_names = {c.name.lower() for c in model.components}
+    assert "readme" not in component_names
+    assert "skills-lock" not in component_names
+    assert "vercel" not in component_names
+
+    # 2. No bogus "container_core" created solely for root configs
+    container_ids = {c.id for c in model.containers}
+    assert "container_core" not in container_ids
+    assert "container_backend" in container_ids
+
+    # 3. No container has "Json / REST API" technology
+    for cont in model.containers:
+        assert "Json" not in cont.technology
+        assert "json" not in cont.technology.lower()
