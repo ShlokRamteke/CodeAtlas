@@ -76,6 +76,7 @@ import {
 import { EngineeringContextViewer } from "./EngineeringContextViewer";
 import { HistoricalTimelineViewer } from "./HistoricalTimelineViewer";
 import { PreChangeInvestigationViewer } from "./PreChangeInvestigationViewer";
+import { C4ArchitectureViewer } from "./C4ArchitectureViewer";
 
 
 interface ArchitectureExplorerProps {
@@ -363,7 +364,7 @@ def test_aggregates():
 
 export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) {
   const [activeTab, setActiveTab] = useState<
-    "components" | "symbols" | "relationships" | "git_history" | "engineering" | "project_context" | "investigation" | "ingest"
+    "components" | "symbols" | "relationships" | "git_history" | "engineering" | "project_context" | "c4_export" | "investigation" | "ingest"
   >("components");
   const [historySubTab, setHistorySubTab] = useState<
     "timeline" | "commits" | "trace" | "prs" | "issues" | "retrieval"
@@ -766,6 +767,20 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
         >
           <FileText className="w-4 h-4" />
           Unified ProjectContext
+        </button>
+        <button
+          onClick={() => setActiveTab("c4_export")}
+          className={`py-3 px-4 border-b-2 flex items-center gap-2 transition whitespace-nowrap ${
+            activeTab === "c4_export"
+              ? "border-cyan-500 text-cyan-400 font-semibold"
+              : "border-transparent hover:text-slate-200"
+          }`}
+        >
+          <Layers className="w-4 h-4" />
+          C4 &amp; Diagram Export
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-300">
+            PH4-10
+          </span>
         </button>
         <button
           onClick={() => setActiveTab("investigation")}
@@ -2010,6 +2025,12 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
               </div>
             )}
           </div>
+        ) : activeTab === "c4_export" ? (
+          <C4ArchitectureViewer
+            repositoryId={repository.id}
+            repositoryName={repository.name}
+            majorComponents={architecture?.majorComponents.map((c) => ({ name: c.name, path: c.path }))}
+          />
         ) : activeTab === "investigation" ? (
           <PreChangeInvestigationViewer repository={repository} />
         ) : (

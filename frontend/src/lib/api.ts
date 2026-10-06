@@ -28,6 +28,7 @@ import type {
   EngineeringContextOverviewResponse,
   ComponentMilestoneEvent,
   ComponentTimelineResponse,
+  C4ArchitectureExport,
   InvestigationProjectionResponse,
   ReferenceDetailResponse,
   ConcurrentOverlapReport,
@@ -1520,5 +1521,30 @@ export async function ingestEngineeringDocs(
   }
 }
 
+export async function fetchRepositoryC4Architecture(
+  repositoryId: string,
+  component?: string
+): Promise<C4ArchitectureExport | null> {
+  try {
+    const params = new URLSearchParams();
+    if (component) params.append("component", component);
+    const url = `${API_BASE}/api/v1/repositories/${repositoryId}/architecture/c4${
+      params.toString() ? `?${params.toString()}` : ""
+    }`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (error) {
+    return null;
+  }
+}
 
-
+export function exportRepositoryArchitectureUrl(
+  repositoryId: string,
+  format: "markdown" | "mermaid" | "json" | "c4" = "markdown",
+  component?: string
+): string {
+  const params = new URLSearchParams({ format });
+  if (component) params.append("component", component);
+  return `${API_BASE}/api/v1/repositories/${repositoryId}/architecture/export?${params.toString()}`;
+}

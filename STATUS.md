@@ -6,11 +6,11 @@ Phase 4 — Change Investigation Engine
 
 ## Current Task
 
-PH4-09 Complete &mdash; Next: PH4-10 (C4 Architecture & Dependency Export)
+PH4-10 Complete &mdash; Phase 4 Investigation Engine Complete
 
 ## Status
 
-PH4-09 COMPLETE / READY FOR PH4-10
+PH4-10 COMPLETE / READY FOR PHASE 5
 
 
 
@@ -156,11 +156,20 @@ developer understand a proposed change before implementation.
   - Distillation & Projections: rendered dedicated `### 👥 Code Ownership & Recommended Reviewers` blocks with reviewer rankings, bus factor badges, file ownership tables, and alert banners in Human Markdown and dense JSON `ownership` telemetry.
   - REST endpoints: added `GET /api/v1/investigations/{id}/ownership` returning `CodeOwnershipReportSchema`.
   - Contracts & Frontend UI: added `AuthorCommitStat`, `FileOwnership`, `ReviewerRecommendation`, and `CodeOwnershipReport` to `@codeatlas/contracts`. Enhanced `PreChangeInvestigationViewer` with live interactive **Code Ownership & Recommended Reviewers** card with bus factor badges, reviewer cards, role tags, and authorship tables.
-  - 100% automated test pass rate across 119 pytest tests, ruff clean, and Next.js frontend production build clean.
+  - 100% automated test pass rate across 123 pytest tests, ruff clean, and Next.js frontend production build clean.
+- **Phase 4 — Task PH4-10 (C4 Architecture & Dependency Export)**:
+  - `C4ArchitectureExporter` in `app.architecture.c4_exporter`: synthesizes portable C4 System Context, Container, and Component models directly from canonical `ProjectContext`.
+  - Multi-tier Mermaid diagram generator: produces Mermaid C4Context (`C4Context`), Mermaid C4Container (`C4Container`), Mermaid C4Component (`C4Component`), and portable standard Mermaid flowchart (`flowchart TB/LR`) with container subgraphs and verified dependency edges.
+  - Portable architecture document generator: automatically writes comprehensive GFM specifications ready for `ARCHITECTURE.md` including stakeholder directory, container catalog, component matrix, dependency diagrams, interface directory, and governing design constraints.
+  - REST endpoints: added `GET /api/v1/repositories/{id}/architecture/c4` returning `C4ArchitectureExportResponse` and `GET /api/v1/repositories/{id}/architecture/export` streaming Markdown documents, Mermaid definitions, or C4 JSON payloads.
+  - Contracts & Frontend UI: added `C4Person`, `C4System`, `C4Container`, `C4Component`, `C4Relationship`, `C4Diagrams`, and `C4ArchitectureExport` to `@codeatlas/contracts`. Implemented interactive `C4ArchitectureViewer` component in Next.js UI with diagram level switcher, copy code buttons, download links, container/component inventory, and invariant tables.
+  - 100% automated test pass rate across 131 pytest tests, ruff clean, and Next.js frontend production build clean.
 
 ## Remaining
 
-- **Phase 4**: Change Investigation Engine (PH4-10: C4 Architecture & Dependency Export).
+- **Phase 5**: SaaS Experience & Core (Repository overview, health indicators, async indexing workers, GitHub App).
+- **Phase 6**: Model Context Protocol (MCP) Integration.
+- **Phase 7**: Evaluation & Production Hardening.
 
 ## Blockers
 
@@ -168,7 +177,7 @@ None known.
 
 ## Next Action
 
-Start Task PH4-10 (C4 Architecture & Dependency Export).
+Start Phase 5 (SaaS Experience & Core).
 
 ## Session Rule
 
@@ -185,7 +194,7 @@ receive scoped views of that model.
 
 ## Last Updated
 
-2026-09-21
+2026-10-06
 
 
 

@@ -921,6 +921,88 @@ export interface CodeOwnershipReport {
   summary: string;
 }
 
+export interface C4Person {
+  id: string;
+  name: string;
+  description: string;
+  external: boolean;
+}
+
+export interface C4System {
+  id: string;
+  name: string;
+  description: string;
+  external: boolean;
+}
+
+export interface C4Component {
+  id: string;
+  name: string;
+  container_id?: string;
+  containerId?: string;
+  technology: string;
+  description: string;
+  source_path?: string;
+  sourcePath?: string;
+  symbol_count?: number;
+  symbolCount?: number;
+  file_count?: number;
+  fileCount?: number;
+  dependencies: string[];
+}
+
+export interface C4Container {
+  id: string;
+  name: string;
+  technology: string;
+  description: string;
+  container_type?: string;
+  containerType?: string;
+  path?: string | null;
+  components: C4Component[];
+}
+
+export interface C4Relationship {
+  source_id?: string;
+  sourceId?: string;
+  target_id?: string;
+  targetId?: string;
+  description: string;
+  technology?: string | null;
+  relationship_type?: string;
+  relationshipType?: string;
+}
+
+export interface C4Diagrams {
+  context_mermaid?: string;
+  contextMermaid?: string;
+  container_mermaid?: string;
+  containerMermaid?: string;
+  component_mermaid?: string;
+  componentMermaid?: string;
+  flowchart_mermaid?: string;
+  flowchartMermaid?: string;
+}
+
+export interface C4ArchitectureExport {
+  repository_id?: string;
+  repositoryId?: string;
+  system_name?: string;
+  systemName?: string;
+  system_description?: string;
+  systemDescription?: string;
+  persons: C4Person[];
+  systems: C4System[];
+  containers: C4Container[];
+  components: C4Component[];
+  relationships: C4Relationship[];
+  constraints: Record<string, any>[];
+  diagrams: C4Diagrams;
+  markdown_export?: string;
+  markdownExport?: string;
+}
+
+
 
 
 

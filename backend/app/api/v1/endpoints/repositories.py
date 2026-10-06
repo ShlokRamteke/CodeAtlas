@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import os
 import uuid
+from dataclasses import asdict
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.architecture.c4_exporter import C4ArchitectureExporter
 from app.context_builder.builder import CurrentSystemContextBuilder
 from app.core.db import get_db
 from app.ingestion.engine import IngestionEngine
@@ -25,6 +28,15 @@ from app.models.source_file import SourceFile
 from app.models.symbol import Symbol, SymbolKind
 from app.parser.ast_parser import ExtractedDependency, ExtractedSymbol, ParsedFileResult
 from app.parser.relationship_analyzer import RelationshipAnalyzer
+from app.schemas.c4 import (
+    C4ArchitectureExportResponse,
+    C4ComponentSchema,
+    C4ContainerSchema,
+    C4DiagramsSchema,
+    C4PersonSchema,
+    C4RelationshipSchema,
+    C4SystemSchema,
+)
 from app.schemas.investigation import ConcurrentOverlapReportSchema
 from app.schemas.repository import (
     ArchitectureOverviewResponse,
@@ -827,24 +839,12 @@ async def _fetch_context_enrichments(
     return historical_changes, prs, issues, docs, constraints
 
 
-@router.get("/{repository_id}/context", response_model=ProjectContextRead)
-async def get_repository_context(
-    repository_id: uuid.UUID,
-    component: Optional[str] = Query(None, description="Optional component or file path filter"),
-    db: AsyncSession = Depends(get_db),
-) -> ProjectContextRead:
-    """
-    Returns the canonical Unified ProjectContext for a repository or component.
-    Single source of truth consumed by Human UI and AI/Agent prompt pipelines.
-    Enriched with AST entities/relationships, Git history, PRs, Issues, ADRs, and Design Constraints.
-    """
-    repo = await db.get(Repository, repository_id)
-    if not repo:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Repository not found",
-        )
-
+async def _build_repo_project_context(
+    db: AsyncSession,
+    repo: Repository,
+    component: Optional[str] = None,
+):
+    repository_id = repo.id
     files_stmt = select(SourceFile).where(SourceFile.repository_id == repository_id)
     files = list((await db.execute(files_stmt)).scalars().all())
 
@@ -945,7 +945,7 @@ async def get_repository_context(
 
     target_type = "component" if component else "repository"
     target_name = component if component else repo.full_name
-    proj_ctx = builder.build_project_context(
+    return builder.build_project_context(
         target_id=str(repo.id),
         target_name=target_name,
         target_type=target_type,
@@ -961,7 +961,134 @@ async def get_repository_context(
         design_constraints=design_constraints,
     )
 
+
+@router.get("/{repository_id}/context", response_model=ProjectContextRead)
+async def get_repository_context(
+    repository_id: uuid.UUID,
+    component: Optional[str] = Query(None, description="Optional component or file path filter"),
+    db: AsyncSession = Depends(get_db),
+) -> ProjectContextRead:
+    """
+    Returns the canonical Unified ProjectContext for a repository or component.
+    Single source of truth consumed by Human UI and AI/Agent prompt pipelines.
+    Enriched with AST entities/relationships, Git history, PRs, Issues, ADRs, and Design Constraints.
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Repository not found",
+        )
+
+    proj_ctx = await _build_repo_project_context(db, repo, component)
     return ProjectContextRead.model_validate(proj_ctx.to_dict())
+
+
+@router.get(
+    "/{repository_id}/architecture/c4",
+    response_model=C4ArchitectureExportResponse,
+)
+async def get_repository_c4_architecture(
+    repository_id: uuid.UUID,
+    component: Optional[str] = Query(None, description="Optional component or file path filter"),
+    db: AsyncSession = Depends(get_db),
+) -> C4ArchitectureExportResponse:
+    """
+    Generate clean C4 Container/Component models, Mermaid diagram definitions,
+    and portable architecture documentation from canonical ProjectContext.
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Repository not found",
+        )
+
+    proj_ctx = await _build_repo_project_context(db, repo, component)
+    model = C4ArchitectureExporter.export_from_project_context(
+        proj_ctx,
+        repo_name=repo.name,
+        repo_description=f"Architecture specification for {repo.full_name}",
+    )
+
+    return C4ArchitectureExportResponse(
+        repository_id=repository_id,
+        system_name=model.system_name,
+        system_description=model.system_description,
+        persons=[C4PersonSchema(**asdict(p)) for p in model.persons],
+        systems=[C4SystemSchema(**asdict(s)) for s in model.systems],
+        containers=[
+            C4ContainerSchema(
+                id=c.id,
+                name=c.name,
+                technology=c.technology,
+                description=c.description,
+                container_type=c.container_type,
+                path=c.path,
+                components=[C4ComponentSchema(**asdict(comp)) for comp in c.components],
+            )
+            for c in model.containers
+        ],
+        components=[C4ComponentSchema(**asdict(comp)) for comp in model.components],
+        relationships=[C4RelationshipSchema(**asdict(r)) for r in model.relationships],
+        constraints=model.constraints,
+        diagrams=C4DiagramsSchema(
+            context_mermaid=model.to_mermaid_context(),
+            container_mermaid=model.to_mermaid_container(),
+            component_mermaid=model.to_mermaid_component(),
+            flowchart_mermaid=model.to_mermaid_flowchart("TB"),
+        ),
+        markdown_export=model.to_markdown_document(),
+    )
+
+
+@router.get(
+    "/{repository_id}/architecture/export",
+)
+async def export_repository_architecture(
+    repository_id: uuid.UUID,
+    format: str = Query("markdown", description="Export format: markdown, mermaid, json, or c4"),
+    component: Optional[str] = Query(None, description="Optional component or file path filter"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Export portable architectural specification for engineering documentation.
+    Supported formats: markdown (GFM document with Mermaid), mermaid (diagram definition), json (C4 model).
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Repository not found",
+        )
+
+    proj_ctx = await _build_repo_project_context(db, repo, component)
+    model = C4ArchitectureExporter.export_from_project_context(
+        proj_ctx,
+        repo_name=repo.name,
+        repo_description=f"Architecture specification for {repo.full_name}",
+    )
+
+    fmt = format.lower()
+    if fmt == "markdown":
+        return Response(
+            content=model.to_markdown_document(),
+            media_type="text/markdown",
+            headers={"Content-Disposition": f'attachment; filename="{repo.name}_architecture.md"'},
+        )
+    elif fmt == "mermaid":
+        return Response(
+            content=model.to_mermaid_flowchart("TB"),
+            media_type="text/vnd.mermaid",
+            headers={"Content-Disposition": f'attachment; filename="{repo.name}_architecture.mmd"'},
+        )
+    elif fmt in ["json", "c4"]:
+        return JSONResponse(content=model.to_dict())
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported format '{format}'. Supported formats: markdown, mermaid, json, c4",
+        )
 
 
 @router.get(
