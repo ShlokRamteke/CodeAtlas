@@ -9,6 +9,7 @@ from app.architecture.c4_exporter import (
 from app.context_builder.project_context import (
     ContextDesignConstraint,
     ContextEntity,
+    ContextRelationship,
     ProjectContext,
 )
 from app.context_builder.project_context import (
@@ -498,5 +499,129 @@ def test_c4_pure_frontend_nextjs_repository_detection():
     assert "Container_Boundary" in comp_mmd
     assert "comp_app" in comp_mmd
     assert "Rel(person_dev, comp_app" in comp_mmd
+
+
+def test_c4_component_diagram_with_alias_references():
+    """Verify that alias imports (@/components, @/lib) generate connected edges in C4Component."""
+    entities = [
+        ContextEntity(id="f1", name="app/page.tsx", kind="file", path="app/page.tsx", language="TypeScript"),
+        ContextEntity(id="s1", name="ConvertPage", kind="symbol", path="app/page.tsx", signature="export default function ConvertPage()"),
+        ContextEntity(id="f2", name="components/dropzone.tsx", kind="file", path="components/dropzone.tsx", language="TypeScript"),
+        ContextEntity(id="s2", name="Dropzone", kind="symbol", path="components/dropzone.tsx", signature="export function Dropzone()"),
+        ContextEntity(id="f3", name="lib/utils.ts", kind="file", path="lib/utils.ts", language="TypeScript"),
+        ContextEntity(id="s3", name="cn", kind="symbol", path="lib/utils.ts", signature="export function cn()"),
+    ]
+
+    relationships = [
+        ContextRelationship(
+            source_name="ConvertPage",
+            source_path="app/page.tsx",
+            target_name="Dropzone",
+            target_path="@/components/dropzone",
+            type="imports",
+            confidence=1.0,
+            resolution_method="ast_import_resolver",
+        ),
+        ContextRelationship(
+            source_name="Dropzone",
+            source_path="components/dropzone.tsx",
+            target_name="cn",
+            target_path="@/lib/utils",
+            type="imports",
+            confidence=1.0,
+            resolution_method="ast_import_resolver",
+        ),
+    ]
+
+    ctx = ProjectContext(
+        target_type="repository",
+        target_id="repo-convert-zone",
+        target_name="convert-zone",
+        summary="Convert-zone application",
+        entities=entities,
+        relationships=relationships,
+    )
+
+    model = C4ArchitectureExporter.export_from_project_context(ctx, repo_name="convert-zone")
+
+    # Check component dependencies list updated
+    comp_map = {c.id: c for c in model.components}
+    assert "comp_app" in comp_map
+    assert "comp_components" in comp_map
+    assert "comp_lib" in comp_map
+    assert "UI Components" in comp_map["comp_app"].dependencies
+    assert "Utilities & Libraries" in comp_map["comp_components"].dependencies
+
+    # Check Mermaid component diagram renders relationships between components
+    comp_mmd = model.to_mermaid_component()
+    assert "Rel(comp_app, comp_components" in comp_mmd
+    assert "Rel(comp_components, comp_lib" in comp_mmd
+
+
+def test_c4_pure_backend_express_repository():
+    """Verify that a pure Express / Node.js backend repo generates only container_backend."""
+    entities = [
+        ContextEntity(id="f1", name="server/controllers/formController.js", kind="file", path="server/controllers/formController.js", language="JavaScript"),
+        ContextEntity(id="s1", name="submitForm", kind="symbol", path="server/controllers/formController.js", signature="exports.submitForm"),
+        ContextEntity(id="f2", name="server/models/Form.js", kind="file", path="server/models/Form.js", language="JavaScript"),
+        ContextEntity(id="f3", name="server/middleware/adminAuth.js", kind="file", path="server/middleware/adminAuth.js", language="JavaScript"),
+        ContextEntity(id="f4", name="package.json", kind="file", path="package.json", language="JSON"),
+    ]
+
+    ctx = ProjectContext(
+        target_type="repository",
+        target_id="repo-express",
+        target_name="forms-api",
+        summary="Form processing API",
+        entities=entities,
+        relationships=[],
+    )
+
+    model = C4ArchitectureExporter.export_from_project_context(ctx, repo_name="forms-api")
+
+    # Exactly ONE container_backend (+ DB container if models detected)
+    container_ids = [c.id for c in model.containers]
+    assert "container_backend" in container_ids
+    assert "container_frontend" not in container_ids
+    assert "container_core" not in container_ids
+
+    backend_cont = next(c for c in model.containers if c.id == "container_backend")
+    assert "Node.js" in backend_cont.technology or "JavaScript" in backend_cont.technology
+    assert backend_cont.container_type == "api"
+
+    # Components properly classified
+    comp_names = {c.name for c in model.components}
+    assert "Controllers" in comp_names
+    assert "Data Models & Schemas" in comp_names
+    assert "Middleware & Auth" in comp_names
+    assert "Package" not in comp_names
+
+
+def test_c4_fullstack_monorepo():
+    """Verify that a monorepo with both frontend and backend directories creates both containers."""
+    entities = [
+        ContextEntity(id="f1", name="frontend/src/components/button.tsx", kind="file", path="frontend/src/components/button.tsx", language="TypeScript"),
+        ContextEntity(id="f2", name="backend/app/api/endpoints.py", kind="file", path="backend/app/api/endpoints.py", language="Python"),
+        ContextEntity(id="f3", name="backend/app/models/user.py", kind="file", path="backend/app/models/user.py", language="Python"),
+    ]
+
+    ctx = ProjectContext(
+        target_type="repository",
+        target_id="repo-fullstack",
+        target_name="fullstack-app",
+        summary="Fullstack web application",
+        entities=entities,
+        relationships=[],
+    )
+
+    model = C4ArchitectureExporter.export_from_project_context(ctx, repo_name="fullstack-app")
+
+    container_ids = {c.id for c in model.containers}
+    assert "container_frontend" in container_ids
+    assert "container_backend" in container_ids
+
+    # Container relationships include frontend calling backend
+    cont_mmd = model.to_mermaid_container()
+    assert "Rel(container_frontend, container_backend" in cont_mmd
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -304,6 +305,7 @@ def _detect_repository_layout(all_entities: List[Any]) -> str:
     all_paths = [getattr(e, "path", str(e)) for e in all_entities]
     all_paths_lower = [p.lower() for p in all_paths]
     top_dirs = {Path(p).parts[0].lower() for p in all_paths if len(Path(p).parts) > 1}
+    dir_segments = {part.lower() for p in all_paths for part in Path(p).parts[:-1]}
 
     has_explicit_frontend = bool(top_dirs & {"frontend", "client", "web", "ui"})
     has_explicit_backend = bool(top_dirs & {"backend", "server", "api"})
@@ -327,7 +329,7 @@ def _detect_repository_layout(all_entities: List[Any]) -> str:
         for p in all_paths_lower
     )
     frontend_dir_signals = {"components", "hooks", "screens", "views", "styles", "widgets"}
-    has_frontend_dirs = bool(top_dirs & frontend_dir_signals)
+    has_frontend_dirs = bool((top_dirs | dir_segments) & frontend_dir_signals)
     has_jsx_tsx = any(p.endswith(".tsx") or p.endswith(".jsx") for p in all_paths_lower)
 
     # In Next.js, app/ is the frontend App Router if it contains tsx/jsx or standard routes
@@ -343,14 +345,6 @@ def _detect_repository_layout(all_entities: List[Any]) -> str:
         for p in all_paths_lower
     )
 
-    if (
-        (is_frontend_config or has_frontend_dirs or has_nextjs_app_router or has_jsx_tsx)
-        and not has_explicit_backend
-        and not has_backend_app_dir
-    ):
-        return "frontend_app"
-
-    # Backend app detection
     backend_dir_signals = {
         "controllers",
         "routes",
@@ -359,7 +353,16 @@ def _detect_repository_layout(all_entities: List[Any]) -> str:
         "handlers",
         "resolvers",
     }
-    has_backend_dirs = bool(top_dirs & backend_dir_signals)
+    has_backend_dirs = bool((top_dirs | dir_segments) & backend_dir_signals)
+
+    if (
+        (is_frontend_config or has_frontend_dirs or has_nextjs_app_router or has_jsx_tsx)
+        and not has_explicit_backend
+        and not has_backend_app_dir
+        and not (has_backend_dirs and not has_jsx_tsx and not is_frontend_config)
+    ):
+        return "frontend_app"
+
     if (has_explicit_backend or has_backend_dirs or has_backend_app_dir) and not has_explicit_frontend and not has_frontend_dirs:
         return "backend_app"
 
@@ -370,6 +373,225 @@ def _detect_repository_layout(all_entities: List[Any]) -> str:
         return "monorepo_packages"
 
     return "standard"
+
+
+def _infer_component_info(
+    file_path: str,
+    repo_layout: str,
+) -> tuple[str, str, str, str, str]:
+    """Dynamically determine (cont_id, cont_name, cont_type, comp_path, comp_name) for any file.
+
+    Ensures all repositories (frontend, backend, monorepo, packages) partition their code
+    cleanly into semantic architectural components.
+    """
+    p = Path(file_path)
+    parts = p.parts
+
+    # 1. Determine container
+    if repo_layout == "frontend_app":
+        cont_id = "container_frontend"
+        cont_name = "Frontend Web Application"
+        cont_type = "web_app"
+        top_dir = "frontend"
+    elif repo_layout == "backend_app":
+        cont_id = "container_backend"
+        cont_name = "Backend API & Services"
+        cont_type = "api"
+        top_dir = "backend"
+    elif repo_layout == "monorepo_packages":
+        pkg = parts[1] if len(parts) >= 2 else "core"
+        cont_id = f"container_{_sanitize_id(pkg)}"
+        cont_name = f"{pkg.title()} Package"
+        cont_type = "library" if any(k in parts[0] for k in ["pack", "lib", "share"]) else "api"
+        top_dir = parts[0]
+    else:
+        top = parts[0].lower() if len(parts) > 1 else ""
+        stem = p.stem.lower()
+        if top in ["frontend", "web", "client", "ui"] or (len(parts) == 1 and stem in ["index", "client", "ui", "web"]):
+            cont_id = "container_frontend"
+            cont_name = "Frontend Application"
+            cont_type = "web_app"
+            top_dir = "frontend"
+        elif top in ["backend", "server", "api"] or (len(parts) == 1 and stem in ["server", "api", "backend", "main"]):
+            cont_id = "container_backend"
+            cont_name = "Backend API & Services"
+            cont_type = "api"
+            top_dir = "backend"
+        elif top in ["packages", "contracts", "shared", "libs"]:
+            cont_id = "container_contracts"
+            cont_name = "Shared Packages & Libraries"
+            cont_type = "library"
+            top_dir = top
+        elif top == "app":
+            if any(file_path.endswith(ext) for ext in [".py", ".go", ".rs", ".rb"]):
+                cont_id = "container_backend"
+                cont_name = "Backend API & Services"
+                cont_type = "api"
+                top_dir = "backend"
+            else:
+                cont_id = "container_frontend"
+                cont_name = "Frontend Application"
+                cont_type = "web_app"
+                top_dir = "frontend"
+        else:
+            cont_id = "container_core"
+            cont_name = "Core Application"
+            cont_type = "api"
+            top_dir = "root"
+
+    # 2. Determine component path and name
+    subparts = list(parts)
+    wrapper_prefix = ""
+    if len(subparts) > 1 and subparts[0].lower() in [
+        "frontend", "backend", "server", "client", "web", "ui", "packages"
+    ]:
+        wrapper_prefix = subparts[0]
+        subparts = subparts[1:]
+
+    inner_prefix = ""
+    if len(subparts) > 1 and subparts[0].lower() in ["src", "internal", "pkg"]:
+        inner_prefix = subparts[0]
+        subparts = subparts[1:]
+
+    # Check if Next.js App Router (app/ containing pages/routes)
+    if subparts and subparts[0].lower() == "app" and cont_type == "web_app":
+        comp_path_parts = [p for p in [wrapper_prefix, inner_prefix, "app"] if p]
+        comp_path = "/".join(comp_path_parts)
+        comp_name = "App Router (Pages & Routes)"
+    elif subparts and len(subparts) >= 2:
+        layer = subparts[0].lower()
+        comp_path_parts = [p for p in [wrapper_prefix, inner_prefix, subparts[0]] if p]
+        comp_path = "/".join(comp_path_parts)
+
+        layer_names = {
+            "app": "App Router (Pages & Routes)" if cont_type == "web_app" else "Core Application Services",
+            "pages": "Pages & Routes",
+            "routes": "API Endpoints & Routing",
+            "endpoints": "API Endpoints & Routing",
+            "api": "API Endpoints & Routing" if cont_type == "api" else "API Client Services",
+            "controllers": "Controllers",
+            "models": "Data Models & Schemas",
+            "schemas": "Data Models & Schemas",
+            "entities": "Data Models & Schemas",
+            "services": "Business Logic Services",
+            "middleware": "Middleware & Auth",
+            "components": "UI Components",
+            "hooks": "State & Lifecycle Hooks",
+            "lib": "Utilities & Libraries",
+            "utils": "Utilities & Libraries",
+            "helpers": "Utilities & Helpers",
+            "db": "Database & Storage",
+            "database": "Database & Storage",
+            "repository": "Repositories & Persistence",
+            "repositories": "Repositories & Persistence",
+            "core": "Core Configuration",
+            "config": "Core Configuration",
+            "store": "State Management",
+            "stores": "State Management",
+            "styles": "Styles & Design Tokens",
+        }
+        comp_name = layer_names.get(layer, layer.replace("_", " ").title())
+    elif subparts and len(subparts) == 1:
+        comp_path = file_path
+        comp_name = p.stem.replace("_", " ").title()
+    else:
+        comp_path = file_path
+        comp_name = p.stem.replace("_", " ").title()
+
+    return cont_id, cont_name, cont_type, comp_path, comp_name
+
+
+def _find_component_for_path(
+    path: str,
+    components_map: Dict[str, C4Component],
+    comp_lookup_by_file: Dict[str, str],
+    source_path: Optional[str] = None,
+) -> Optional[str]:
+    """Resolve a target path (file, alias @/, ~/, or relative import) to a C4 component ID."""
+    if not path:
+        return None
+
+    # 1. Exact match in file-to-component lookup
+    if path in comp_lookup_by_file:
+        return comp_lookup_by_file[path]
+
+    # 2. Exact match in component IDs
+    if path in components_map:
+        return path
+
+    # 3. Direct component source_path match
+    for cid, comp in components_map.items():
+        if comp.source_path == path or comp.source_path == path.strip("/"):
+            return cid
+
+    # 4. Normalize aliases and relative paths
+    clean = path.strip()
+    if clean.startswith(("@/", "~/", "#/", "$lib/")):
+        clean = clean.split("/", 1)[1] if "/" in clean else clean
+    elif clean.startswith(".") and source_path:
+        try:
+            clean = os.path.normpath(str(Path(source_path).parent / clean)).replace("\\", "/")
+        except Exception:
+            pass
+    elif "." in clean and not any(
+        clean.endswith(ext)
+        for ext in [".js", ".ts", ".jsx", ".tsx", ".py", ".css", ".json", ".mjs"]
+    ):
+        clean = clean.replace(".", "/")
+
+    clean = clean.lstrip("/")
+
+    # Check normalized in lookup
+    if clean in comp_lookup_by_file:
+        return comp_lookup_by_file[clean]
+
+    # Check with extensions in lookup
+    for ext in [
+        "",
+        ".tsx",
+        ".ts",
+        ".jsx",
+        ".js",
+        ".py",
+        ".go",
+        ".rs",
+        ".vue",
+        ".svelte",
+        "/index.tsx",
+        "/index.ts",
+        "/index.js",
+        "/__init__.py",
+    ]:
+        cand = f"{clean}{ext}"
+        if cand in comp_lookup_by_file:
+            return comp_lookup_by_file[cand]
+
+    # 5. Check component source_path prefix matching (longest first)
+    sorted_comps = sorted(
+        components_map.values(),
+        key=lambda c: len(c.source_path),
+        reverse=True,
+    )
+
+    clean_lower = clean.lower()
+    for comp in sorted_comps:
+        comp_sp = comp.source_path.lower().strip("/")
+        comp_sp_bare = comp_sp[4:] if comp_sp.startswith("src/") else comp_sp
+
+        if clean_lower.startswith(comp_sp) or clean_lower.startswith(comp_sp_bare):
+            return comp.id
+
+        clean_parts = Path(clean_lower).parts
+        if comp_sp in clean_parts or comp_sp_bare in clean_parts:
+            return comp.id
+
+    # 6. Check component name or stem matching
+    clean_stem = Path(clean).stem.lower()
+    for comp in sorted_comps:
+        if comp.name.lower() == clean_stem or Path(comp.source_path).stem.lower() == clean_stem:
+            return comp.id
+
+    return None
 
 
 @dataclass
@@ -925,130 +1147,10 @@ class C4ArchitectureExporter:
         repo_layout = _detect_repository_layout(all_entities)
 
         for f in files_to_process:
-            p = Path(f.path)
-            parts = p.parts
-
-            if repo_layout == "frontend_app":
-                cont_id = "container_frontend"
-                cont_name = "Frontend Web Application"
-                cont_type = "web_app"
-                top_dir = "frontend"
-
-                comp_root = parts[0].lower()
-                if comp_root == "src" and len(parts) >= 2:
-                    comp_root = parts[1].lower()
-                    comp_path = f"src/{parts[1]}"
-                else:
-                    comp_path = parts[0]
-
-                if comp_root == "app":
-                    comp_name = "App Router (Pages & Routes)"
-                elif comp_root == "components":
-                    comp_name = "UI Components"
-                elif comp_root == "hooks":
-                    comp_name = "State & Lifecycle Hooks"
-                elif comp_root in ["lib", "utils"]:
-                    comp_name = "Utilities & Libraries"
-                elif len(parts) == 1:
-                    comp_path = f.path
-                    comp_name = p.stem.title()
-                else:
-                    comp_name = comp_root.title()
-
-            elif repo_layout == "backend_app":
-                cont_id = "container_backend"
-                cont_name = "Backend API & Services"
-                cont_type = "api"
-                top_dir = "backend"
-
-                if len(parts) >= 3:
-                    if parts[0].lower() in ["app", "src"]:
-                        comp_path = "/".join(parts[:2])
-                        comp_name = parts[1].title()
-                    else:
-                        comp_path = "/".join(parts[:2])
-                        comp_name = " / ".join(parts[:2]).title()
-                elif len(parts) == 2:
-                    comp_path = parts[0]
-                    comp_name = parts[0].title()
-                else:
-                    comp_path = f.path
-                    comp_name = p.stem.title()
-
-            elif repo_layout == "monorepo_packages":
-                pkg_name = parts[1] if len(parts) >= 2 else "core"
-                cont_id = f"container_{_sanitize_id(pkg_name)}"
-                cont_name = f"{pkg_name.title()} Package"
-                cont_type = "library" if "pack" in parts[0] or "lib" in parts[0] else "api"
-                top_dir = parts[0]
-
-                if len(parts) >= 3:
-                    comp_path = "/".join(parts[:3])
-                    comp_name = " / ".join(parts[1:3]).title()
-                elif len(parts) == 2:
-                    comp_path = "/".join(parts[:2])
-                    comp_name = parts[1].title()
-                else:
-                    comp_path = f.path
-                    comp_name = p.stem.title()
-
-            else:
-                # Monorepo or Standard multi-directory layout
-                if len(parts) == 1:
-                    stem = p.stem.lower()
-                    if stem in ["server", "api", "backend", "main"]:
-                        cont_id = "container_backend"
-                        cont_name = "Backend API & Services"
-                        cont_type = "api"
-                        top_dir = "server"
-                    elif stem in ["index", "client", "ui", "web"]:
-                        cont_id = "container_frontend"
-                        cont_name = "Frontend Application"
-                        cont_type = "web_app"
-                        top_dir = "client"
-                    else:
-                        cont_id = "container_core"
-                        cont_name = "Core Application"
-                        cont_type = "api"
-                        top_dir = "root"
-                else:
-                    top_dir = parts[0].lower()
-                    if top_dir in ["frontend", "web", "client", "ui"]:
-                        cont_id = "container_frontend"
-                        cont_name = "Frontend Application"
-                        cont_type = "web_app"
-                    elif top_dir in ["backend", "server", "api"]:
-                        cont_id = "container_backend"
-                        cont_name = "Backend API & Services"
-                        cont_type = "api"
-                    elif top_dir == "app":
-                        if any(f.path.endswith(ext) for ext in [".py", ".go", ".rs", ".rb"]):
-                            cont_id = "container_backend"
-                            cont_name = "Backend API & Services"
-                            cont_type = "api"
-                        else:
-                            cont_id = "container_frontend"
-                            cont_name = "Frontend Application"
-                            cont_type = "web_app"
-                    elif top_dir in ["packages", "contracts", "shared", "libs"]:
-                        cont_id = "container_contracts"
-                        cont_name = "Shared Packages & Libraries"
-                        cont_type = "library"
-                    else:
-                        cont_id = "container_core"
-                        cont_name = "Core Application"
-                        cont_type = "api"
-
-                if len(parts) >= 3:
-                    comp_path = "/".join(parts[:3])
-                    comp_name = " / ".join(parts[1:3]).title()
-                elif len(parts) == 2:
-                    comp_path = "/".join(parts[:2])
-                    comp_name = parts[1].title()
-                else:
-                    comp_path = f.path
-                    comp_name = p.stem.title()
-
+            cont_id, cont_name, cont_type, comp_path, comp_name = _infer_component_info(
+                f.path, repo_layout
+            )
+            top_dir = cont_id.replace("container_", "")
             if cont_id not in container_files_by_id:
                 container_files_by_id[cont_id] = []
                 container_meta_by_id[cont_id] = {
@@ -1268,14 +1370,18 @@ class C4ArchitectureExporter:
         # Map AST relationships into component-level C4 relationships
         seen_comp_rels = set()
         for rel in context.relationships:
-            src_comp_id = comp_lookup_by_file.get(rel.source_path)
-            tgt_comp_id = comp_lookup_by_file.get(rel.target_path)
+            src_comp_id = _find_component_for_path(
+                rel.source_path, components_map, comp_lookup_by_file
+            )
+            tgt_comp_id = _find_component_for_path(
+                rel.target_path, components_map, comp_lookup_by_file, source_path=rel.source_path
+            )
             if src_comp_id and tgt_comp_id and src_comp_id != tgt_comp_id:
                 pair = (src_comp_id, tgt_comp_id)
                 if pair not in seen_comp_rels:
                     seen_comp_rels.add(pair)
                     # Update component dependencies list
-                    if tgt_comp_id in components_map:
+                    if tgt_comp_id in components_map and src_comp_id in components_map:
                         tgt_name = components_map[tgt_comp_id].name
                         if tgt_name not in components_map[src_comp_id].dependencies:
                             components_map[src_comp_id].dependencies.append(tgt_name)
@@ -1290,7 +1396,7 @@ class C4ArchitectureExporter:
                             source_id=src_comp_id,
                             target_id=tgt_comp_id,
                             description=rel_label,
-                            technology=rel.resolution_method,
+                            technology=rel.resolution_method or "ast_import_resolver",
                             relationship_type=rel.type,
                         )
                     )
@@ -1341,78 +1447,19 @@ class C4ArchitectureExporter:
                 continue
 
             path_parts = Path(comp_info.path).parts
-            if repo_layout == "frontend_app":
-                cont_id = "container_frontend"
-                cont_name = "Frontend Web Application"
-                cont_type = "web_app"
-                top = "frontend"
-            elif repo_layout == "backend_app":
-                cont_id = "container_backend"
-                cont_name = "Backend Services"
-                cont_type = "api"
-                top = "backend"
-            elif repo_layout == "monorepo_packages":
-                pkg_name = path_parts[1] if len(path_parts) >= 2 else "core"
-                cont_id = f"container_{_sanitize_id(pkg_name)}"
-                cont_name = f"{pkg_name.title()} Package"
-                cont_type = "library" if "pack" in path_parts[0] or "lib" in path_parts[0] else "api"
-                top = path_parts[0]
-            else:
-                if len(path_parts) == 1:
-                    stem = Path(comp_info.path).stem.lower()
-                    if stem in ["server", "api", "backend", "main"]:
-                        cont_id = "container_backend"
-                        cont_name = "Backend Services"
-                        cont_type = "api"
-                        top = "server"
-                    elif stem in ["index", "client", "ui", "web"]:
-                        cont_id = "container_frontend"
-                        cont_name = "Frontend Application"
-                        cont_type = "web_app"
-                        top = "client"
-                    else:
-                        cont_id = "container_core"
-                        cont_name = "Core Services"
-                        cont_type = "api"
-                        top = "root"
-                else:
-                    top = path_parts[0].lower()
-                    if top in ["frontend", "web", "ui", "client"]:
-                        cont_id = "container_frontend"
-                        cont_name = "Frontend Application"
-                        cont_type = "web_app"
-                    elif top in ["backend", "server", "api"]:
-                        cont_id = "container_backend"
-                        cont_name = "Backend Services"
-                        cont_type = "api"
-                    elif top == "app":
-                        if any(comp_info.path.endswith(ext) for ext in [".py", ".go", ".rs", ".rb"]):
-                            cont_id = "container_backend"
-                            cont_name = "Backend Services"
-                            cont_type = "api"
-                        else:
-                            cont_id = "container_frontend"
-                            cont_name = "Frontend Application"
-                            cont_type = "web_app"
-                    elif top in ["packages", "contracts", "shared", "libs"]:
-                        cont_id = "container_contracts"
-                        cont_name = "Contracts & Shared Packages"
-                        cont_type = "library"
-                    else:
-                        cont_id = "container_core"
-                        cont_name = "Core Services"
-                        cont_type = "api"
-
-            # Dynamic component technology
+            cont_id, cont_name, cont_type, comp_path, comp_name = _infer_component_info(
+                comp_info.path, repo_layout
+            )
+            top = cont_id.replace("container_", "")
             comp_tech = _infer_file_technology(comp_info.path)
 
             c4_comp = C4Component(
-                id=f"comp_{_sanitize_id(comp_info.path)}",
-                name=comp_info.name,
+                id=f"comp_{_sanitize_id(comp_path)}",
+                name=comp_name,
                 container_id=cont_id,
                 technology=comp_tech,
-                description=f"Component handling {comp_info.name}",
-                source_path=comp_info.path,
+                description=f"Component handling {comp_name.lower()} operations",
+                source_path=comp_path,
                 symbol_count=comp_info.symbol_count,
                 file_count=comp_info.file_count,
                 dependencies=comp_info.dependencies,
@@ -1444,23 +1491,45 @@ class C4ArchitectureExporter:
                 container_type="api",
             )
 
+        # Build comp_lookup_by_file and components_map
+        comp_lookup_by_file: Dict[str, str] = {}
+        for comp in components_list:
+            comp_lookup_by_file[comp.source_path] = comp.id
+        components_map = {c.id: c for c in components_list}
+
         # Relationships
         relationships: List[C4Relationship] = []
+        seen_comp_rels = set()
         for r in arch_graph.relationships:
-            rel_label = (
-                f"{r.type.replace('_', ' ')}: {r.source_name} to {r.target_name}"
-                if r.source_name and r.target_name
-                else r.type.replace("_", " ")
+            src_comp_id = _find_component_for_path(
+                r.source_path, components_map, comp_lookup_by_file
             )
-            relationships.append(
-                C4Relationship(
-                    source_id=f"comp_{_sanitize_id(r.source_path)}",
-                    target_id=f"comp_{_sanitize_id(r.target_path)}",
-                    description=rel_label,
-                    technology=r.resolution_method,
-                    relationship_type=r.type,
-                )
+            tgt_comp_id = _find_component_for_path(
+                r.target_path, components_map, comp_lookup_by_file, source_path=r.source_path
             )
+            if src_comp_id and tgt_comp_id and src_comp_id != tgt_comp_id:
+                pair = (src_comp_id, tgt_comp_id)
+                if pair not in seen_comp_rels:
+                    seen_comp_rels.add(pair)
+                    if tgt_comp_id in components_map and src_comp_id in components_map:
+                        tgt_name = components_map[tgt_comp_id].name
+                        if tgt_name not in components_map[src_comp_id].dependencies:
+                            components_map[src_comp_id].dependencies.append(tgt_name)
+
+                    rel_label = (
+                        f"{r.type.replace('_', ' ')}: {r.source_name} to {r.target_name}"
+                        if r.source_name and r.target_name
+                        else r.type.replace("_", " ")
+                    )
+                    relationships.append(
+                        C4Relationship(
+                            source_id=src_comp_id,
+                            target_id=tgt_comp_id,
+                            description=rel_label,
+                            technology=r.resolution_method or "ast_import_resolver",
+                            relationship_type=r.type,
+                        )
+                    )
 
         # Persona
         if repo_layout == "frontend_app":
