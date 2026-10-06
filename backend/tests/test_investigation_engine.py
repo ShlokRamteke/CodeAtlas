@@ -1048,7 +1048,9 @@ async def test_investigation_with_target_symbol_only_resolves_file(db_session: A
 
 
 @pytest.mark.asyncio
-async def test_investigation_infers_files_from_query_when_target_file_omitted(db_session: AsyncSession):
+async def test_investigation_infers_files_from_query_when_target_file_omitted(
+    db_session: AsyncSession,
+):
     """Verify that when target_path is omitted, query keywords automatically resolve to matching repository files."""
     from app.models.source_file import SourceFile
 
@@ -1095,10 +1097,10 @@ async def test_investigation_infers_files_from_query_when_target_file_omitted(db
 @pytest.mark.asyncio
 async def test_investigation_resolves_llm_file_for_openai_query(db_session: AsyncSession):
     """Verify that 'Move to openai based llms' resolves backend/app/investigation/llm.py and populates ownership."""
+    from app.models.commit import Commit
+    from app.models.commit_file_change import ChangeType, CommitFileChange
     from app.models.source_file import SourceFile
     from app.models.symbol import Symbol, SymbolKind
-    from app.models.commit import Commit
-    from app.models.commit_file_change import CommitFileChange, ChangeType
 
     repo = Repository(
         owner="ShlokRamteke",
@@ -1177,7 +1179,3 @@ async def test_investigation_resolves_llm_file_for_openai_query(db_session: Asyn
     assert own_sig["overall_bus_factor"] >= 1
     assert len(own_sig["recommended_reviewers"]) >= 1
     assert own_sig["recommended_reviewers"][0]["author_name"] == "Shlok Dev"
-
-
-
-

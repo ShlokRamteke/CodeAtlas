@@ -152,11 +152,7 @@ async def run_investigation(
         if run_req and run_req.target_symbol and run_req.target_symbol.strip()
         else None
     )
-    diff = (
-        run_req.diff.strip()
-        if run_req and run_req.diff and run_req.diff.strip()
-        else None
-    )
+    diff = run_req.diff.strip() if run_req and run_req.diff and run_req.diff.strip() else None
 
     await engine.run(
         investigation_id=inv.id,
@@ -241,7 +237,9 @@ def _reconstruct_brief_data(inv: Investigation) -> dict:
             target_files.extend(signals["ownership"]["target_files"])
         elif "decomposition" in signals and signals["decomposition"].get("target_files"):
             target_files.extend(signals["decomposition"]["target_files"])
-        elif "change_risk" in signals and signals["change_risk"].get("kamei_metrics", {}).get("target_files"):
+        elif "change_risk" in signals and signals["change_risk"].get("kamei_metrics", {}).get(
+            "target_files"
+        ):
             target_files.extend(signals["change_risk"]["kamei_metrics"]["target_files"])
 
     guarding_sig = signals.get("guarding_tests", {})
