@@ -18,6 +18,8 @@ class ExtractedSymbol:
     line_end: int
     signature: Optional[str] = None
     docstring: Optional[str] = None
+    decorators: List[str] = field(default_factory=list)
+    method_names: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -197,6 +199,17 @@ class ASTCodeParser:
                 if name_node:
                     name = get_text(name_node)
                     first_line = code[node.start_byte : node.end_byte].split("\n")[0].strip()
+                    decorators: List[str] = [
+                        get_text(c).strip() for c in node.children if c.type == "decorator"
+                    ]
+                    if node.parent:
+                        decorators.extend(
+                            [
+                                get_text(c).strip()
+                                for c in node.parent.children
+                                if c.type == "decorator"
+                            ]
+                        )
                     symbols.append(
                         ExtractedSymbol(
                             name=name,
@@ -204,6 +217,7 @@ class ASTCodeParser:
                             line_start=node.start_point[0] + 1,
                             line_end=node.end_point[0] + 1,
                             signature=first_line[:200],
+                            decorators=decorators,
                         )
                     )
 
@@ -218,6 +232,25 @@ class ASTCodeParser:
                 if name_node:
                     name = get_text(name_node)
                     first_line = code[node.start_byte : node.end_byte].split("\n")[0].strip()
+                    decorators: List[str] = [
+                        get_text(c).strip() for c in node.children if c.type == "decorator"
+                    ]
+                    if node.parent:
+                        decorators.extend(
+                            [
+                                get_text(c).strip()
+                                for c in node.parent.children
+                                if c.type == "decorator"
+                            ]
+                        )
+                    method_names: List[str] = []
+                    body_node = node.child_by_field_name("body")
+                    if body_node:
+                        for child in body_node.children:
+                            if child.type == "method_definition":
+                                m_name_node = child.child_by_field_name("name")
+                                if m_name_node:
+                                    method_names.append(get_text(m_name_node))
                     symbols.append(
                         ExtractedSymbol(
                             name=name,
@@ -225,6 +258,8 @@ class ASTCodeParser:
                             line_start=node.start_point[0] + 1,
                             line_end=node.end_point[0] + 1,
                             signature=first_line[:200],
+                            decorators=decorators,
+                            method_names=method_names,
                         )
                     )
 
@@ -279,6 +314,9 @@ class ASTCodeParser:
                 if name_node:
                     name = get_text(name_node)
                     first_line = code[node.start_byte : node.end_byte].split("\n")[0].strip()
+                    decorators: List[str] = [
+                        get_text(c).strip() for c in node.children if c.type == "decorator"
+                    ]
                     symbols.append(
                         ExtractedSymbol(
                             name=name,
@@ -286,6 +324,7 @@ class ASTCodeParser:
                             line_start=node.start_point[0] + 1,
                             line_end=node.end_point[0] + 1,
                             signature=first_line[:200],
+                            decorators=decorators,
                         )
                     )
 
@@ -388,6 +427,12 @@ class ASTCodeParser:
                         if expr.type == "string":
                             docstring = get_text(expr).strip("'\" \n")
 
+                    decorators: List[str] = []
+                    if node.parent and node.parent.type == "decorated_definition":
+                        for child in node.parent.children:
+                            if child.type == "decorator":
+                                decorators.append(get_text(child).strip())
+
                     symbols.append(
                         ExtractedSymbol(
                             name=name,
@@ -396,6 +441,7 @@ class ASTCodeParser:
                             line_end=node.end_point[0] + 1,
                             signature=first_line[:200],
                             docstring=docstring,
+                            decorators=decorators,
                         )
                     )
 
@@ -416,6 +462,31 @@ class ASTCodeParser:
                         if expr.type == "string":
                             docstring = get_text(expr).strip("'\" \n")
 
+                    decorators: List[str] = []
+                    if node.parent and node.parent.type == "decorated_definition":
+                        for child in node.parent.children:
+                            if child.type == "decorator":
+                                decorators.append(get_text(child).strip())
+
+                    method_names: List[str] = []
+                    if body:
+                        for child in body.children:
+                            target_fn = None
+                            if child.type in ["function_definition", "async_function_definition"]:
+                                target_fn = child
+                            elif child.type == "decorated_definition":
+                                for sub in child.children:
+                                    if sub.type in [
+                                        "function_definition",
+                                        "async_function_definition",
+                                    ]:
+                                        target_fn = sub
+                                        break
+                            if target_fn:
+                                fn_name_node = target_fn.child_by_field_name("name")
+                                if fn_name_node:
+                                    method_names.append(get_text(fn_name_node))
+
                     symbols.append(
                         ExtractedSymbol(
                             name=name,
@@ -424,6 +495,8 @@ class ASTCodeParser:
                             line_end=node.end_point[0] + 1,
                             signature=first_line[:200],
                             docstring=docstring,
+                            decorators=decorators,
+                            method_names=method_names,
                         )
                     )
 

@@ -458,6 +458,9 @@ def _infer_component_info(
     if len(subparts) > 1 and subparts[0].lower() in ["src", "internal", "pkg"]:
         inner_prefix = subparts[0]
         subparts = subparts[1:]
+    elif len(subparts) > 2 and subparts[0].lower() == "app" and cont_type != "web_app":
+        inner_prefix = subparts[0]
+        subparts = subparts[1:]
 
     # Check if Next.js App Router (app/ containing pages/routes)
     if subparts and subparts[0].lower() == "app" and cont_type == "web_app":
@@ -629,6 +632,8 @@ class C4Component:
     symbol_count: int = 0
     file_count: int = 0
     dependencies: List[str] = field(default_factory=list)
+    symbol_roles: Dict[str, int] = field(default_factory=dict)
+    dominant_role: Optional[str] = None
 
 
 @dataclass
@@ -1168,10 +1173,15 @@ class C4ArchitectureExporter:
         code_files = [f for f in files if is_architectural_code_file(f.path, f.language)]
         files_to_process = code_files if code_files else files
 
-        # Count symbols by file path
+        # Count symbols and collect roles by file path
         sym_count_by_file: Dict[str, int] = {}
+        sym_roles_by_file: Dict[str, List[str]] = {}
         for s in symbols:
             sym_count_by_file[s.path] = sym_count_by_file.get(s.path, 0) + 1
+            role = getattr(s, "architectural_role", None)
+            if role:
+                role_str = role.value if hasattr(role, "value") else str(role)
+                sym_roles_by_file.setdefault(s.path, []).append(role_str)
 
         # Collect files by container ID
         container_files_by_id: Dict[str, List[Any]] = {}
@@ -1211,6 +1221,12 @@ class C4ArchitectureExporter:
             comp = components_map[comp_id]
             comp.file_count += 1
             comp.symbol_count += sym_count_by_file.get(f.path, len(f.signature or ""))
+            for role_str in sym_roles_by_file.get(f.path, []):
+                comp.symbol_roles[role_str] = comp.symbol_roles.get(role_str, 0) + 1
+
+        for comp in components_map.values():
+            if comp.symbol_roles:
+                comp.dominant_role = max(comp.symbol_roles.items(), key=lambda kv: kv[1])[0]
 
         # Build dynamic containers based on actual member files
         for cont_id, c_files in container_files_by_id.items():

@@ -25,7 +25,7 @@ from app.models.issue import Issue
 from app.models.pull_request import PullRequest
 from app.models.repository import Repository
 from app.models.source_file import SourceFile
-from app.models.symbol import Symbol, SymbolKind
+from app.models.symbol import ArchitecturalRole, Symbol, SymbolKind
 from app.parser.ast_parser import ExtractedDependency, ExtractedSymbol, ParsedFileResult
 from app.parser.relationship_analyzer import RelationshipAnalyzer
 from app.schemas.c4 import (
@@ -413,6 +413,7 @@ async def list_repository_symbols(
     repository_id: uuid.UUID,
     name: Optional[str] = Query(None, description="Search symbol by name"),
     kind: Optional[SymbolKind] = Query(None, description="Filter by symbol kind"),
+    role: Optional[ArchitecturalRole] = Query(None, description="Filter by architectural role"),
     db: AsyncSession = Depends(get_db),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
@@ -422,6 +423,8 @@ async def list_repository_symbols(
         stmt = stmt.where(Symbol.name.ilike(f"%{name}%"))
     if kind:
         stmt = stmt.where(Symbol.kind == kind)
+    if role:
+        stmt = stmt.where(Symbol.architectural_role == role)
     stmt = stmt.offset(skip).limit(limit).order_by(Symbol.name.asc())
     result = await db.execute(stmt)
     return list(result.scalars().all())

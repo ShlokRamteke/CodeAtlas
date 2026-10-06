@@ -25,6 +25,15 @@ class SymbolKind(str, enum.Enum):
     METHOD = "method"
 
 
+class ArchitecturalRole(str, enum.Enum):
+    CONTROLLER = "controller"
+    SERVICE = "service"
+    REPOSITORY = "repository"
+    ENTITY = "entity"
+    MIDDLEWARE = "middleware"
+    UTILITY = "utility"
+
+
 class Symbol(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "symbols"
 
@@ -49,6 +58,11 @@ class Symbol(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     line_end: Mapped[int] = mapped_column(Integer, nullable=False)
     signature: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     docstring: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    architectural_role: Mapped[Optional[ArchitecturalRole]] = mapped_column(
+        Enum(ArchitecturalRole, name="architectural_role", native_enum=False),
+        nullable=True,
+        index=True,
+    )
     embedding = mapped_column(Vector(1536), nullable=True)
 
     file: Mapped["SourceFile"] = relationship("SourceFile", back_populates="symbols")

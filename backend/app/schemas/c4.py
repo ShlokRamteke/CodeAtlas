@@ -30,6 +30,8 @@ class C4ComponentSchema(BaseModel):
     symbol_count: int = 0
     file_count: int = 0
     dependencies: List[str] = Field(default_factory=list)
+    symbol_roles: Dict[str, int] = Field(default_factory=dict)
+    dominant_role: Optional[str] = None
 
 
 class C4ContainerSchema(BaseModel):

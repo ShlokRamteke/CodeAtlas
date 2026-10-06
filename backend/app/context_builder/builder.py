@@ -151,6 +151,9 @@ class CurrentSystemContextBuilder:
             s for s in symbols if not target_file_ids or s.get("file_id") in target_file_ids
         ]
         for s in target_symbols:
+            role_val = s.get("architectural_role")
+            if hasattr(role_val, "value"):
+                role_val = role_val.value
             entities.append(
                 ContextEntity(
                     id=str(s.get("id") or uuid.uuid4()),
@@ -160,6 +163,7 @@ class CurrentSystemContextBuilder:
                     signature=s.get("signature"),
                     line_start=s.get("line_start"),
                     line_end=s.get("line_end"),
+                    architectural_role=str(role_val) if role_val else None,
                 )
             )
 

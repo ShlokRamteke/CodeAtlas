@@ -89,3 +89,63 @@ def test_python_ast_parsing() -> None:
     deps = {(d.target_path, d.imported_symbol, d.kind) for d in result.dependencies}
     assert ("os", None, "external") in deps
     assert ("app.models.user", "User", "internal") in deps
+
+
+def test_python_decorators_and_methods() -> None:
+    parser = ASTCodeParser()
+    code = """
+    from fastapi import APIRouter
+
+    router = APIRouter()
+
+    @router.get("/users")
+    async def get_users():
+        return []
+
+    @dataclass
+    class UserRepository:
+        async def find_by_id(self, user_id: str):
+            pass
+
+        def delete(self, user_id: str):
+            pass
+    """
+    result = parser.parse_code("backend/app/api/users.py", code)
+    assert result.language == "python"
+
+    symbols_map = {s.name: s for s in result.symbols}
+    assert "get_users" in symbols_map
+    assert any("router.get" in dec for dec in symbols_map["get_users"].decorators)
+
+    assert "UserRepository" in symbols_map
+    repo = symbols_map["UserRepository"]
+    assert any("dataclass" in dec for dec in repo.decorators)
+    assert "find_by_id" in repo.method_names
+    assert "delete" in repo.method_names
+
+
+def test_typescript_decorators_and_methods() -> None:
+    parser = ASTCodeParser()
+    code = """
+    @Controller('/payments')
+    export class PaymentController {
+        @Get('/')
+        async getPayments() {
+            return [];
+        }
+
+        @Post('/')
+        async createPayment() {
+            return {};
+        }
+    }
+    """
+    result = parser.parse_code("src/controllers/PaymentController.ts", code)
+    assert result.language == "typescript"
+
+    symbols_map = {s.name: s for s in result.symbols}
+    assert "PaymentController" in symbols_map
+    ctrl = symbols_map["PaymentController"]
+    assert any("Controller" in dec for dec in ctrl.decorators)
+    assert "getPayments" in ctrl.method_names
+    assert "createPayment" in ctrl.method_names
