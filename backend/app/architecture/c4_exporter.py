@@ -38,8 +38,134 @@ def _sanitize_flowchart_label(val: str) -> str:
     return cleaned
 
 
+CODE_EXTENSIONS = {
+    ".py",
+    ".pyi",
+    ".js",
+    ".jsx",
+    ".mjs",
+    ".cjs",
+    ".ts",
+    ".tsx",
+    ".go",
+    ".rs",
+    ".java",
+    ".kt",
+    ".scala",
+    ".c",
+    ".cpp",
+    ".cc",
+    ".cxx",
+    ".h",
+    ".hpp",
+    ".cs",
+    ".rb",
+    ".php",
+    ".swift",
+    ".dart",
+    ".vue",
+    ".svelte",
+}
+
+NON_CODE_EXTENSIONS = {
+    ".md",
+    ".markdown",
+    ".txt",
+    ".rst",
+    ".pdf",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".ini",
+    ".cfg",
+    ".cnf",
+    ".lock",
+    ".env",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".svg",
+    ".ico",
+    ".webp",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot",
+    ".csv",
+    ".tsv",
+    ".sql",
+    ".sh",
+    ".bash",
+    ".zsh",
+}
+
+
+def is_architectural_code_file(path: str, language: Optional[str] = None) -> bool:
+    """Check if file represents executable application source code rather than documentation/config."""
+    p = Path(path)
+    name = p.name.lower()
+    ext = p.suffix.lower()
+
+    if name.startswith("."):
+        return False
+    if name in {"license", "copying", "readme", "dockerfile", "makefile", "procfile"}:
+        return False
+    if ext in NON_CODE_EXTENSIONS:
+        return False
+    if ext in CODE_EXTENSIONS:
+        return True
+
+    if language:
+        lang_name = language.strip().lower()
+        if lang_name in {
+            "python",
+            "javascript",
+            "typescript",
+            "go",
+            "rust",
+            "java",
+            "c",
+            "c++",
+            "c#",
+            "ruby",
+            "php",
+            "swift",
+            "dart",
+        }:
+            return True
+
+    return False
+
+
 def _infer_file_technology(path: str, language: Optional[str] = None) -> str:
     """Infer file programming language/runtime from language tag or file extension."""
+    ext = Path(path).suffix.lower()
+    if ext in NON_CODE_EXTENSIONS:
+        return "Unknown"
+
+    if ext in [".js", ".mjs", ".cjs", ".jsx"]:
+        return "JavaScript"
+    if ext in [".ts", ".tsx"]:
+        return "TypeScript"
+    if ext == ".py":
+        return "Python"
+    if ext == ".go":
+        return "Go"
+    if ext == ".rs":
+        return "Rust"
+    if ext in [".java", ".kt"]:
+        return "Java"
+    if ext == ".rb":
+        return "Ruby"
+    if ext == ".php":
+        return "PHP"
+    if ext in [".cs"]:
+        return "C#"
+    if ext in [".vue", ".svelte"]:
+        return "Web"
+
     if language:
         lang = language.strip().lower()
         if lang in ["javascript", "js"]:
@@ -60,29 +186,10 @@ def _infer_file_technology(path: str, language: Optional[str] = None) -> str:
             return "PHP"
         if lang in ["c#", "csharp"]:
             return "C#"
+        if lang in ["json", "yaml", "markdown", "text", "toml", "xml"]:
+            return "Unknown"
         return language.title()
 
-    ext = Path(path).suffix.lower()
-    if ext in [".js", ".mjs", ".cjs", ".jsx"]:
-        return "JavaScript"
-    if ext in [".ts", ".tsx"]:
-        return "TypeScript"
-    if ext == ".py":
-        return "Python"
-    if ext == ".go":
-        return "Go"
-    if ext == ".rs":
-        return "Rust"
-    if ext in [".java", ".kt"]:
-        return "Java"
-    if ext == ".rb":
-        return "Ruby"
-    if ext == ".php":
-        return "PHP"
-    if ext in [".cs"]:
-        return "C#"
-    if ext in [".html", ".css", ".scss", ".sass", ".vue", ".svelte"]:
-        return "Web"
     return "Unknown"
 
 
@@ -678,6 +785,10 @@ class C4ArchitectureExporter:
         files = [e for e in all_entities if e.kind == "file"]
         symbols = [e for e in all_entities if e.kind == "symbol"]
 
+        # Filter to architectural code files, ignoring documentation, config, lockfiles
+        code_files = [f for f in files if is_architectural_code_file(f.path, f.language)]
+        files_to_process = code_files if code_files else files
+
         # Count symbols by file path
         sym_count_by_file: Dict[str, int] = {}
         for s in symbols:
@@ -687,28 +798,46 @@ class C4ArchitectureExporter:
         container_files_by_id: Dict[str, List[Any]] = {}
         container_meta_by_id: Dict[str, Dict[str, str]] = {}
 
-        for f in files:
+        for f in files_to_process:
             p = Path(f.path)
             parts = p.parts
 
             # Container detection heuristic
-            top_dir = parts[0].lower() if parts else "root"
-            if top_dir in ["frontend", "web", "client", "ui"]:
-                cont_id = "container_frontend"
-                cont_name = "Frontend Application"
-                cont_type = "web_app"
-            elif top_dir in ["backend", "server", "api", "app"]:
-                cont_id = "container_backend"
-                cont_name = "Backend API & Services"
-                cont_type = "api"
-            elif top_dir in ["packages", "contracts", "shared"]:
-                cont_id = "container_contracts"
-                cont_name = "Shared Packages & Libraries"
-                cont_type = "library"
+            if len(parts) == 1:
+                stem = p.stem.lower()
+                if stem in ["server", "api", "backend", "app", "main"]:
+                    cont_id = "container_backend"
+                    cont_name = "Backend API & Services"
+                    cont_type = "api"
+                    top_dir = "server"
+                elif stem in ["index", "client", "ui", "web"]:
+                    cont_id = "container_frontend"
+                    cont_name = "Frontend Application"
+                    cont_type = "web_app"
+                    top_dir = "client"
+                else:
+                    cont_id = "container_core"
+                    cont_name = "Core Application"
+                    cont_type = "api"
+                    top_dir = "root"
             else:
-                cont_id = "container_core"
-                cont_name = "Core Application"
-                cont_type = "api"
+                top_dir = parts[0].lower()
+                if top_dir in ["frontend", "web", "client", "ui"]:
+                    cont_id = "container_frontend"
+                    cont_name = "Frontend Application"
+                    cont_type = "web_app"
+                elif top_dir in ["backend", "server", "api", "app"]:
+                    cont_id = "container_backend"
+                    cont_name = "Backend API & Services"
+                    cont_type = "api"
+                elif top_dir in ["packages", "contracts", "shared", "libs"]:
+                    cont_id = "container_contracts"
+                    cont_name = "Shared Packages & Libraries"
+                    cont_type = "library"
+                else:
+                    cont_id = f"container_{_sanitize_id(top_dir)}"
+                    cont_name = f"{top_dir.title()} Service"
+                    cont_type = "api"
 
             if cont_id not in container_files_by_id:
                 container_files_by_id[cont_id] = []
@@ -972,25 +1101,45 @@ class C4ArchitectureExporter:
         components_list: List[C4Component] = []
 
         for comp_info in arch_graph.major_components:
-            path_parts = Path(comp_info.path).parts
-            top = path_parts[0].lower() if path_parts else "core"
+            if not is_architectural_code_file(comp_info.path):
+                continue
 
-            if top in ["frontend", "web", "ui", "client"]:
-                cont_id = "container_frontend"
-                cont_name = "Frontend Application"
-                cont_type = "web_app"
-            elif top in ["backend", "server", "api", "app"]:
-                cont_id = "container_backend"
-                cont_name = "Backend Services"
-                cont_type = "api"
-            elif top in ["packages", "contracts", "shared"]:
-                cont_id = "container_contracts"
-                cont_name = "Contracts & Shared Packages"
-                cont_type = "library"
+            path_parts = Path(comp_info.path).parts
+            if len(path_parts) == 1:
+                stem = Path(comp_info.path).stem.lower()
+                if stem in ["server", "api", "backend", "app", "main"]:
+                    cont_id = "container_backend"
+                    cont_name = "Backend Services"
+                    cont_type = "api"
+                    top = "server"
+                elif stem in ["index", "client", "ui", "web"]:
+                    cont_id = "container_frontend"
+                    cont_name = "Frontend Application"
+                    cont_type = "web_app"
+                    top = "client"
+                else:
+                    cont_id = "container_core"
+                    cont_name = "Core Services"
+                    cont_type = "api"
+                    top = "root"
             else:
-                cont_id = "container_core"
-                cont_name = "Core Services"
-                cont_type = "api"
+                top = path_parts[0].lower()
+                if top in ["frontend", "web", "ui", "client"]:
+                    cont_id = "container_frontend"
+                    cont_name = "Frontend Application"
+                    cont_type = "web_app"
+                elif top in ["backend", "server", "api", "app"]:
+                    cont_id = "container_backend"
+                    cont_name = "Backend Services"
+                    cont_type = "api"
+                elif top in ["packages", "contracts", "shared", "libs"]:
+                    cont_id = "container_contracts"
+                    cont_name = "Contracts & Shared Packages"
+                    cont_type = "library"
+                else:
+                    cont_id = f"container_{_sanitize_id(top)}"
+                    cont_name = f"{top.title()} Services"
+                    cont_type = "api"
 
             # Dynamic component technology
             comp_tech = _infer_file_technology(comp_info.path)
