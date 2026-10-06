@@ -420,3 +420,30 @@ OpenRouter provides vendor-agnostic routing across Anthropic, OpenAI, Meta, and 
 - LLM outputs are reliably structured with typed Pydantic validation.
 - All automated unit tests run offline with `MockLLMProvider`, requiring zero API keys in CI/CD.
 
+---
+
+## ADR-019 — System One Non-Autoregressive Decision Models & `/v1/systemone` Protocol Adapter
+
+**Status:** Accepted
+
+**Date:** 2026-10-06
+
+**Decision**
+
+1. Adopt the open `/v1/systemone` decision model protocol for Phase 5 semantic indexing:
+   - Evaluates input state against typed questions: `choice` (categorical), `noul` (boolean yes/no), and `score` (ordered numeric).
+   - Non-autoregressive forward evaluation running on local CPU (Laya / ModernBERT) with sub-40ms latency and zero per-token cloud costs.
+2. Enforce strict calibrated probability thresholds ($P \ge 0.85$ or certainty $\max(P, 1 - P) \ge 0.85$) before accepting any decision into the canonical `ProjectContext`.
+3. Require deterministic rule-based fallbacks for every decision primitive whenever the server is offline, disabled, or confidence falls below the $0.85$ threshold.
+4. Implement `MockSystemOneClient` for fast, reproducible, offline unit tests without requiring a running model daemon in CI.
+
+**Reason**
+
+Generative LLMs are too slow (1–5 seconds per call), expensive, and prone to hallucinations for mass repository indexing across thousands of AST symbols, commit logs, and documentation sentences. System One models provide fast, typed, non-autoregressive classifications with calibrated probabilities, allowing the indexing pipeline to enrich architectural roles, semantic invariants, and container boundaries reliably.
+
+**Implication**
+
+- `backend/app/semantic/` provides the protocol schemas (`systemone.py`) and client adapter (`client.py`).
+- Indexing components degrade gracefully to deterministic heuristic defaults if the model is unreachable.
+- No third-party cloud API keys or internet access required for repository semantic indexing.
+

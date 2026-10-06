@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     OPENROUTER_MODEL: str = "anthropic/claude-3.5-sonnet"
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
 
+    # Semantic Decision Models (System One / Laya)
+    DECISION_MODEL_URL: str = "http://localhost:8081"
+    DECISION_MODEL_ENABLED: bool = True
+    DECISION_MODEL_TIMEOUT: float = 2.0
+    DECISION_CONFIDENCE_THRESHOLD: float = 0.85
+
     # CORS
     BACKEND_CORS_ORIGINS: Any = [
         "http://localhost:3000",

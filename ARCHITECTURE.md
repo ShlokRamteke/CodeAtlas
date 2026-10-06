@@ -467,3 +467,30 @@ podman compose up -d (or make up)
 ### Storage Persistence & Live Development
 - **Database Volumes**: The PostgreSQL service uses a dedicated named volume (`postgres_data`) ensuring data is never lost across container restarts (`make up` / `make down`).
 - **Live Code Reloading**: The backend (`./backend/app:/app/app:Z`) and frontend (`./frontend/src:/app/frontend/src:Z`) bind mounts allow instant hot-reloading in development without container restarts.
+
+## 21. Semantic Indexing & System One Decision Pipeline (Phase 5)
+
+Enriches the deterministic repository index with fast, typed, non-autoregressive "System One" decision models (Laya / ModernBERT / `/v1/systemone` protocol) running locally on CPU at sub-40ms latency and zero per-token cloud costs.
+
+```text
+Raw Codebase & Docs
+      ↓
+Tree-sitter AST & Git Indexer (Deterministic Baseline)
+      ↓
+SystemOneClient (POST /v1/systemone on local CPU / 40ms)
+      ├── PH5-02: Symbol Architectural Role (controller, service, repository, entity)
+      ├── PH5-03: Semantic Invariant Mining (security, data_integrity, performance)
+      ├── PH5-04: Commit Intent & Bug-Fix Defect Mining (refines Kamei defect pressure)
+      └── PH5-05: C4 Container Boundary Classification (monorepo container roles)
+      ↓
+Enriched ProjectContext & C4 Architecture Models
+```
+
+### Protocol Primitives
+1. **choice**: Categorical classification over discrete options with probability distribution and confidence score.
+2. **noul**: Boolean yes/no question returning calibrated probability $P \in [0, 1]$. Certainty is measured as $\max(P, 1 - P)$.
+3. **score**: Ordered numeric rating against a defined legend with confidence score.
+
+### Calibration & Deterministic Fallback
+- **Strict Gating**: Classifications require calibrated confidence $\ge 0.85$ to be accepted into the canonical `ProjectContext`.
+- **Graceful Fallback**: If the decision engine is unavailable, offline, or confidence is $< 0.85$, the engine falls back immediately to deterministic rule heuristics without failing ingestion.
