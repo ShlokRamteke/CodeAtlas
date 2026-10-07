@@ -76,10 +76,10 @@ Enriched ProjectContext & C4 Architecture Models
 - [x] Eliminate manual directory mapping in C4 architecture exports.
 
 ### PH5-06: Containerized Local Serving & Performance Benchmark
-- [ ] Add `laya` service to `compose.yaml` (using `ghcr.io/nandakishorm/laya-serve` on port 8081).
-- [ ] Environment variable configuration (`DECISION_MODEL_URL`, `DECISION_MODEL_ENABLED`).
-- [ ] Benchmark test suite asserting sub-40ms execution on CPU.
-- [ ] End-to-end repository indexing regression tests verifying enriched metadata quality.
+- [x] Add `laya` service to `compose.yaml` (using `ghcr.io/nandakishorm/laya-serve` on port 8081).
+- [x] Environment variable configuration (`DECISION_MODEL_URL`, `DECISION_MODEL_ENABLED`).
+- [x] Benchmark test suite asserting sub-40ms execution on CPU.
+- [x] End-to-end repository indexing regression tests verifying enriched metadata quality.
 
 ## Explicit Non-Goals
 
@@ -95,4 +95,4 @@ Enriched ProjectContext & C4 Architecture Models
 - [x] Unformatted natural-language constraints in docs are extracted into `DesignConstraint` records.
 - [x] Commit history defect pressure reflects classified bugfix commits.
 - [x] C4 container export correctly identifies non-standard container directories.
-- [ ] All unit, integration, and benchmark tests pass without regressions.
+- [x] All unit, integration, and benchmark tests pass without regressions.

@@ -73,6 +73,21 @@ class SystemOneClient:
             if should_close:
                 await client.aclose()
 
+    async def check_health(self) -> bool:
+        """Check if System One decision model server is reachable and healthy."""
+        if not self.enabled:
+            return False
+        client = await self._get_client()
+        should_close = self._http_client is None
+        try:
+            response = await client.get(f"{self.base_url}/health")
+            return response.status_code == 200
+        except Exception:
+            return False
+        finally:
+            if should_close:
+                await client.aclose()
+
     async def decide_noul(
         self,
         state: Any,
@@ -474,6 +489,10 @@ class MockSystemOneClient(SystemOneClient):
     def set_offline(self, offline: bool = True) -> None:
         """Simulate network disconnection."""
         self.offline = offline
+
+    async def check_health(self) -> bool:
+        """Check mock decision server availability."""
+        return not self.offline and self.enabled
 
     async def ask(self, request: SystemOneRequest) -> SystemOneResponse:
         """Process request against registered canned responses or dynamic handler."""
