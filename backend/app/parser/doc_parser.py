@@ -316,6 +316,82 @@ class EngineeringContextParser:
         return constraints
 
     @classmethod
+    def extract_candidate_sentences(cls, content: str) -> List[Tuple[int, int, str]]:
+        """
+        Extract candidate directive sentences from markdown content,
+        excluding code blocks, headers, table rows, and trivial lines.
+        Returns list of (line_start, line_end, text).
+        """
+        lines = content.splitlines()
+        candidates: List[Tuple[int, int, str]] = []
+        in_code_block = False
+
+        for idx, raw_line in enumerate(lines, start=1):
+            line = raw_line.strip()
+            if not line:
+                continue
+
+            # Toggle code block state
+            if line.startswith("```"):
+                in_code_block = not in_code_block
+                continue
+
+            if in_code_block:
+                continue
+
+            # Skip headers
+            if line.startswith("#"):
+                continue
+
+            # Skip markdown table rows
+            if line.startswith("|") and line.endswith("|"):
+                continue
+
+            # Skip HTML comments
+            if line.startswith("<!--"):
+                continue
+
+            # Clean bullet lists and numbered lists
+            clean_line = line
+            list_match = re.match(r"^(?:[-*+]|\d+\.)\s+(.*)$", line)
+            if list_match:
+                clean_line = list_match.group(1).strip()
+
+            # Strip markdown formatting like bold/italics at borders
+            clean_text = clean_line.strip("`*_ ")
+
+            # Skip very short lines (< 20 chars) or lines that look like links/images only
+            if len(clean_text) < 20 or len(clean_text) > 400:
+                continue
+            if clean_text.startswith("![") or clean_text.startswith("["):
+                if re.match(r"^\[.*?\]\(.*?\)$", clean_text):
+                    continue
+
+            candidates.append((idx, idx, clean_text))
+
+        return candidates
+
+    @classmethod
+    async def extract_semantic_constraints(
+        cls,
+        path: str,
+        content: str,
+        miner: Optional[Any] = None,
+    ) -> List[ParsedConstraint]:
+        """
+        Extract semantic natural-language invariants using System One / heuristic mining.
+        """
+        from app.semantic.invariant_miner import SemanticInvariantMiner
+
+        active_miner = miner or SemanticInvariantMiner()
+        rfc_constraints = cls.extract_constraints(path, content)
+        return await active_miner.mine_document(
+            path=path,
+            content=content,
+            existing_constraints=rfc_constraints,
+        )
+
+    @classmethod
     def parse_doc(cls, path: str, content: str, content_hash: str) -> ParsedEngineeringDoc:
         """Parse engineering document into structured sections, metadata, and constraints."""
         doc_type = cls.classify_doc_type(path)

@@ -57,11 +57,11 @@ Enriched ProjectContext & C4 Architecture Models
 - [x] Expose symbol role in symbol query endpoints and C4 component exports.
 
 ### PH5-03: Semantic Constraint & Invariant Mining (Documentation Indexing)
-- [ ] Extend `engineering_context_parser.py` to evaluate natural-language document sentences in markdown (`README.md`, `ARCHITECTURE.md`, `ADRs`).
-- [ ] Classify whether sentences constitute non-negotiable architectural invariants (`is_invariant: noul`).
-- [ ] Categorize invariant domain (`security`, `concurrency`, `data_integrity`, `performance`, `deployment`).
-- [ ] Determine RFC 2119 equivalent priority (`MUST`, `SHOULD`, `FORBIDDEN`).
-- [ ] Index natural rules that do not explicitly contain uppercase RFC keywords.
+- [x] Extend `engineering_context_parser.py` to evaluate natural-language document sentences in markdown (`README.md`, `ARCHITECTURE.md`, `ADRs`).
+- [x] Classify whether sentences constitute non-negotiable architectural invariants (`is_invariant: noul`).
+- [x] Categorize invariant domain (`security`, `concurrency`, `data_integrity`, `performance`, `deployment`).
+- [x] Determine RFC 2119 equivalent priority (`MUST`, `SHOULD`, `FORBIDDEN`).
+- [x] Index natural rules that do not explicitly contain uppercase RFC keywords.
 
 ### PH5-04: Commit Intent & Historic Bug-Fix Defect Mining (Git History Indexing)
 - [ ] Extend `git_indexer.py` commit ingestion pipeline.
@@ -92,7 +92,7 @@ Enriched ProjectContext & C4 Architecture Models
 - [ ] `SystemOneClient` handles `choice`, `noul`, and `score` questions with calibrated probabilities.
 - [ ] Ingestion degrades gracefully to deterministic defaults when decision model is offline.
 - [x] Code symbols receive verified `architectural_role` tags during indexing.
-- [ ] Unformatted natural-language constraints in docs are extracted into `DesignConstraint` records.
+- [x] Unformatted natural-language constraints in docs are extracted into `DesignConstraint` records.
 - [ ] Commit history defect pressure reflects classified bugfix commits.
 - [ ] C4 container export correctly identifies non-standard container directories.
 - [ ] All unit, integration, and benchmark tests pass without regressions.

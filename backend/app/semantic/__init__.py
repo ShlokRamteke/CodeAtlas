@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from app.models.symbol import ArchitecturalRole
 from app.semantic.client import MockSystemOneClient, SystemOneClient
+from app.semantic.invariant_miner import SemanticInvariantMiner
 from app.semantic.symbol_classifier import SymbolRoleClassifier
 from app.semantic.systemone import (
     ChoiceAnswer,
@@ -37,6 +38,7 @@ __all__ = [
     "QuestionType",
     "ScoreAnswer",
     "ScoreQuestion",
+    "SemanticInvariantMiner",
     "SymbolRoleClassifier",
     "SystemOneAnswer",
     "SystemOneClient",
