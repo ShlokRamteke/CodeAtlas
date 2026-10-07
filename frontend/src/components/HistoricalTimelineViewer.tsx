@@ -442,6 +442,26 @@ export function HistoricalTimelineViewer({
 
                     {/* Commit Hash & Diff stats badge */}
                     <div className="flex items-center gap-2 flex-shrink-0">
+                      {milestone.commitIntent && (
+                        <span
+                          className={`text-[10px] uppercase font-mono px-1.5 py-0.5 rounded font-semibold border ${
+                            milestone.commitIntent === "bugfix" || milestone.commitIntent === "security_patch"
+                              ? "bg-rose-950/60 text-rose-300 border-rose-500/30"
+                              : milestone.commitIntent === "feature"
+                              ? "bg-emerald-950/60 text-emerald-300 border-emerald-500/30"
+                              : milestone.commitIntent === "refactor"
+                              ? "bg-amber-950/60 text-amber-300 border-amber-500/30"
+                              : "bg-slate-850 text-slate-300 border-slate-700"
+                          }`}
+                        >
+                          {milestone.commitIntent}
+                        </span>
+                      )}
+                      {milestone.isDefectFix && (
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-red-950/70 text-red-300 border border-red-500/40 font-semibold" title="Defect Repair">
+                          🐞 Defect Fix
+                        </span>
+                      )}
                       {milestone.commitHash && (
                         <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-slate-900 text-indigo-300 border border-slate-700">
                           {milestone.commitHash.slice(0, 7)}

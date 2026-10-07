@@ -13,7 +13,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING, Optional, Sequence
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -53,6 +53,8 @@ class HistoricalCommitInfo:
     timestamp: datetime
     touched_files: tuple[str, ...]
     is_fix: bool = False
+    commit_intent: Optional[str] = None
+    is_defect_fix: Optional[bool] = None
 
 
 @dataclass(frozen=True)
@@ -219,7 +221,12 @@ def compute_defect_pressure(
 
     for commit in commits:
         # Check if commit is a bug-fix and touches at least one target file
-        is_fix = commit.is_fix or is_fix_commit(commit.message)
+        is_fix = (
+            commit.is_fix
+            or bool(commit.is_defect_fix)
+            or commit.commit_intent in ("bugfix", "security_patch")
+            or is_fix_commit(commit.message)
+        )
         if not is_fix:
             continue
 
@@ -249,7 +256,12 @@ def assess_change_risk(
     fix_commits = [
         c
         for c in commits
-        if (c.is_fix or is_fix_commit(c.message))
+        if (
+            c.is_fix
+            or bool(c.is_defect_fix)
+            or c.commit_intent in ("bugfix", "security_patch")
+            or is_fix_commit(c.message)
+        )
         and any(f in target_files for f in c.touched_files)
     ]
 
@@ -343,6 +355,8 @@ async def mine_defect_pressure_from_db(
             Commit.message,
             Commit.committed_at,
             CommitFileChange.file_path,
+            Commit.commit_intent,
+            Commit.is_defect_fix,
         )
         .join(CommitFileChange, Commit.id == CommitFileChange.commit_id)
         .where(
@@ -356,14 +370,21 @@ async def mine_defect_pressure_from_db(
     rows = res.all()
 
     commit_dict: dict[str, dict] = {}
-    for c_hash, message, committed_at, file_path in rows:
+    for c_hash, message, committed_at, file_path, commit_intent, is_defect_fix in rows:
         if c_hash not in commit_dict:
+            is_fix = (
+                bool(is_defect_fix)
+                or commit_intent in ("bugfix", "security_patch")
+                or is_fix_commit(message)
+            )
             commit_dict[c_hash] = {
                 "hash": c_hash,
                 "message": message,
                 "timestamp": committed_at,
                 "touched_files": set(),
-                "is_fix": is_fix_commit(message),
+                "is_fix": is_fix,
+                "commit_intent": commit_intent,
+                "is_defect_fix": is_defect_fix,
             }
         if file_path:
             commit_dict[c_hash]["touched_files"].add(file_path)
@@ -375,6 +396,8 @@ async def mine_defect_pressure_from_db(
             timestamp=info["timestamp"],
             touched_files=tuple(info["touched_files"]),
             is_fix=info["is_fix"],
+            commit_intent=info["commit_intent"],
+            is_defect_fix=info["is_defect_fix"],
         )
         for info in commit_dict.values()
     ]

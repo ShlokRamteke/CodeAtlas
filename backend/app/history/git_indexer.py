@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+import logging
 import re
 import uuid
 from dataclasses import dataclass, field
@@ -12,6 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.commit import Commit
 from app.models.commit_file_change import ChangeType, CommitFileChange
 from app.models.engineering_doc import EngineeringDocType, EngineeringDocument
+from app.semantic.commit_classifier import (
+    CommitClassificationResult,
+    CommitIntentClassifier,
+)
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -48,6 +53,9 @@ class FileHistoryResult:
 class GitHistoryIndexer:
     """Deterministic Git history parser, indexer, and file timeline analyzer."""
 
+    def __init__(self, classifier: Optional[CommitIntentClassifier] = None) -> None:
+        self.classifier = classifier or CommitIntentClassifier()
+
     async def index_commits(
         self,
         repository_id: uuid.UUID,
@@ -56,6 +64,16 @@ class GitHistoryIndexer:
     ) -> int:
         """Persist commits and their file changes idempotently."""
         indexed_count = 0
+
+        # Batch classify parsed commits via System One model / calibrated fallback
+        classifications: Dict[str, CommitClassificationResult] = {}
+        if parsed_commits:
+            try:
+                classifications = await self.classifier.classify_commits_batch(parsed_commits)
+            except Exception as e:
+                logger.warning(
+                    "Batch commit classification failed, falling back to heuristics: %s", e
+                )
         for pc in parsed_commits:
             # Check if commit already exists
             existing_stmt = select(Commit).where(
@@ -64,6 +82,19 @@ class GitHistoryIndexer:
             )
             existing = (await db.execute(existing_stmt)).scalar_one_or_none()
             if existing:
+                # Backfill commit_intent and is_defect_fix if missing
+                if existing.commit_intent is None:
+                    classif = classifications.get(pc.commit_hash)
+                    if classif:
+                        existing.commit_intent = classif.commit_intent.value
+                        existing.is_defect_fix = classif.is_defect_fix
+                    else:
+                        fb_intent, fb_defect = self.classifier.heuristic_classify(
+                            pc.message, [fc.file_path for fc in pc.file_changes]
+                        )
+                        existing.commit_intent = fb_intent.value
+                        existing.is_defect_fix = fb_defect
+
                 # Backfill file changes & diff metrics if missing
                 if (
                     existing.files_changed_count == 0 or existing.insertions == 0
@@ -90,6 +121,17 @@ class GitHistoryIndexer:
             insertions = sum(fc.insertions for fc in pc.file_changes)
             deletions = sum(fc.deletions for fc in pc.file_changes)
 
+            classif = classifications.get(pc.commit_hash)
+            if classif:
+                commit_intent_val = classif.commit_intent.value
+                is_defect_fix_val = classif.is_defect_fix
+            else:
+                fb_intent, fb_defect = self.classifier.heuristic_classify(
+                    pc.message, [fc.file_path for fc in pc.file_changes]
+                )
+                commit_intent_val = fb_intent.value
+                is_defect_fix_val = fb_defect
+
             commit_obj = Commit(
                 id=uuid.uuid4(),
                 repository_id=repository_id,
@@ -102,6 +144,8 @@ class GitHistoryIndexer:
                 files_changed_count=len(pc.file_changes),
                 insertions=insertions,
                 deletions=deletions,
+                commit_intent=commit_intent_val,
+                is_defect_fix=is_defect_fix_val,
             )
             db.add(commit_obj)
             await db.flush()
@@ -179,6 +223,8 @@ class GitHistoryIndexer:
                 "change_type": change.change_type.value,
                 "insertions": change.insertions,
                 "deletions": change.deletions,
+                "commit_intent": getattr(commit, "commit_intent", None),
+                "is_defect_fix": getattr(commit, "is_defect_fix", False),
                 "linked_pull_requests": linked_prs,
                 "linked_issues": linked_issues,
             }
@@ -280,6 +326,8 @@ class GitHistoryIndexer:
                         "files_changed_count": commit.files_changed_count,
                         "insertions": commit.insertions,
                         "deletions": commit.deletions,
+                        "commit_intent": getattr(commit, "commit_intent", None),
+                        "is_defect_fix": getattr(commit, "is_defect_fix", False),
                         "linked_pull_requests": linked_prs,
                         "linked_issues": linked_issues,
                     }
@@ -379,14 +427,30 @@ class GitHistoryIndexer:
             author_name = c.author_name or "Unknown"
             authors_map[author_name] = authors_map.get(author_name, 0) + 1
 
+            intent = getattr(c, "commit_intent", None)
+            is_defect = getattr(c, "is_defect_fix", False)
+
             if idx == 0 or (entry["has_added"] and idx <= 1):
                 event_type = "introduction"
-            elif any(
-                kw in msg
-                for kw in ["fix", "bug", "patch", "issue", "resolve", "defect", "error", "crash"]
+            elif (
+                is_defect
+                or intent in ("bugfix", "security_patch")
+                or any(
+                    kw in msg
+                    for kw in [
+                        "fix",
+                        "bug",
+                        "patch",
+                        "issue",
+                        "resolve",
+                        "defect",
+                        "error",
+                        "crash",
+                    ]
+                )
             ):
                 event_type = "bug_fix"
-            elif any(
+            elif intent == "refactor" or any(
                 kw in msg
                 for kw in [
                     "refactor",
@@ -406,19 +470,23 @@ class GitHistoryIndexer:
                 for kw in ["adr", "rfc", "contract", "spec", "architecture", "migration", "schema"]
             ):
                 event_type = "architectural_decision"
-            elif any(
-                kw in msg
-                for kw in [
-                    "feat",
-                    "feature",
-                    "add",
-                    "implement",
-                    "support",
-                    "new",
-                    "create",
-                    "extend",
-                ]
-            ) or (ins > 50 and ins > 3 * (dels or 1)):
+            elif (
+                intent == "feature"
+                or any(
+                    kw in msg
+                    for kw in [
+                        "feat",
+                        "feature",
+                        "add",
+                        "implement",
+                        "support",
+                        "new",
+                        "create",
+                        "extend",
+                    ]
+                )
+                or (ins > 50 and ins > 3 * (dels or 1))
+            ):
                 event_type = "feature_addition"
             else:
                 event_type = "maintenance"
@@ -438,6 +506,8 @@ class GitHistoryIndexer:
                     "timestamp": c.committed_at.isoformat(),
                     "author": author_name,
                     "commit_hash": c.commit_hash,
+                    "commit_intent": intent,
+                    "is_defect_fix": is_defect,
                     "insertions": ins,
                     "deletions": dels,
                     "files_changed": entry["files_changed"],

@@ -9,6 +9,11 @@ from __future__ import annotations
 
 from app.models.symbol import ArchitecturalRole
 from app.semantic.client import MockSystemOneClient, SystemOneClient
+from app.semantic.commit_classifier import (
+    CommitClassificationResult,
+    CommitIntent,
+    CommitIntentClassifier,
+)
 from app.semantic.invariant_miner import SemanticInvariantMiner
 from app.semantic.symbol_classifier import SymbolRoleClassifier
 from app.semantic.systemone import (
@@ -31,6 +36,9 @@ __all__ = [
     "ArchitecturalRole",
     "ChoiceAnswer",
     "ChoiceQuestion",
+    "CommitClassificationResult",
+    "CommitIntent",
+    "CommitIntentClassifier",
     "DecisionResult",
     "MockSystemOneClient",
     "NoulAnswer",

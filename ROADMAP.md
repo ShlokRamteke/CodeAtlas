@@ -122,7 +122,7 @@ Enrich the deterministic repository index with fast, typed, non-autoregressive "
 - **PH5-01 — System One Client & Protocol Adapter** *(Completed)*: `/v1/systemone` async client, choice/score/noul support, calibrated probability parser, deterministic fallback.
 - **PH5-02 — Architectural Symbol Role Classification** *(Completed)*: Symbol role tagging (controller, service, repository, entity, middleware, utility) persisting to `ContextEntity`.
 - **PH5-03 — Semantic Constraint & Invariant Mining** *(Completed)*: Extracting natural-language architectural rules from docs into `DesignConstraint` records with domain tagging.
-- **PH5-04 — Git History Defect Intent Categorizer**: Tagging bug-fixing commits across git history to refine Kamei defect pressure calculations.
+- **PH5-04 — Git History Defect Intent Categorizer** *(Completed)*: Tagging bug-fixing commits across git history to refine Kamei defect pressure calculations.
 - **PH5-05 — C4 Container & Subsystem Boundary Classifier**: Automatic classification of monorepo packages/services into C4 container roles.
 - **PH5-06 — Local Container Serving & Benchmark**: Podman container definition for `laya-serve` and CPU latency/throughput benchmark tests.
 

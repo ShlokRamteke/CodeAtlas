@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, Uuid
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, Uuid, false
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -38,6 +38,10 @@ class Commit(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     files_changed_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     insertions: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     deletions: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    commit_intent: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
+    is_defect_fix: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False, index=True
+    )
     embedding = mapped_column(Vector(1536), nullable=True)
 
     repository: Mapped["Repository"] = relationship("Repository", back_populates="commits")

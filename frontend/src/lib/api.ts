@@ -800,6 +800,8 @@ export async function fetchRepositoryCommits(
       filesChangedCount: c.files_changed_count,
       insertions: c.insertions,
       deletions: c.deletions,
+      commitIntent: c.commit_intent,
+      isDefectFix: c.is_defect_fix,
       fileChanges: (c.file_changes || []).map((fc: any) => ({
         id: fc.id,
         commitId: fc.commit_id,
@@ -998,6 +1000,8 @@ function mapMilestoneEvent(m: any): ComponentMilestoneEvent {
     timestamp: m.timestamp,
     author: m.author,
     commitHash: m.commit_hash || m.commitHash,
+    commitIntent: m.commit_intent || m.commitIntent,
+    isDefectFix: m.is_defect_fix !== undefined ? m.is_defect_fix : m.isDefectFix,
     insertions: m.insertions,
     deletions: m.deletions,
     filesChanged: m.files_changed || m.filesChanged,

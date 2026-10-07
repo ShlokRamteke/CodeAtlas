@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, timezone
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.history.git_indexer import (
@@ -12,6 +13,7 @@ from app.history.git_indexer import (
     ParsedCommit,
     ParsedFileChange,
 )
+from app.models.commit import Commit
 from app.models.repository import Repository
 
 
@@ -78,6 +80,14 @@ async def test_git_indexer_index_and_file_history(db_session: AsyncSession) -> N
     assert file_history.introducing_commit["author_name"] == "Alice"
     assert len(file_history.authors) == 2
 
+    # Check commit intent and defect fix fields
+    c2 = next(c for c in file_history.commits if c["commit_hash"] == "commit_002")
+    c1 = next(c for c in file_history.commits if c["commit_hash"] == "commit_001")
+    assert c1["commit_intent"] == "feature"
+    assert c1["is_defect_fix"] is False
+    assert c2["commit_intent"] == "refactor"
+    assert c2["is_defect_fix"] is False
+
 
 @pytest.mark.asyncio
 async def test_git_indexer_component_history(db_session: AsyncSession) -> None:
@@ -122,3 +132,68 @@ async def test_git_indexer_component_history(db_session: AsyncSession) -> None:
     assert comp_res["total_commits"] == 1
     assert comp_res["introducing_commit"]["commit_hash"] == "c1"
     assert len(comp_res["files_touched"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_git_indexer_defect_intent_indexing(db_session: AsyncSession) -> None:
+    repo = Repository(
+        id=uuid.uuid4(),
+        owner="test-owner",
+        name="defect-repo",
+        full_name="test-owner/defect-repo",
+        default_branch="main",
+    )
+    db_session.add(repo)
+    await db_session.commit()
+
+    indexer = GitHistoryIndexer()
+    commits = [
+        ParsedCommit(
+            commit_hash="fix_001",
+            author_name="Bob",
+            author_email="bob@test.com",
+            committed_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=timezone.utc),
+            message="fix(auth): resolve nil pointer exception on token verify",
+            file_changes=[
+                ParsedFileChange(
+                    file_path="src/auth.ts",
+                    change_type=ChangeType.MODIFIED,
+                    insertions=5,
+                    deletions=2,
+                )
+            ],
+        ),
+        ParsedCommit(
+            commit_hash="sec_002",
+            author_name="Eve",
+            author_email="eve@test.com",
+            committed_at=datetime(2025, 3, 2, 11, 0, 0, tzinfo=timezone.utc),
+            message="sec: patch CVE-2025-1010 timing attack in crypto",
+            file_changes=[
+                ParsedFileChange(
+                    file_path="src/crypto.ts",
+                    change_type=ChangeType.MODIFIED,
+                    insertions=8,
+                    deletions=1,
+                )
+            ],
+        ),
+    ]
+
+    count = await indexer.index_commits(repo.id, commits, db_session)
+    assert count == 2
+
+    # Query DB directly to check persisted columns
+    stmt = select(Commit).where(Commit.repository_id == repo.id).order_by(Commit.committed_at.asc())
+    saved = (await db_session.execute(stmt)).scalars().all()
+    assert len(saved) == 2
+
+    c_fix = saved[0]
+    assert c_fix.commit_hash == "fix_001"
+    assert c_fix.commit_intent == "bugfix"
+    assert c_fix.is_defect_fix is True
+
+    c_sec = saved[1]
+    assert c_sec.commit_hash == "sec_002"
+    assert c_sec.commit_intent == "security_patch"
+    assert c_sec.is_defect_fix is True
