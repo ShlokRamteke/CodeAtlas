@@ -6,11 +6,11 @@ Phase 5 — Semantic Indexing & Decision Models
 
 ## Current Task
 
-PH5-04 Complete &mdash; Git History Defect Intent Categorizer (Git History Indexing)
+PH5-05 Complete &mdash; C4 Container Boundary & Deployable Unit Classifier (Architecture Indexing)
 
 ## Status
 
-PH5-04 COMPLETE / READY FOR PH5-05
+PH5-05 COMPLETE / READY FOR PH5-06
 
 
 
@@ -207,10 +207,18 @@ developer understand a proposed change before implementation.
   - Integrated refined defect tags directly into Kamei defect pressure calculations in `app.history.change_risk` (`mine_defect_pressure_from_db`, `compute_defect_pressure`, `assess_change_risk`), recognizing defect repairs even without conventional "fix:" prefixes.
   - Updated `@codeatlas/contracts` (`CommitItem`, `ComponentMilestoneEvent`) and frontend UI components (`ArchitectureExplorer`, `HistoricalTimelineViewer`) with intent and defect repair badges.
   - 100% automated test pass rate across 185 pytest tests (10 new unit and integration tests), ruff clean, and clean contracts/frontend production builds.
+- **Phase 5 — Task PH5-05 (C4 Container Boundary & Deployable Unit Classifier)**:
+  - Implemented `ContainerClassifier` in `app.semantic.container_classifier` supporting container role classification (`api`, `web_app`, `worker`, `database`, `shared_library`, `cli_tool`).
+  - System One protocol integration: `ChoiceQuestion` evaluation with calibrated probability gating ($P \ge 0.85$), batch processing, and deterministic heuristic fallback.
+  - Heuristic analysis evaluating directories, code files, and package manifests (`package.json`, `pyproject.toml`, `Dockerfile`, `Cargo.toml`, `go.mod`).
+  - Extended `c4_exporter.py` (`_detect_repository_layout`, `_infer_component_info`, `_detect_container_technology`, `_detect_container_description`): dynamic multi-package and monorepo layout parsing (`packages/`, `services/`, `apps/`, `libs/`, `cmd/`, `workers/`, `modules/`) without manual directory mapping.
+  - Added `C4ArchitectureExporter.export_from_project_context_async` enabling non-blocking System One container boundary classification.
+  - Enriched Mermaid C4 diagrams: `worker` renders as `ContainerQueue`, `database` as `ContainerDb`, and other deployable units as `Container`.
+  - 100% automated test pass rate across 198 pytest tests (13 new unit and integration tests), ruff clean, and clean contracts/frontend production builds.
 
 ## Remaining
 
-- **Phase 5**: Semantic Indexing & Decision Models (PH5-05 C4 container classifier, PH5-06 local serving).
+- **Phase 5**: Semantic Indexing & Decision Models (PH5-06 local serving & benchmarks).
 - **Phase 6**: SaaS Experience & Core (Repository overview, health indicators, async indexing workers, GitHub App).
 - **Phase 7**: Model Context Protocol (MCP) Integration.
 - **Phase 8**: Evaluation & Production Hardening.
@@ -221,7 +229,7 @@ None known.
 
 ## Next Action
 
-Start Task PH5-05: C4 Container Boundary & Deployable Unit Classifier (Architecture Indexing).
+Start Task PH5-06: Containerized Local Serving & Performance Benchmark.
 
 ## Session Rule
 
