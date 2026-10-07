@@ -2,15 +2,15 @@
 
 ## Current Phase
 
-Phase 5 — Semantic Indexing & Decision Models
+Phase 5 &mdash; Semantic Indexing & Decision Models (Complete)
 
 ## Current Task
 
-PH5-05 Complete &mdash; C4 Container Boundary & Deployable Unit Classifier (Architecture Indexing)
+PH5-06 Complete &mdash; Containerized Local Serving & Performance Benchmark
 
 ## Status
 
-PH5-05 COMPLETE / READY FOR PH5-06
+PHASE 5 COMPLETE / READY FOR PHASE 6 (SaaS Experience & Core)
 
 
 
@@ -216,9 +216,17 @@ developer understand a proposed change before implementation.
   - Enriched Mermaid C4 diagrams: `worker` renders as `ContainerQueue`, `database` as `ContainerDb`, and other deployable units as `Container`.
   - 100% automated test pass rate across 198 pytest tests (13 new unit and integration tests), ruff clean, and clean contracts/frontend production builds.
 
+- **Phase 5 — Task PH5-06 (Local Container Serving & Performance Benchmark)**:
+  - Added dedicated `laya` container service (`ghcr.io/nandakishorm/laya-serve:latest` on port 8081) to `compose.yaml` and `podman-compose.yml`.
+  - Wired `DECISION_MODEL_URL` and `DECISION_MODEL_ENABLED` settings into backend compose environment and `.env.example`.
+  - Added `check_health()` async health check endpoint verification to `SystemOneClient` and `MockSystemOneClient`.
+  - Implemented CPU performance benchmark suite in `backend/tests/test_systemone_benchmark.py`: verified sub-40ms execution on local CPU for single decision primitives (`choice`, `noul`, `score`) and amortized sub-millisecond per-decision batch latency (>1,000 decisions/second).
+  - Implemented end-to-end repository indexing regression suite verifying enriched metadata quality across AST symbol roles, natural language doc invariants, commit defect tags, and monorepo C4 container boundaries.
+  - Verified graceful deterministic heuristic fallback when decision model is offline or disabled across all 4 indexing pipelines.
+  - 100% automated test pass rate across 208 pytest tests (10 new benchmark and regression tests), ruff format/lint clean, and clean contracts/frontend builds.
+
 ## Remaining
 
-- **Phase 5**: Semantic Indexing & Decision Models (PH5-06 local serving & benchmarks).
 - **Phase 6**: SaaS Experience & Core (Repository overview, health indicators, async indexing workers, GitHub App).
 - **Phase 7**: Model Context Protocol (MCP) Integration.
 - **Phase 8**: Evaluation & Production Hardening.
@@ -229,7 +237,7 @@ None known.
 
 ## Next Action
 
-Start Task PH5-06: Containerized Local Serving & Performance Benchmark.
+Start Phase 6 (SaaS Experience & Core): Task PH6-01 (Repository Overview & Health Indicators).
 
 ## Session Rule
 

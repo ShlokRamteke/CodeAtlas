@@ -113,7 +113,7 @@ A developer can provide a proposed change and receive a grounded, evidence-backe
 
 ---
 
-## Phase 5 — Semantic Indexing & Decision Models
+## Phase 5 — Semantic Indexing & Decision Models (Completed)
 
 ### Goal
 Enrich the deterministic repository index with fast, typed, non-autoregressive "System One" decision models (Laya / ModernBERT / `/v1/systemone` protocol) running locally on CPU at sub-40ms latency and zero per-token cloud costs.
@@ -124,7 +124,7 @@ Enrich the deterministic repository index with fast, typed, non-autoregressive "
 - **PH5-03 — Semantic Constraint & Invariant Mining** *(Completed)*: Extracting natural-language architectural rules from docs into `DesignConstraint` records with domain tagging.
 - **PH5-04 — Git History Defect Intent Categorizer** *(Completed)*: Tagging bug-fixing commits across git history to refine Kamei defect pressure calculations.
 - **PH5-05 — C4 Container & Subsystem Boundary Classifier** *(Completed)*: Automatic classification of monorepo packages/services into C4 container roles.
-- **PH5-06 — Local Container Serving & Benchmark**: Podman container definition for `laya-serve` and CPU latency/throughput benchmark tests.
+- **PH5-06 — Local Container Serving & Benchmark** *(Completed)*: Container definitions for `laya-serve` (`compose.yaml` and `podman-compose.yml`), sub-40ms CPU latency benchmarks, batch throughput scaling, and E2E indexing quality regression suite.
 
 ### Done when
 Repositories can be indexed with rich architectural roles, semantic invariants, and container boundaries in sub-second local CPU passes with graceful fallback.

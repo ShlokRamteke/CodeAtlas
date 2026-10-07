@@ -494,3 +494,9 @@ Enriched ProjectContext & C4 Architecture Models
 ### Calibration & Deterministic Fallback
 - **Strict Gating**: Classifications require calibrated confidence $\ge 0.85$ to be accepted into the canonical `ProjectContext`.
 - **Graceful Fallback**: If the decision engine is unavailable, offline, or confidence is $< 0.85$, the engine falls back immediately to deterministic rule heuristics without failing ingestion.
+
+### Containerized Serving & Performance Guarantees (PH5-06)
+- **Local Container Serving**: Packaged as a dedicated `laya` service (`ghcr.io/nandakishorm/laya-serve:latest` on port 8081) in `compose.yaml` and `podman-compose.yml`. Configured via `DECISION_MODEL_URL` and `DECISION_MODEL_ENABLED`.
+- **Latency SLA**: Sub-40ms execution on local CPU for single decision primitives (`choice`, `noul`, `score`) with health monitoring (`/health`).
+- **Batch Throughput**: Heterogeneous batch evaluations (`evaluate_batch`) execute in single forward passes, amortizing to sub-millisecond per-question latency (>1,000 decisions/second).
+- **Enriched Metadata Quality**: Enriches AST symbols with verified `ArchitecturalRole`, mines unformatted doc invariants into `DesignConstraint`, refines Kamei defect pressure through semantic defect tags, and dynamically assigns C4 container roles across monorepo layouts.
