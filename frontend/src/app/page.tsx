@@ -113,8 +113,9 @@ export default function Home() {
                 CodeAtlas
               </span>
               <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                Phase 3 — Historical Context & Evolution
+                Phase 6 — SaaS Experience &amp; Core
               </span>
+
             </div>
           </div>
 

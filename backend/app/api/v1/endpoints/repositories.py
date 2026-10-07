@@ -26,6 +26,7 @@ from app.models.pull_request import PullRequest
 from app.models.repository import Repository
 from app.models.source_file import SourceFile
 from app.models.symbol import ArchitecturalRole, Symbol, SymbolKind
+from app.overview.service import RepositoryOverviewService
 from app.parser.ast_parser import ExtractedDependency, ExtractedSymbol, ParsedFileResult
 from app.parser.relationship_analyzer import RelationshipAnalyzer
 from app.schemas.c4 import (
@@ -50,6 +51,7 @@ from app.schemas.repository import (
     IngestFilesRequest,
     ProjectContextRead,
     RepositoryCreate,
+    RepositoryOverviewResponse,
     RepositoryRead,
     SymbolRead,
 )
@@ -364,6 +366,25 @@ async def get_repository(
             detail=f"Repository {repository_id} not found.",
         )
     return repo
+
+
+@router.get("/{repository_id}/overview", response_model=RepositoryOverviewResponse)
+async def get_repository_overview(
+    repository_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+) -> RepositoryOverviewResponse:
+    """
+    Get unified repository overview and multi-dimensional health indicators:
+    test protection, ownership/bus factor, defect pressure, architectural modularity,
+    governance, concurrent in-flight activity, and defect hotspots.
+    """
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository {repository_id} not found.",
+        )
+    return await RepositoryOverviewService.compute_overview(db, repo)
 
 
 @router.post("/{repository_id}/ingest", response_model=ArchitectureOverviewResponse)

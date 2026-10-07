@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -243,3 +243,59 @@ class ContextBriefResponse(BaseModel):
     human_summary: str
     llm_context: str
     project_context: Optional[ProjectContextRead] = None
+
+
+class HealthMetricDetail(BaseModel):
+    name: str
+    category: str
+    score: float
+    status: str  # healthy, warning, alert
+    summary: str
+    details: Dict[str, Any] = {}
+
+
+class RepositoryHealthIndicators(BaseModel):
+    composite_score: float
+    status: str  # healthy, stable, attention_needed
+    summary: str
+    metrics: Dict[str, HealthMetricDetail] = {}
+
+
+class HotspotFileItem(BaseModel):
+    file_path: str
+    change_count: int
+    defect_count: int
+    risk_level: str  # high, medium, low
+
+
+class TopContributorItem(BaseModel):
+    name: str
+    email: str
+    commit_count: int
+    ownership_percentage: float
+    role: str
+    days_since_last_commit: Optional[int] = None
+
+
+class RepositoryOverviewResponse(BaseModel):
+    repository_id: uuid.UUID
+    name: str
+    owner: str
+    full_name: str
+    default_branch: str
+    indexed_at: Optional[datetime] = None
+    file_count: int
+    symbol_count: int
+    dependency_count: int
+    commit_count: int
+    pull_request_count: int
+    issue_count: int
+    adr_count: int
+    constraint_count: int
+    languages: Dict[str, int]
+    health: RepositoryHealthIndicators
+    hotspots: List[HotspotFileItem]
+    top_contributors: List[TopContributorItem]
+    dominant_roles: Dict[str, int]
+    container_count: int
+    component_count: int

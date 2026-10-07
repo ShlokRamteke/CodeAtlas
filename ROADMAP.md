@@ -136,9 +136,10 @@ Repositories can be indexed with rich architectural roles, semantic invariants, 
 ### Goal
 Turn the change-investigation engine into a clear developer-facing web experience and secure multi-tenant SaaS product.
 
-### Core Work
-- Repository overview and health indicators
-- Architecture / component explorer
+### Structured Tasks
+- **PH6-01 — Repository Overview & Health Indicators** *(Completed)*: Deterministic 6-dimension health scorecard (testing protection, bus factor / ownership concentration, defect pressure, architectural modularity, governance invariants, concurrent PR collision risk) and interactive executive dashboard.
+- **PH6-02 — Architecture / Component Explorer**
+
 - Historical timeline and evolution view
 - Change-investigation entry flow (target + proposed change)
 - Pre-Change Investigation Brief interactive UI

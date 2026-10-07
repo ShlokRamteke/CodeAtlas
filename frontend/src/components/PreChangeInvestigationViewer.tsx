@@ -51,19 +51,31 @@ import {
 
 interface PreChangeInvestigationViewerProps {
   repository: Repository;
+  initialTargetPath?: string;
 }
 
 export function PreChangeInvestigationViewer({
   repository,
+  initialTargetPath,
 }: PreChangeInvestigationViewerProps) {
   const [investigations, setInvestigations] = useState<InvestigationResponse[]>([]);
   const [selectedInv, setSelectedInv] = useState<InvestigationResponse | null>(null);
   const [loadingList, setLoadingList] = useState(false);
 
   // Form state
-  const [query, setQuery] = useState("");
-  const [targetPath, setTargetPath] = useState("");
+  const [query, setQuery] = useState(initialTargetPath ? `Investigate changes in ${initialTargetPath}` : "");
+  const [targetPath, setTargetPath] = useState(initialTargetPath || "");
   const [targetSymbol, setTargetSymbol] = useState("");
+
+  useEffect(() => {
+    if (initialTargetPath) {
+      setTargetPath(initialTargetPath);
+      if (!query) {
+        setQuery(`Investigate changes in ${initialTargetPath}`);
+      }
+    }
+  }, [initialTargetPath]);
+
   const [diff, setDiff] = useState("");
   const [showDiffInput, setShowDiffInput] = useState(false);
   const [running, setRunning] = useState(false);
