@@ -72,11 +72,15 @@ import {
   Target,
   Clock,
   BookOpen,
+  Compass,
 } from "lucide-react";
+
 import { EngineeringContextViewer } from "./EngineeringContextViewer";
 import { HistoricalTimelineViewer } from "./HistoricalTimelineViewer";
 import { PreChangeInvestigationViewer } from "./PreChangeInvestigationViewer";
 import { C4ArchitectureViewer } from "./C4ArchitectureViewer";
+import { RepositoryOverviewViewer } from "./RepositoryOverviewViewer";
+
 
 
 interface ArchitectureExplorerProps {
@@ -364,8 +368,10 @@ def test_aggregates():
 
 export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) {
   const [activeTab, setActiveTab] = useState<
-    "components" | "symbols" | "relationships" | "git_history" | "engineering" | "project_context" | "c4_export" | "investigation" | "ingest"
-  >("components");
+    "overview" | "components" | "symbols" | "relationships" | "git_history" | "engineering" | "project_context" | "c4_export" | "investigation" | "ingest"
+  >("overview");
+  const [prefilledInvestigationTarget, setPrefilledInvestigationTarget] = useState<string>("");
+
   const [historySubTab, setHistorySubTab] = useState<
     "timeline" | "commits" | "trace" | "prs" | "issues" | "retrieval"
   >("timeline");
@@ -705,7 +711,22 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
       {/* Tab Navigation */}
       <div className="flex border-b border-slate-800 px-6 bg-slate-950/20 text-xs font-medium text-slate-400 overflow-x-auto">
         <button
+          onClick={() => setActiveTab("overview")}
+          className={`py-3 px-4 border-b-2 flex items-center gap-2 transition whitespace-nowrap ${
+            activeTab === "overview"
+              ? "border-indigo-500 text-indigo-400 font-semibold"
+              : "border-transparent hover:text-slate-200"
+          }`}
+        >
+          <Compass className="w-4 h-4" />
+          Overview &amp; Health
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-300">
+            PH6-01
+          </span>
+        </button>
+        <button
           onClick={() => setActiveTab("components")}
+
           className={`py-3 px-4 border-b-2 flex items-center gap-2 transition whitespace-nowrap ${
             activeTab === "components"
               ? "border-indigo-500 text-indigo-400 font-semibold"
@@ -820,11 +841,22 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
           </div>
         )}
 
-        {loading ? (
+        {activeTab === "overview" ? (
+          <RepositoryOverviewViewer
+            repository={repository}
+            onNavigateTab={(tab, targetFile) => {
+              if (targetFile) {
+                setPrefilledInvestigationTarget(targetFile);
+              }
+              setActiveTab(tab as any);
+            }}
+          />
+        ) : loading ? (
           <div className="py-12 text-center text-slate-500 text-sm">
             Loading architecture graph...
           </div>
         ) : activeTab === "components" ? (
+
           <div>
             {!architecture || architecture.majorComponents.length === 0 ? (
               <div className="py-12 text-center">
@@ -2091,8 +2123,12 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
             majorComponents={architecture?.majorComponents.map((c) => ({ name: c.name, path: c.path }))}
           />
         ) : activeTab === "investigation" ? (
-          <PreChangeInvestigationViewer repository={repository} />
+          <PreChangeInvestigationViewer
+            repository={repository}
+            initialTargetPath={prefilledInvestigationTarget}
+          />
         ) : (
+
           /* Ingest / Add Code Tab */
           <div className="space-y-8">
             {/* 1. Quick Ingest Templates */}

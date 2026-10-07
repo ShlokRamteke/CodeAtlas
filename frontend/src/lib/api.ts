@@ -39,7 +39,9 @@ import type {
   FileOwnership,
   ReviewerRecommendation,
   AuthorCommitStat,
+  RepositoryOverviewResponse,
 } from "@codeatlas/contracts";
+
 
 
 
@@ -427,7 +429,22 @@ export async function fetchRepositoryArchitecture(
   }
 }
 
+export async function fetchRepositoryOverview(
+  repositoryId: string
+): Promise<RepositoryOverviewResponse | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/repositories/${repositoryId}/overview`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (error) {
+    return null;
+  }
+}
+
 export async function fetchRepositorySymbols(
+
   repositoryId: string,
   name?: string,
   kind?: string,

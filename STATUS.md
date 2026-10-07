@@ -2,15 +2,16 @@
 
 ## Current Phase
 
-Phase 5 &mdash; Semantic Indexing & Decision Models (Complete)
+Phase 6 &mdash; SaaS Experience & Core (In Progress)
 
 ## Current Task
 
-PH5-06 Complete &mdash; Containerized Local Serving & Performance Benchmark
+PH6-01 Complete &mdash; Repository Overview & Health Indicators
 
 ## Status
 
-PHASE 5 COMPLETE / READY FOR PHASE 6 (SaaS Experience & Core)
+IN PROGRESS &mdash; Phase 6 Task PH6-01 Complete / Ready for PH6-02
+
 
 
 
@@ -225,9 +226,20 @@ developer understand a proposed change before implementation.
   - Verified graceful deterministic heuristic fallback when decision model is offline or disabled across all 4 indexing pipelines.
   - 100% automated test pass rate across 208 pytest tests (10 new benchmark and regression tests), ruff format/lint clean, and clean contracts/frontend builds.
 
+- **Phase 6 — Task PH6-01 (Repository Overview & Health Indicators)**:
+  - `RepositoryOverviewService` in `app.overview.service`: computes 6 deterministic repository health indicators (testing protection index, knowledge distribution / bus factor, defect pressure & stability, architectural modularity & coupling density, engineering governance / ADRs / invariants, concurrent in-flight PR activity).
+  - Composite normalized 0-100 repository health score with calibrated status tiers (`HEALTHY`, `STABLE`, `ATTENTION_NEEDED`).
+  - Hotspot file detection aggregating historical commit churn and defect repair tags with risk classification (`high`, `medium`, `low`).
+  - Top contributors and authorship blame distribution with ownership percentage and maintainer role classification.
+  - REST endpoint: added `GET /api/v1/repositories/{id}/overview` returning structured `RepositoryOverviewResponse`.
+  - Contracts & Frontend UI: added `HealthMetricDetail`, `RepositoryHealthIndicators`, `HotspotFileItem`, `TopContributorItem`, and `RepositoryOverviewResponse` to `@codeatlas/contracts`.
+  - Implemented interactive `RepositoryOverviewViewer` dashboard in Next.js UI as default active tab in `ArchitectureExplorer` with health score gauge, 6 indicator cards, hotspot table with 1-click investigation navigation, maintainer cards, and architectural composition metrics.
+  - Connected hotspot investigation trigger to prefill target files in `PreChangeInvestigationViewer`.
+  - 100% automated test pass rate across 212 pytest tests (4 new unit/integration tests), ruff format/lint clean, and clean contracts/frontend production builds.
+
 ## Remaining
 
-- **Phase 6**: SaaS Experience & Core (Repository overview, health indicators, async indexing workers, GitHub App).
+- **Phase 6**: SaaS Experience & Core (Architecture/component explorer, historical timeline and evolution view, change-investigation entry flow, GitHub App, async indexing workers).
 - **Phase 7**: Model Context Protocol (MCP) Integration.
 - **Phase 8**: Evaluation & Production Hardening.
 
@@ -237,7 +249,8 @@ None known.
 
 ## Next Action
 
-Start Phase 6 (SaaS Experience & Core): Task PH6-01 (Repository Overview & Health Indicators).
+Continue Phase 6 (SaaS Experience & Core): Task PH6-02 (Architecture & Component Explorer).
+
 
 ## Session Rule
 

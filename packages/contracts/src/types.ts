@@ -1014,6 +1014,86 @@ export interface C4ArchitectureExport {
   markdownExport?: string;
 }
 
+export interface HealthMetricDetail {
+  name: string;
+  category: string;
+  score: number;
+  status: 'healthy' | 'warning' | 'alert';
+  summary: string;
+  details: Record<string, any>;
+}
+
+export interface RepositoryHealthIndicators {
+  composite_score: number;
+  compositeScore?: number;
+  status: 'healthy' | 'stable' | 'attention_needed';
+  summary: string;
+  metrics: Record<string, HealthMetricDetail>;
+}
+
+export interface HotspotFileItem {
+  file_path: string;
+  filePath?: string;
+  change_count: number;
+  changeCount?: number;
+  defect_count: number;
+  defectCount?: number;
+  risk_level: 'high' | 'medium' | 'low';
+  riskLevel?: 'high' | 'medium' | 'low';
+}
+
+export interface TopContributorItem {
+  name: string;
+  email: string;
+  commit_count: number;
+  commitCount?: number;
+  ownership_percentage: number;
+  ownershipPercentage?: number;
+  role: string;
+  days_since_last_commit?: number | null;
+  daysSinceLastCommit?: number | null;
+}
+
+export interface RepositoryOverviewResponse {
+  repository_id: string;
+  repositoryId?: string;
+  name: string;
+  owner: string;
+  full_name: string;
+  fullName?: string;
+  default_branch: string;
+  defaultBranch?: string;
+  indexed_at?: string | null;
+  indexedAt?: string | null;
+  file_count: number;
+  fileCount?: number;
+  symbol_count: number;
+  symbolCount?: number;
+  dependency_count: number;
+  dependencyCount?: number;
+  commit_count: number;
+  commitCount?: number;
+  pull_request_count: number;
+  pullRequestCount?: number;
+  issue_count: number;
+  issueCount?: number;
+  adr_count: number;
+  adrCount?: number;
+  constraint_count: number;
+  constraintCount?: number;
+  languages: Record<string, number>;
+  health: RepositoryHealthIndicators;
+  hotspots: HotspotFileItem[];
+  top_contributors: TopContributorItem[];
+  dominant_roles: Record<string, number>;
+  dominantRoles?: Record<string, number>;
+  container_count: number;
+  containerCount?: number;
+  component_count: number;
+  componentCount?: number;
+}
+
+
 
 
 
