@@ -91,7 +91,7 @@ Enriched ProjectContext & C4 Architecture Models
 
 - [ ] `SystemOneClient` handles `choice`, `noul`, and `score` questions with calibrated probabilities.
 - [ ] Ingestion degrades gracefully to deterministic defaults when decision model is offline.
-- [ ] Code symbols receive verified `architectural_role` tags during indexing.
+- [x] Code symbols receive verified `architectural_role` tags during indexing.
 - [ ] Unformatted natural-language constraints in docs are extracted into `DesignConstraint` records.
 - [ ] Commit history defect pressure reflects classified bugfix commits.
 - [ ] C4 container export correctly identifies non-standard container directories.

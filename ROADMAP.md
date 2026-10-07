@@ -119,8 +119,8 @@ A developer can provide a proposed change and receive a grounded, evidence-backe
 Enrich the deterministic repository index with fast, typed, non-autoregressive "System One" decision models (Laya / ModernBERT / `/v1/systemone` protocol) running locally on CPU at sub-40ms latency and zero per-token cloud costs.
 
 ### Structured Tasks
-- **PH5-01 — System One Client & Protocol Adapter**: `/v1/systemone` async client, choice/score/noul support, calibrated probability parser, deterministic fallback.
-- **PH5-02 — Architectural Symbol Role Classification**: Symbol role tagging (controller, service, repository, entity, middleware, utility) persisting to `ContextEntity`.
+- **PH5-01 — System One Client & Protocol Adapter** *(Completed)*: `/v1/systemone` async client, choice/score/noul support, calibrated probability parser, deterministic fallback.
+- **PH5-02 — Architectural Symbol Role Classification** *(Completed)*: Symbol role tagging (controller, service, repository, entity, middleware, utility) persisting to `ContextEntity`.
 - **PH5-03 — Semantic Constraint & Invariant Mining**: Extracting natural-language architectural rules from docs into `DesignConstraint` records with domain tagging.
 - **PH5-04 — Git History Defect Intent Categorizer**: Tagging bug-fixing commits across git history to refine Kamei defect pressure calculations.
 - **PH5-05 — C4 Container & Subsystem Boundary Classifier**: Automatic classification of monorepo packages/services into C4 container roles.
