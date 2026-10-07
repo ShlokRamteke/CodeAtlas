@@ -6,11 +6,11 @@ Phase 5 — Semantic Indexing & Decision Models
 
 ## Current Task
 
-PH5-03 Complete &mdash; Semantic Constraint & Invariant Mining (Documentation Indexing)
+PH5-04 Complete &mdash; Git History Defect Intent Categorizer (Git History Indexing)
 
 ## Status
 
-PH5-03 COMPLETE / READY FOR PH5-04
+PH5-04 COMPLETE / READY FOR PH5-05
 
 
 
@@ -198,10 +198,19 @@ developer understand a proposed change before implementation.
   - Candidate directive extractor in `EngineeringContextParser.extract_candidate_sentences` filtering out code blocks, markdown tables, HTML comments, and shell commands.
   - Integrated directly into `EngineeringContextIndexer.index_document()` and `IngestionEngine` with deduplication against explicit RFC 2119 constraints.
   - 100% automated test pass rate across 175 pytest tests (14 new unit and integration tests), ruff clean, and clean contracts/frontend production builds.
+- **Phase 5 — Task PH5-04 (Git History Defect Intent Categorizer)**:
+  - Implemented `CommitIntentClassifier` in `app.semantic.commit_classifier` classifying commits into semantic intents (`bugfix`, `refactor`, `feature`, `chore`, `security_patch`) and defect repair status (`is_defect_fix: noul`).
+  - System One protocol integration: `ChoiceQuestion` (`commit_intent`) and `NoulQuestion` (`is_defect_fix`) with calibrated probability gating ($P \ge 0.85$) and deterministic conventional commit / keyword heuristic fallback.
+  - Added database columns `commit_intent` (`VARCHAR(50)`, indexed) and `is_defect_fix` (`BOOLEAN`, default `false`, indexed) to `Commit` model with Alembic migration `0008_commit_intent_defect_fix`.
+  - Extended `GitHistoryIndexer.index_commits` pipeline to batch classify incoming commits, persist intent/defect tags, and backfill existing commits.
+  - Refined component milestone event type classification and exposed intent/defect fields in `FileHistoryResult`, component history, and `get_component_timeline`.
+  - Integrated refined defect tags directly into Kamei defect pressure calculations in `app.history.change_risk` (`mine_defect_pressure_from_db`, `compute_defect_pressure`, `assess_change_risk`), recognizing defect repairs even without conventional "fix:" prefixes.
+  - Updated `@codeatlas/contracts` (`CommitItem`, `ComponentMilestoneEvent`) and frontend UI components (`ArchitectureExplorer`, `HistoricalTimelineViewer`) with intent and defect repair badges.
+  - 100% automated test pass rate across 185 pytest tests (10 new unit and integration tests), ruff clean, and clean contracts/frontend production builds.
 
 ## Remaining
 
-- **Phase 5**: Semantic Indexing & Decision Models (PH5-04 commit intent, PH5-05 C4 container classifier, PH5-06 local serving).
+- **Phase 5**: Semantic Indexing & Decision Models (PH5-05 C4 container classifier, PH5-06 local serving).
 - **Phase 6**: SaaS Experience & Core (Repository overview, health indicators, async indexing workers, GitHub App).
 - **Phase 7**: Model Context Protocol (MCP) Integration.
 - **Phase 8**: Evaluation & Production Hardening.
@@ -212,7 +221,7 @@ None known.
 
 ## Next Action
 
-Start Task PH5-04: Git History Defect Intent Categorizer (Git History Indexing).
+Start Task PH5-05: C4 Container Boundary & Deployable Unit Classifier (Architecture Indexing).
 
 ## Session Rule
 

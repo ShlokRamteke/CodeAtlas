@@ -64,10 +64,10 @@ Enriched ProjectContext & C4 Architecture Models
 - [x] Index natural rules that do not explicitly contain uppercase RFC keywords.
 
 ### PH5-04: Commit Intent & Historic Bug-Fix Defect Mining (Git History Indexing)
-- [ ] Extend `git_indexer.py` commit ingestion pipeline.
-- [ ] Classify commit intent: `bugfix`, `refactor`, `feature`, `chore`, `security_patch`.
-- [ ] Identify whether historical commits represent defect/regression repairs (`is_defect_fix: noul`).
-- [ ] Feed refined defect tags directly into Kamei defect pressure calculations (`app.history.change_risk`).
+- [x] Extend `git_indexer.py` commit ingestion pipeline.
+- [x] Classify commit intent: `bugfix`, `refactor`, `feature`, `chore`, `security_patch`.
+- [x] Identify whether historical commits represent defect/regression repairs (`is_defect_fix: noul`).
+- [x] Feed refined defect tags directly into Kamei defect pressure calculations (`app.history.change_risk`).
 
 ### PH5-05: C4 Container Boundary & Deployable Unit Classifier (Architecture Indexing)
 - [ ] Extend `c4_exporter.py` for monorepo and custom layout analysis (`packages/`, `services/`, `libs/`).
@@ -89,10 +89,10 @@ Enriched ProjectContext & C4 Architecture Models
 
 ## Acceptance Criteria & Definition of Done
 
-- [ ] `SystemOneClient` handles `choice`, `noul`, and `score` questions with calibrated probabilities.
-- [ ] Ingestion degrades gracefully to deterministic defaults when decision model is offline.
+- [x] `SystemOneClient` handles `choice`, `noul`, and `score` questions with calibrated probabilities.
+- [x] Ingestion degrades gracefully to deterministic defaults when decision model is offline.
 - [x] Code symbols receive verified `architectural_role` tags during indexing.
 - [x] Unformatted natural-language constraints in docs are extracted into `DesignConstraint` records.
-- [ ] Commit history defect pressure reflects classified bugfix commits.
+- [x] Commit history defect pressure reflects classified bugfix commits.
 - [ ] C4 container export correctly identifies non-standard container directories.
 - [ ] All unit, integration, and benchmark tests pass without regressions.

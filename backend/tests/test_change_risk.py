@@ -276,3 +276,78 @@ async def test_mine_defect_pressure_from_db(db_session: AsyncSession) -> None:
     assert len(fix_commits) == 1
     assert fix_commits[0].hash == "1111111111111111111111111111111111111111"
     assert "backend/app/orders.py" in fix_commits[0].touched_files
+
+
+@pytest.mark.asyncio
+async def test_defect_pressure_semantic_intent_mining(db_session: AsyncSession) -> None:
+    """Verify that commits marked with is_defect_fix or commit_intent='bugfix'/'security_patch'
+    contribute to defect pressure even without conventional 'fix:' prefixes."""
+    import uuid
+
+    repo = Repository(
+        id=uuid.uuid4(),
+        owner="test-owner",
+        name="semantic-defect-repo",
+        full_name="test-owner/semantic-defect-repo",
+        default_branch="main",
+    )
+    db_session.add(repo)
+    await db_session.commit()
+
+    now = datetime.now(timezone.utc)
+
+    # c_semantic has a message that doesn't trigger conventional is_fix_commit (e.g. "stabilize background queue")
+    # but has is_defect_fix=True and commit_intent="bugfix" from System One classification
+    c_semantic = Commit(
+        repository_id=repo.id,
+        commit_hash="4444444444444444444444444444444444444444",
+        author_name="Dev",
+        author_email="dev@example.com",
+        committed_at=now - timedelta(days=5),
+        message="stabilize background queue execution timing",
+        commit_intent="bugfix",
+        is_defect_fix=True,
+    )
+    # c_sec has security_patch intent
+    c_sec = Commit(
+        repository_id=repo.id,
+        commit_hash="5555555555555555555555555555555555555555",
+        author_name="Dev",
+        author_email="dev@example.com",
+        committed_at=now - timedelta(days=10),
+        message="protect auth token validation path",
+        commit_intent="security_patch",
+        is_defect_fix=True,
+    )
+    db_session.add_all([c_semantic, c_sec])
+    await db_session.commit()
+
+    fc_sem = CommitFileChange(
+        commit_id=c_semantic.id,
+        file_path="backend/app/queue.py",
+        change_type=ChangeType.MODIFIED,
+        insertions=10,
+        deletions=2,
+    )
+    fc_sec = CommitFileChange(
+        commit_id=c_sec.id,
+        file_path="backend/app/queue.py",
+        change_type=ChangeType.MODIFIED,
+        insertions=8,
+        deletions=1,
+    )
+    db_session.add_all([fc_sem, fc_sec])
+    await db_session.commit()
+
+    pressure, fix_commits = await mine_defect_pressure_from_db(
+        db=db_session,
+        repository_id=repo.id,
+        target_files={"backend/app/queue.py"},
+        limit=20000,
+        reference_time=now,
+    )
+
+    assert len(fix_commits) == 2
+    assert pressure > 1.8
+    assert any(c.hash == "4444444444444444444444444444444444444444" for c in fix_commits)
+    assert any(c.hash == "5555555555555555555555555555555555555555" for c in fix_commits)

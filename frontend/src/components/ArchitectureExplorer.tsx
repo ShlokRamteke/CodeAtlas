@@ -1208,6 +1208,26 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
                           </div>
 
                           <div className="flex items-center gap-2 flex-shrink-0">
+                            {c.commitIntent && (
+                              <span
+                                className={`text-[10px] uppercase font-mono px-1.5 py-0.5 rounded font-semibold border ${
+                                  c.commitIntent === "bugfix" || c.commitIntent === "security_patch"
+                                    ? "bg-rose-950/60 text-rose-300 border-rose-500/30"
+                                    : c.commitIntent === "feature"
+                                    ? "bg-emerald-950/60 text-emerald-300 border-emerald-500/30"
+                                    : c.commitIntent === "refactor"
+                                    ? "bg-amber-950/60 text-amber-300 border-amber-500/30"
+                                    : "bg-slate-800 text-slate-300 border-slate-700"
+                                }`}
+                              >
+                                {c.commitIntent}
+                              </span>
+                            )}
+                            {c.isDefectFix && (
+                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-red-950/70 text-red-300 border border-red-500/40 font-semibold" title="Defect Repair">
+                                🐞 Defect Fix
+                              </span>
+                            )}
                             <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">
                               {c.commitHash.slice(0, 7)}
                             </span>

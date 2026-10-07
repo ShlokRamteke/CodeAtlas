@@ -284,6 +284,8 @@ export interface CommitItem {
   filesChangedCount?: number;
   insertions?: number;
   deletions?: number;
+  commitIntent?: string | null;
+  isDefectFix?: boolean;
   fileChanges?: CommitFileChangeItem[];
   linkedPullRequests?: LinkedPullRequest[];
   linkedIssues?: LinkedIssue[];
@@ -341,6 +343,8 @@ export interface ComponentMilestoneEvent {
   timestamp: string;
   author?: string | null;
   commitHash?: string | null;
+  commitIntent?: string | null;
+  isDefectFix?: boolean;
   insertions?: number | null;
   deletions?: number | null;
   filesChanged?: number | null;

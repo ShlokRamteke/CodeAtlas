@@ -62,6 +62,8 @@ class CommitRead(BaseModel):
     files_changed_count: int
     insertions: int
     deletions: int
+    commit_intent: Optional[str] = None
+    is_defect_fix: bool = False
     file_changes: List[CommitFileChangeRead] = []
     linked_pull_requests: List[LinkedPullRequestRead] = []
     linked_issues: List[LinkedIssueRead] = []
