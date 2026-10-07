@@ -760,3 +760,134 @@ def test_c4_component_symbol_roles_aggregation():
     assert "repository" in repo_comp.symbol_roles
     assert repo_comp.symbol_roles["repository"] == 1
     assert repo_comp.dominant_role == "repository"
+
+
+def test_monorepo_multi_container_classification():
+    """Verify that multi-container monorepos dynamically classify worker, cli, web, and library containers."""
+    entities = [
+        ContextEntity(
+            id="f1",
+            name="apps/web/src/pages/index.tsx",
+            kind="file",
+            path="apps/web/src/pages/index.tsx",
+            language="TypeScript",
+        ),
+        ContextEntity(
+            id="f2",
+            name="services/api/src/main.py",
+            kind="file",
+            path="services/api/src/main.py",
+            language="Python",
+        ),
+        ContextEntity(
+            id="f3",
+            name="services/worker/tasks.py",
+            kind="file",
+            path="services/worker/tasks.py",
+            language="Python",
+        ),
+        ContextEntity(
+            id="f4",
+            name="cmd/atlas-cli/main.go",
+            kind="file",
+            path="cmd/atlas-cli/main.go",
+            language="Go",
+        ),
+        ContextEntity(
+            id="f5",
+            name="packages/contracts/src/types.ts",
+            kind="file",
+            path="packages/contracts/src/types.ts",
+            language="TypeScript",
+        ),
+    ]
+
+    ctx = ProjectContext(
+        target_type="repository",
+        target_id="repo-monorepo",
+        target_name="EnterpriseMonorepo",
+        summary="Multi-service distributed architecture",
+        entities=entities,
+        relationships=[],
+    )
+
+    model = C4ArchitectureExporter.export_from_project_context(ctx, repo_name="EnterpriseMonorepo")
+
+    container_map = {c.id: c for c in model.containers}
+    assert "container_web" in container_map
+    assert "container_api" in container_map
+    assert "container_worker" in container_map
+    assert "container_atlas_cli" in container_map
+    assert "container_contracts" in container_map
+
+    # Check classifications
+    assert container_map["container_web"].container_type == "web_app"
+    assert container_map["container_api"].container_type == "api"
+    assert container_map["container_worker"].container_type == "worker"
+    assert container_map["container_atlas_cli"].container_type == "cli_tool"
+    assert container_map["container_contracts"].container_type == "shared_library"
+
+    # Technologies
+    assert "Go" in container_map["container_atlas_cli"].technology
+    assert (
+        "Worker" in container_map["container_worker"].technology
+        or "Python" in container_map["container_worker"].technology
+    )
+
+    # Mermaid diagram contains ContainerQueue for worker
+    mmd = model.to_mermaid_container()
+    assert "ContainerQueue(container_worker" in mmd
+    assert "Container(container_atlas_cli" in mmd
+
+
+@pytest.mark.asyncio
+async def test_export_from_project_context_async_systemone():
+    """Verify async C4 export leverages System One batch classification with MockSystemOneClient."""
+    from app.semantic.client import MockSystemOneClient
+    from app.semantic.container_classifier import ContainerClassifier
+
+    mock_client = MockSystemOneClient(enabled=True)
+    # Configure mock responses for batch container classifications
+    mock_client.set_choice_response("cont_0", "worker", confidence=0.96)
+    mock_client.set_choice_response("cont_1", "api", confidence=0.92)
+
+    classifier = ContainerClassifier(client=mock_client)
+
+    entities = [
+        ContextEntity(
+            id="f1",
+            name="services/job-runner/worker.py",
+            kind="file",
+            path="services/job-runner/worker.py",
+            language="Python",
+        ),
+        ContextEntity(
+            id="f2",
+            name="services/billing-api/server.py",
+            kind="file",
+            path="services/billing-api/server.py",
+            language="Python",
+        ),
+    ]
+
+    ctx = ProjectContext(
+        target_type="repository",
+        target_id="repo-async",
+        target_name="AsyncRepo",
+        summary="Async service test",
+        entities=entities,
+        relationships=[],
+    )
+
+    model = await C4ArchitectureExporter.export_from_project_context_async(
+        context=ctx,
+        repo_name="AsyncRepo",
+        container_classifier=classifier,
+    )
+
+    container_map = {c.id: c for c in model.containers}
+    assert "container_job_runner" in container_map
+    assert "container_billing_api" in container_map
+
+    assert container_map["container_job_runner"].container_type == "worker"
+    assert container_map["container_billing_api"].container_type == "api"

@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from app.context_builder.project_context import ProjectContext
 from app.parser.relationship_analyzer import ArchitectureGraph
+from app.semantic.container_classifier import ContainerClassifier
 
 
 def _sanitize_id(val: str) -> str:
@@ -277,8 +278,42 @@ def _detect_container_technology(
             return "Java / Spring Boot"
         return f"{primary_lang} / REST API"
 
-    if container_type == "library":
+    if container_type == "worker":
+        if top_tech == "Python":
+            return (
+                "Celery / Python"
+                if any(
+                    "celery"
+                    in getattr(item, "path", getattr(item, "source_path", str(item))).lower()
+                    for item in container_items
+                )
+                else "Python Worker"
+            )
+        if top_tech in ("TypeScript", "JavaScript"):
+            return (
+                "BullMQ / TypeScript"
+                if any(
+                    "bull" in getattr(item, "path", getattr(item, "source_path", str(item))).lower()
+                    for item in container_items
+                )
+                else "Node.js Worker"
+            )
+        return f"{primary_lang} Worker"
+
+    if container_type == "cli_tool":
+        if top_tech == "Go":
+            return "Go CLI"
+        if top_tech == "Python":
+            return "Python CLI"
+        if top_tech in ("TypeScript", "JavaScript"):
+            return "Node.js CLI"
+        return f"{primary_lang} CLI"
+
+    if container_type in ("library", "shared_library"):
         return f"{primary_lang}"
+
+    if container_type == "database":
+        return "Relational Database"
 
     return primary_lang
 
@@ -289,8 +324,12 @@ def _detect_container_description(container_type: str, cont_tech: str) -> str:
         return f"Client web application, user interface, and frontend views ({cont_tech})"
     if container_type == "api":
         return f"Backend API, business logic, and server services ({cont_tech})"
-    if container_type == "library":
+    if container_type in ("library", "shared_library"):
         return f"Shared contracts, utility libraries, and reusable models ({cont_tech})"
+    if container_type == "worker":
+        return f"Background task processor and asynchronous job queue worker ({cont_tech})"
+    if container_type == "cli_tool":
+        return f"Command-line interface utility and developer tool ({cont_tech})"
     if container_type == "database":
         return f"Persistent data storage for application state and records ({cont_tech})"
     return f"Core application business logic and execution components ({cont_tech})"
@@ -374,7 +413,7 @@ def _detect_repository_layout(all_entities: List[Any]) -> str:
     if has_explicit_frontend:
         return "frontend_app"
 
-    if bool(top_dirs & {"packages", "services", "libs"}):
+    if bool(top_dirs & {"packages", "services", "libs", "apps", "cmd", "workers", "modules"}):
         return "monorepo_packages"
 
     return "standard"
@@ -383,6 +422,7 @@ def _detect_repository_layout(all_entities: List[Any]) -> str:
 def _infer_component_info(
     file_path: str,
     repo_layout: str,
+    container_roles_map: Optional[Dict[str, str]] = None,
 ) -> tuple[str, str, str, str, str]:
     """Dynamically determine (cont_id, cont_name, cont_type, comp_path, comp_name) for any file.
 
@@ -391,9 +431,55 @@ def _infer_component_info(
     """
     p = Path(file_path)
     parts = p.parts
+    top = parts[0].lower() if len(parts) > 1 else ""
+
+    # Multi-package / multi-service directory check
+    is_multi_package = (
+        top
+        in [
+            "packages",
+            "services",
+            "apps",
+            "libs",
+            "cmd",
+            "workers",
+            "modules",
+        ]
+        and len(parts) >= 2
+    )
+    pkg = parts[1] if is_multi_package else ""
 
     # 1. Determine container
-    if repo_layout == "frontend_app":
+    if is_multi_package and (
+        repo_layout in ("monorepo_packages", "monorepo", "standard")
+        or top in ("packages", "services", "apps", "cmd", "workers")
+    ):
+        cont_id = f"container_{_sanitize_id(pkg)}"
+        if container_roles_map and cont_id in container_roles_map:
+            cont_type = container_roles_map[cont_id]
+        else:
+            classified = ContainerClassifier.heuristic_classify(
+                f"{top}/{pkg}",
+                files=[file_path],
+            )
+            cont_type = classified.value
+
+        role_suffix_map = {
+            "web_app": "Application",
+            "api": "Service",
+            "worker": "Worker",
+            "database": "Database",
+            "shared_library": "Library",
+            "library": "Library",
+            "cli_tool": "CLI",
+        }
+        suffix = role_suffix_map.get(cont_type, "Package")
+        clean_pkg_title = pkg.replace("-", " ").replace("_", " ").title()
+        if clean_pkg_title.lower().endswith(suffix.lower()):
+            cont_name = clean_pkg_title
+        else:
+            cont_name = f"{clean_pkg_title} {suffix}"
+    elif repo_layout == "frontend_app":
         cont_id = "container_frontend"
         cont_name = "Frontend Web Application"
         cont_type = "web_app"
@@ -401,13 +487,7 @@ def _infer_component_info(
         cont_id = "container_backend"
         cont_name = "Backend API & Services"
         cont_type = "api"
-    elif repo_layout == "monorepo_packages":
-        pkg = parts[1] if len(parts) >= 2 else "core"
-        cont_id = f"container_{_sanitize_id(pkg)}"
-        cont_name = f"{pkg.title()} Package"
-        cont_type = "library" if any(k in parts[0] for k in ["pack", "lib", "share"]) else "api"
     else:
-        top = parts[0].lower() if len(parts) > 1 else ""
         stem = p.stem.lower()
         if top in ["frontend", "web", "client", "ui"] or (
             len(parts) == 1 and stem in ["index", "client", "ui", "web"]
@@ -421,10 +501,18 @@ def _infer_component_info(
             cont_id = "container_backend"
             cont_name = "Backend API & Services"
             cont_type = "api"
+        elif top in ["worker", "consumer", "celery", "jobs"]:
+            cont_id = "container_worker"
+            cont_name = "Background Worker"
+            cont_type = "worker"
+        elif top in ["cmd", "cli", "bin", "tools"]:
+            cont_id = "container_cli"
+            cont_name = "CLI Tool"
+            cont_type = "cli_tool"
         elif top in ["packages", "contracts", "shared", "libs"]:
             cont_id = "container_contracts"
             cont_name = "Shared Packages & Libraries"
-            cont_type = "library"
+            cont_type = "shared_library"
         elif top == "app":
             if any(file_path.endswith(ext) for ext in [".py", ".go", ".rs", ".rb"]):
                 cont_id = "container_backend"
@@ -435,14 +523,15 @@ def _infer_component_info(
                 cont_name = "Frontend Application"
                 cont_type = "web_app"
         else:
-            cont_id = "container_core"
-            cont_name = "Core Application"
-            cont_type = "api"
+            classified = ContainerClassifier.heuristic_classify(top or str(p.parent), [file_path])
+            cont_id = f"container_{_sanitize_id(top or 'core')}"
+            cont_name = f"{(top or 'core').replace('-', ' ').replace('_', ' ').title()} Service"
+            cont_type = classified.value
 
     # 2. Determine component path and name
     subparts = list(parts)
     wrapper_prefix = ""
-    if len(subparts) > 1 and subparts[0].lower() in [
+    container_prefixes = [
         "frontend",
         "backend",
         "server",
@@ -450,9 +539,32 @@ def _infer_component_info(
         "web",
         "ui",
         "packages",
-    ]:
-        wrapper_prefix = subparts[0]
-        subparts = subparts[1:]
+        "services",
+        "apps",
+        "libs",
+        "cmd",
+        "workers",
+        "modules",
+    ]
+    if len(subparts) > 1 and subparts[0].lower() in container_prefixes:
+        if (
+            subparts[0].lower()
+            in [
+                "packages",
+                "services",
+                "apps",
+                "libs",
+                "cmd",
+                "workers",
+                "modules",
+            ]
+            and len(subparts) > 2
+        ):
+            wrapper_prefix = f"{subparts[0]}/{subparts[1]}"
+            subparts = subparts[2:]
+        else:
+            wrapper_prefix = subparts[0]
+            subparts = subparts[1:]
 
     inner_prefix = ""
     if len(subparts) > 1 and subparts[0].lower() in ["src", "internal", "pkg"]:
@@ -1154,6 +1266,8 @@ class C4ArchitectureExporter:
         context: ProjectContext,
         repo_name: str = "Repository",
         repo_description: Optional[str] = None,
+        container_roles: Optional[Dict[str, str]] = None,
+        container_classifier: Optional[ContainerClassifier] = None,
     ) -> C4ArchitectureModel:
         """
         Synthesize C4 model from canonical ProjectContext.
@@ -1164,6 +1278,22 @@ class C4ArchitectureExporter:
         containers_map: Dict[str, C4Container] = {}
         components_map: Dict[str, C4Component] = {}
         all_entities = context.entities
+        classifier = container_classifier or ContainerClassifier()
+
+        # Collect manifest files for contextual container evaluation
+        manifest_by_dir: Dict[str, str] = {}
+        for e in all_entities:
+            if getattr(e, "kind", None) == "file":
+                p_obj = Path(getattr(e, "path", ""))
+                if p_obj.name.lower() in (
+                    "package.json",
+                    "pyproject.toml",
+                    "dockerfile",
+                    "cargo.toml",
+                    "go.mod",
+                ):
+                    parent_key = str(p_obj.parent).replace("\\", "/").strip(".")
+                    manifest_by_dir[parent_key] = p_obj.name.lower()
 
         # File and symbol entities
         files = [e for e in all_entities if e.kind == "file"]
@@ -1191,15 +1321,30 @@ class C4ArchitectureExporter:
 
         for f in files_to_process:
             cont_id, cont_name, cont_type, comp_path, comp_name = _infer_component_info(
-                f.path, repo_layout
+                f.path, repo_layout, container_roles_map=container_roles
             )
-            top_dir = cont_id.replace("container_", "")
+            p_parts = Path(f.path).parts
+            if len(p_parts) > 2 and p_parts[0].lower() in [
+                "packages",
+                "services",
+                "apps",
+                "libs",
+                "cmd",
+                "workers",
+                "modules",
+            ]:
+                cont_dir = f"{p_parts[0]}/{p_parts[1]}"
+            elif len(p_parts) > 1:
+                cont_dir = p_parts[0]
+            else:
+                cont_dir = cont_id.replace("container_", "")
+
             if cont_id not in container_files_by_id:
                 container_files_by_id[cont_id] = []
                 container_meta_by_id[cont_id] = {
                     "name": cont_name,
                     "type": cont_type,
-                    "path": top_dir,
+                    "path": cont_dir,
                 }
             container_files_by_id[cont_id].append(f)
 
@@ -1231,14 +1376,38 @@ class C4ArchitectureExporter:
         # Build dynamic containers based on actual member files
         for cont_id, c_files in container_files_by_id.items():
             meta = container_meta_by_id[cont_id]
-            cont_tech = _detect_container_technology(meta["type"], c_files)
-            cont_desc = _detect_container_description(meta["type"], cont_tech)
+            c_paths = [getattr(cf, "path", str(cf)) for cf in c_files]
+
+            if container_roles and cont_id in container_roles:
+                cont_type = container_roles[cont_id]
+            elif meta["type"] in (
+                "web_app",
+                "api",
+                "worker",
+                "cli_tool",
+                "shared_library",
+                "database",
+            ):
+                cont_type = meta["type"]
+            else:
+                manifest_hint = manifest_by_dir.get(meta["path"])
+                detected_role = classifier.heuristic_classify(
+                    meta["path"],
+                    c_paths,
+                    manifest_content=manifest_hint,
+                )
+                cont_type = (
+                    detected_role.value if hasattr(detected_role, "value") else str(detected_role)
+                )
+
+            cont_tech = _detect_container_technology(cont_type, c_files)
+            cont_desc = _detect_container_description(cont_type, cont_tech)
             containers_map[cont_id] = C4Container(
                 id=cont_id,
                 name=meta["name"],
                 technology=cont_tech,
                 description=cont_desc,
-                container_type=meta["type"],
+                container_type=cont_type,
                 path=meta["path"],
             )
 
@@ -1478,11 +1647,55 @@ class C4ArchitectureExporter:
         )
 
     @classmethod
+    async def export_from_project_context_async(
+        cls,
+        context: ProjectContext,
+        repo_name: str = "Repository",
+        repo_description: Optional[str] = None,
+        container_classifier: Optional[ContainerClassifier] = None,
+    ) -> C4ArchitectureModel:
+        """Asynchronously synthesize C4 model with System One batch container classification."""
+        classifier = container_classifier or ContainerClassifier()
+        all_entities = context.entities
+        files = [e for e in all_entities if e.kind == "file"]
+        code_files = [f for f in files if is_architectural_code_file(f.path, f.language)]
+        files_to_process = code_files if code_files else files
+        repo_layout = _detect_repository_layout(all_entities)
+
+        # Preliminary pass to discover candidate container directories
+        cont_files: Dict[str, List[str]] = {}
+        for f in files_to_process:
+            cont_id, _, _, _, _ = _infer_component_info(f.path, repo_layout)
+            cont_files.setdefault(cont_id, []).append(f.path)
+
+        candidates = [
+            {
+                "path": cid.replace("container_", ""),
+                "files": flist,
+            }
+            for cid, flist in cont_files.items()
+        ]
+        batch_results = await classifier.classify_containers_batch(candidates)
+        container_roles = {
+            f"container_{_sanitize_id(path)}": res.role.value for path, res in batch_results.items()
+        }
+
+        return cls.export_from_project_context(
+            context=context,
+            repo_name=repo_name,
+            repo_description=repo_description,
+            container_roles=container_roles,
+            container_classifier=classifier,
+        )
+
+    @classmethod
     def export_from_architecture_graph(
         cls,
         arch_graph: ArchitectureGraph,
         repo_name: str = "Repository",
         repo_description: Optional[str] = None,
+        container_roles: Optional[Dict[str, str]] = None,
+        container_classifier: Optional[ContainerClassifier] = None,
     ) -> C4ArchitectureModel:
         """
         Synthesize C4 model directly from ArchitectureGraph.
@@ -1500,7 +1713,7 @@ class C4ArchitectureExporter:
                 continue
 
             cont_id, cont_name, cont_type, comp_path, comp_name = _infer_component_info(
-                comp_info.path, repo_layout
+                comp_info.path, repo_layout, container_roles_map=container_roles
             )
             top = cont_id.replace("container_", "")
             comp_tech = _infer_file_technology(comp_info.path)

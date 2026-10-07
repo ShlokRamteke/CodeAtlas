@@ -14,6 +14,11 @@ from app.semantic.commit_classifier import (
     CommitIntent,
     CommitIntentClassifier,
 )
+from app.semantic.container_classifier import (
+    ContainerClassificationResult,
+    ContainerClassifier,
+    ContainerRole,
+)
 from app.semantic.invariant_miner import SemanticInvariantMiner
 from app.semantic.symbol_classifier import SymbolRoleClassifier
 from app.semantic.systemone import (
@@ -39,6 +44,9 @@ __all__ = [
     "CommitClassificationResult",
     "CommitIntent",
     "CommitIntentClassifier",
+    "ContainerClassificationResult",
+    "ContainerClassifier",
+    "ContainerRole",
     "DecisionResult",
     "MockSystemOneClient",
     "NoulAnswer",

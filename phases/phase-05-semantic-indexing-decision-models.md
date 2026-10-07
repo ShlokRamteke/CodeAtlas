@@ -70,10 +70,10 @@ Enriched ProjectContext & C4 Architecture Models
 - [x] Feed refined defect tags directly into Kamei defect pressure calculations (`app.history.change_risk`).
 
 ### PH5-05: C4 Container Boundary & Deployable Unit Classifier (Architecture Indexing)
-- [ ] Extend `c4_exporter.py` for monorepo and custom layout analysis (`packages/`, `services/`, `libs/`).
-- [ ] Evaluate directory listings and package manifests (`pyproject.toml`, `package.json`, `Dockerfile`).
-- [ ] Classify container types: `api`, `web_app`, `worker`, `database`, `shared_library`, `cli_tool`.
-- [ ] Eliminate manual directory mapping in C4 architecture exports.
+- [x] Extend `c4_exporter.py` for monorepo and custom layout analysis (`packages/`, `services/`, `libs/`).
+- [x] Evaluate directory listings and package manifests (`pyproject.toml`, `package.json`, `Dockerfile`).
+- [x] Classify container types: `api`, `web_app`, `worker`, `database`, `shared_library`, `cli_tool`.
+- [x] Eliminate manual directory mapping in C4 architecture exports.
 
 ### PH5-06: Containerized Local Serving & Performance Benchmark
 - [ ] Add `laya` service to `compose.yaml` (using `ghcr.io/nandakishorm/laya-serve` on port 8081).
@@ -94,5 +94,5 @@ Enriched ProjectContext & C4 Architecture Models
 - [x] Code symbols receive verified `architectural_role` tags during indexing.
 - [x] Unformatted natural-language constraints in docs are extracted into `DesignConstraint` records.
 - [x] Commit history defect pressure reflects classified bugfix commits.
-- [ ] C4 container export correctly identifies non-standard container directories.
+- [x] C4 container export correctly identifies non-standard container directories.
 - [ ] All unit, integration, and benchmark tests pass without regressions.
