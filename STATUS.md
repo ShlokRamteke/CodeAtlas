@@ -182,12 +182,13 @@ developer understand a proposed change before implementation.
   - 100% automated test pass rate across 148 pytest tests and ruff clean.
 - **Phase 5 — Task PH5-02 (Architectural Symbol Role Classifier)**:
   - Defined `ArchitecturalRole` enum (`controller`, `service`, `repository`, `entity`, `middleware`, `utility`) in `app.models.symbol` and `@codeatlas/contracts`.
-  - Added `architectural_role` column to `Symbol` model with Alembic migration `0007_add_symbol_architectural_role`.
+  - Added `architectural_role` column to `Symbol` model with Alembic migration `0007_symbol_arch_role`.
   - Extended Tree-sitter AST parser (`ASTCodeParser`) to extract symbol decorators and method names across Python and TypeScript/JavaScript.
   - Implemented `SymbolRoleClassifier` in `app.semantic.symbol_classifier` using `/v1/systemone` `ChoiceQuestion` batch evaluations with calibrated confidence gating ($P \ge 0.85$) and fast deterministic heuristic rule fallback.
   - Integrated batch symbol classification directly into `IngestionEngine` and propagated `architectural_role` onto canonical `ContextEntity` model and schemas.
   - Added `role` query parameter filter to `GET /api/v1/repositories/{id}/symbols`.
   - Enriched C4 component export with aggregated `symbol_roles` counts and `dominant_role` tagging.
+  - Frontend Next.js UI integration: added interactive Role filter dropdown and color-coded role badge column in Architecture Explorer Symbols tab; surfaced dominant role badges and symbol role composition chips on C4 component cards.
   - 100% automated test pass rate across 161 pytest tests (13 new unit and integration tests), ruff clean, and clean contracts/frontend typecheck.
 
 ## Remaining
@@ -220,7 +221,7 @@ receive scoped views of that model.
 
 ## Last Updated
 
-2026-10-06
+2026-10-07
 
 
 
