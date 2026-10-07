@@ -17,6 +17,7 @@ from app.models.source_file import SourceFile
 from app.models.symbol import Symbol, SymbolKind
 from app.parser.ast_parser import ASTCodeParser, ParsedFileResult
 from app.parser.relationship_analyzer import ArchitectureGraph, RelationshipAnalyzer
+from app.semantic.invariant_miner import SemanticInvariantMiner
 from app.semantic.symbol_classifier import SymbolRoleClassifier
 
 # Ignore common build and binary directories
@@ -110,11 +111,13 @@ class IngestionEngine:
         self,
         session: AsyncSession,
         symbol_classifier: Optional[SymbolRoleClassifier] = None,
+        invariant_miner: Optional[SemanticInvariantMiner] = None,
     ) -> None:
         self.session = session
         self.parser = ASTCodeParser()
         self.analyzer = RelationshipAnalyzer()
         self.symbol_classifier = symbol_classifier or SymbolRoleClassifier()
+        self.invariant_miner = invariant_miner or SemanticInvariantMiner()
 
     @staticmethod
     def compute_hash(content: str) -> str:
@@ -249,7 +252,7 @@ class IngestionEngine:
         # 5. Index Engineering Context (docs, ADRs, design constraints)
         from app.history.engineering_indexer import EngineeringContextIndexer
 
-        doc_indexer = EngineeringContextIndexer(self.session)
+        doc_indexer = EngineeringContextIndexer(self.session, miner=self.invariant_miner)
         await doc_indexer.index_repository_docs(repository_id, files)
 
         # 6. Compute Architecture Graph

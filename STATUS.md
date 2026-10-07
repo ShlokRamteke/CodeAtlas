@@ -6,11 +6,11 @@ Phase 5 — Semantic Indexing & Decision Models
 
 ## Current Task
 
-PH5-02 Complete &mdash; Architectural Symbol Role Classifier (AST Indexing)
+PH5-03 Complete &mdash; Semantic Constraint & Invariant Mining (Documentation Indexing)
 
 ## Status
 
-PH5-02 COMPLETE / READY FOR PH5-03
+PH5-03 COMPLETE / READY FOR PH5-04
 
 
 
@@ -190,10 +190,18 @@ developer understand a proposed change before implementation.
   - Enriched C4 component export with aggregated `symbol_roles` counts and `dominant_role` tagging.
   - Frontend Next.js UI integration: added interactive Role filter dropdown and color-coded role badge column in Architecture Explorer Symbols tab; surfaced dominant role badges and symbol role composition chips on C4 component cards.
   - 100% automated test pass rate across 161 pytest tests (13 new unit and integration tests), ruff clean, and clean contracts/frontend typecheck.
+- **Phase 5 — Task PH5-03 (Semantic Constraint & Invariant Mining)**:
+  - Implemented `SemanticInvariantMiner` in `app.semantic.invariant_miner` mining unformatted natural-language architectural rules from docs (`README.md`, `ARCHITECTURE.md`, `ADRs`, design guides) into `DesignConstraint` records.
+  - Multi-primitive System One evaluation: `is_invariant` (`NoulQuestion`), `domain` (`ChoiceQuestion` classifying `security`, `concurrency`, `data_integrity`, `performance`, `deployment`, `architecture`, `testing`, `general`), and `level` (`ChoiceQuestion` determining `must`, `should`, `forbidden`, `must_not`).
+  - Domain and level harmonization: mapped concurrency to performance, mapped deployment to architecture, and mapped forbidden to `MUST_NOT` with preserved semantic provenance in `extra_metadata`.
+  - Calibrated probability gating ($P \ge 0.85$) with fast deterministic heuristic rule fallback for offline/disabled execution.
+  - Candidate directive extractor in `EngineeringContextParser.extract_candidate_sentences` filtering out code blocks, markdown tables, HTML comments, and shell commands.
+  - Integrated directly into `EngineeringContextIndexer.index_document()` and `IngestionEngine` with deduplication against explicit RFC 2119 constraints.
+  - 100% automated test pass rate across 175 pytest tests (14 new unit and integration tests), ruff clean, and clean contracts/frontend production builds.
 
 ## Remaining
 
-- **Phase 5**: Semantic Indexing & Decision Models (PH5-03 invariant mining, PH5-04 commit intent, PH5-05 C4 container classifier, PH5-06 local serving).
+- **Phase 5**: Semantic Indexing & Decision Models (PH5-04 commit intent, PH5-05 C4 container classifier, PH5-06 local serving).
 - **Phase 6**: SaaS Experience & Core (Repository overview, health indicators, async indexing workers, GitHub App).
 - **Phase 7**: Model Context Protocol (MCP) Integration.
 - **Phase 8**: Evaluation & Production Hardening.
@@ -204,7 +212,7 @@ None known.
 
 ## Next Action
 
-Start Task PH5-03: Semantic Constraint & Invariant Mining (Documentation Indexing).
+Start Task PH5-04: Git History Defect Intent Categorizer (Git History Indexing).
 
 ## Session Rule
 

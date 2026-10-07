@@ -22,6 +22,7 @@ from app.parser.doc_parser import (
     EngineeringContextParser,
     ParsedEngineeringDoc,
 )
+from app.semantic.invariant_miner import SemanticInvariantMiner
 
 
 class EngineeringContextIndexer:
@@ -30,9 +31,14 @@ class EngineeringContextIndexer:
     and architectural invariants / design constraints.
     """
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        miner: Optional[SemanticInvariantMiner] = None,
+    ) -> None:
         self.session = session
         self.parser = EngineeringContextParser()
+        self.miner = miner or SemanticInvariantMiner()
 
     @staticmethod
     def compute_hash(content: str) -> str:
@@ -49,6 +55,18 @@ class EngineeringContextIndexer:
         content_hash = self.compute_hash(sanitized)
 
         parsed: ParsedEngineeringDoc = self.parser.parse_doc(path, sanitized, content_hash)
+
+        # Mine semantic natural-language invariants with System One / heuristic fallback
+        semantic_constraints = await self.miner.mine_document(
+            path=path,
+            content=sanitized,
+            existing_constraints=parsed.constraints,
+        )
+        all_constraints = list(parsed.constraints) + list(semantic_constraints)
+        parsed.constraints = all_constraints
+        if parsed.extra_metadata is not None:
+            parsed.extra_metadata["constraint_count"] = len(all_constraints)
+            parsed.extra_metadata["semantic_constraint_count"] = len(semantic_constraints)
 
         # Check existing document for upsert
         stmt = select(EngineeringDocument).where(

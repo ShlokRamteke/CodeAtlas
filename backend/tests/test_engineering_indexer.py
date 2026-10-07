@@ -82,3 +82,42 @@ The system MUST use AES-256-GCM with distinct nonces.
     # Verify all docs count
     all_docs = await indexer.get_docs(repo.id)
     assert len(all_docs) == 4  # README, ADR, ARCHITECTURE, TESTING
+
+
+@pytest.mark.asyncio
+async def test_engineering_indexer_semantic_invariant_mining(db_session: AsyncSession) -> None:
+    repo = Repository(
+        owner="test-org",
+        name="semantic-invariants",
+        full_name="test-org/semantic-invariants",
+    )
+    db_session.add(repo)
+    await db_session.commit()
+    await db_session.refresh(repo)
+
+    from app.semantic.client import MockSystemOneClient
+    from app.semantic.invariant_miner import SemanticInvariantMiner
+    from app.semantic.systemone import NoulAnswer
+
+    mock_client = MockSystemOneClient()
+    mock_client.set_response("q_0_is_inv", NoulAnswer(noul=0.97))
+    mock_client.set_choice_response("q_0_category", "security", confidence=0.95)
+    mock_client.set_choice_response("q_0_level", "must", confidence=0.92)
+
+    miner = SemanticInvariantMiner(client=mock_client)
+    indexer = EngineeringContextIndexer(db_session, miner=miner)
+
+    doc_content = """# Data Protection Architecture
+Guidelines for data storage.
+
+- Enforce strict tenant isolation on every SQL query to prevent cross-tenant data leakage.
+"""
+    doc = await indexer.index_document(repo.id, "ARCHITECTURE.md", doc_content)
+    assert doc.id is not None
+
+    constraints = await indexer.get_constraints(repo.id)
+    assert len(constraints) >= 1
+    sc = next(c for c in constraints if "tenant isolation" in c.statement)
+    assert sc.category == ConstraintCategory.SECURITY
+    assert sc.level == ConstraintLevel.MUST
+    assert sc.extra_metadata.get("semantic_mined") is True
