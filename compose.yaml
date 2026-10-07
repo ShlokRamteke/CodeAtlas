@@ -34,6 +34,9 @@ services:
   laya:
     image: ghcr.io/nandakishorm/laya-serve:latest
     container_name: codeatlas-laya
+    profiles:
+      - semantic
+      - laya
     restart: unless-stopped
     ports:
       - "8081:8081"
@@ -77,8 +80,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      laya:
-        condition: service_started
     networks:
       - codeatlas-network
 
