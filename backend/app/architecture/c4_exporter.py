@@ -5,7 +5,7 @@ import os
 import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 from app.context_builder.project_context import ProjectContext
 from app.parser.relationship_analyzer import ArchitectureGraph
@@ -200,6 +200,276 @@ def _infer_file_technology(path: str, language: Optional[str] = None) -> str:
     return "Unknown"
 
 
+
+def _detect_database_engine(
+    files: Sequence[Any] = (),
+    relationships: Sequence[Any] = (),
+    evidence: Sequence[Any] = (),
+    symbols: Sequence[Any] = (),
+    components: Sequence[Any] = (),
+) -> Optional[Tuple[str, str, str]]:
+    """Detect database engine and architecture metadata (technology, name, description)
+
+    from files, relationships, evidence (imports/code), symbols, and components.
+    Returns (technology, name, description) or None if no specific engine detected.
+    """
+    # 1. Collect file paths
+    file_paths: List[str] = [
+        getattr(f, "path", getattr(f, "source_path", str(f))).lower().replace("\\", "/")
+        for f in files
+    ]
+
+    # 2. Relationship target paths and names (e.g. 'mongoose', 'mongodb', 'pymongo', 'pg', etc.)
+    rel_targets: Set[str] = set()
+    for r in relationships:
+        tgt_p = getattr(r, "target_path", "")
+        tgt_n = getattr(r, "target_name", "")
+        src_p = getattr(r, "source_path", "")
+        if tgt_p:
+            rel_targets.add(str(tgt_p).lower().strip())
+        if tgt_n:
+            rel_targets.add(str(tgt_n).lower().strip())
+        if src_p:
+            file_paths.append(str(src_p).lower().replace("\\", "/"))
+
+    # 3. Component dependencies
+    for comp in components:
+        for dep in getattr(comp, "dependencies", []):
+            if dep:
+                rel_targets.add(str(dep).lower().strip())
+
+    # 4. Evidence snippets (import statements, AST symbols, configs)
+    evidence_texts: List[str] = [
+        getattr(ev, "content", "").lower()
+        for ev in evidence
+        if getattr(ev, "content", None)
+    ]
+
+    # 5. Symbol signatures, names, and docstrings
+    symbol_texts: List[str] = []
+    for s in symbols:
+        name = getattr(s, "name", "") or ""
+        sig = getattr(s, "signature", "") or ""
+        doc = getattr(s, "docstring", "") or ""
+        txt = f"{name} {sig} {doc}".lower()
+        if txt.strip():
+            symbol_texts.append(txt)
+
+    all_texts = evidence_texts + symbol_texts
+
+    def has_rel_target(keywords: Sequence[str]) -> bool:
+        return any(
+            any(
+                kw == t
+                or t.startswith(f"{kw}/")
+                or t.startswith(f"@{kw}/")
+                or f"/{kw}" in t
+                for kw in keywords
+            )
+            for t in rel_targets
+        )
+
+    def has_text_match(keywords: Sequence[str]) -> bool:
+        return any(any(kw in txt for kw in keywords) for txt in all_texts)
+
+    def has_path_match(keywords: Sequence[str]) -> bool:
+        return any(any(kw in fp for kw in keywords) for fp in file_paths)
+
+    # 1. MongoDB Detection
+    mongo_rel_keys = [
+        "mongoose",
+        "mongodb",
+        "pymongo",
+        "motor",
+        "@typegoose/typegoose",
+        "typegoose",
+        "mongoengine",
+        "beanie",
+        "buntdb",
+    ]
+    mongo_text_keys = [
+        "mongoose",
+        "mongodb",
+        "pymongo",
+        "motor.motor_asyncio",
+        "asynciomotorclient",
+        "mongoclient",
+        "mongodatabase",
+        "mongocollection",
+        "mongorepository",
+        "objectid",
+        "@typegoose",
+        "mongoengine",
+        "beanie",
+        "mongodb://",
+        "mongodb+srv://",
+        "mongo_uri",
+        "mongodb_uri",
+        "mongo_url",
+        "mongodb_url",
+    ]
+    mongo_path_keys = ["mongo", "mongoose"]
+
+    if (
+        has_rel_target(mongo_rel_keys)
+        or has_text_match(mongo_text_keys)
+        or has_path_match(mongo_path_keys)
+    ):
+        return (
+            "MongoDB",
+            "Application Database",
+            "Document database storing application collections and state (MongoDB)",
+        )
+
+    # 2. PostgreSQL Detection
+    pg_rel_keys = [
+        "pg",
+        "pg-promise",
+        "pg-pool",
+        "postgres",
+        "postgresql",
+        "psycopg",
+        "psycopg2",
+        "asyncpg",
+        "pgvector",
+        "sqlx-postgres",
+    ]
+    pg_text_keys = [
+        "postgres://",
+        "postgresql://",
+        "from asyncpg",
+        "import asyncpg",
+        "from psycopg",
+        "import psycopg",
+        "require('pg')",
+        "from 'pg'",
+        "from 'pg-promise'",
+        "pgvector",
+        "postgrest",
+        "postgresclient",
+        "pgpool",
+    ]
+    pg_path_keys = ["postgres", "psql", "alembic"]
+
+    if (
+        has_rel_target(pg_rel_keys)
+        or has_text_match(pg_text_keys)
+        or has_path_match(pg_path_keys)
+    ):
+        return (
+            "PostgreSQL",
+            "Application Database",
+            "Relational database storing structured relational schemas and state (PostgreSQL)",
+        )
+
+    # 3. MySQL / MariaDB Detection
+    mysql_rel_keys = ["mysql", "mysql2", "pymysql", "aiomysql", "mariadb"]
+    mysql_text_keys = ["mysql://", "mariadb://", "mysql2", "pymysql", "aiomysql"]
+    mysql_path_keys = ["mysql", "mariadb"]
+
+    if (
+        has_rel_target(mysql_rel_keys)
+        or has_text_match(mysql_text_keys)
+        or has_path_match(mysql_path_keys)
+    ):
+        return (
+            "MySQL",
+            "Application Database",
+            "Relational database storing structured relational schemas and state (MySQL)",
+        )
+
+    # 4. SQLite Detection
+    sqlite_rel_keys = [
+        "sqlite",
+        "sqlite3",
+        "better-sqlite3",
+        "aiosqlite",
+        "rusqlite",
+        "expo-sqlite",
+    ]
+    sqlite_text_keys = ["sqlite://", "better-sqlite3", "aiosqlite", "sqlite3"]
+    sqlite_path_keys = ["sqlite"]
+    has_sqlite_file = any(fp.endswith((".sqlite", ".sqlite3", ".db")) for fp in file_paths)
+
+    if (
+        has_rel_target(sqlite_rel_keys)
+        or has_text_match(sqlite_text_keys)
+        or has_path_match(sqlite_path_keys)
+        or has_sqlite_file
+    ):
+        return (
+            "SQLite",
+            "Application Database",
+            "Embedded database storing application state and local schemas (SQLite)",
+        )
+
+    # 5. DynamoDB Detection
+    dynamo_rel_keys = [
+        "@aws-sdk/client-dynamodb",
+        "@aws-sdk/lib-dynamodb",
+        "boto3.dynamodb",
+        "dynamodb",
+        "pynamodb",
+    ]
+    dynamo_path_keys = ["dynamodb", "dynamo"]
+
+    if has_rel_target(dynamo_rel_keys) or has_path_match(dynamo_path_keys):
+        return (
+            "Amazon DynamoDB",
+            "Application Database",
+            "NoSQL document and key-value database (Amazon DynamoDB)",
+        )
+
+    # 6. Supabase Detection
+    supabase_rel_keys = [
+        "@supabase/supabase-js",
+        "@supabase/ssr",
+        "supabase",
+        "supabase-py",
+    ]
+    supabase_path_keys = ["supabase"]
+
+    if has_rel_target(supabase_rel_keys) or has_path_match(supabase_path_keys):
+        return (
+            "Supabase (PostgreSQL)",
+            "Application Database",
+            "Managed backend database and state storage (Supabase / PostgreSQL)",
+        )
+
+    # 7. Redis Detection
+    redis_rel_keys = ["redis", "ioredis", "aioredis", "redis-py"]
+    redis_text_keys = ["redis://", "rediss://", "ioredis", "aioredis"]
+    redis_path_keys = ["redis"]
+
+    if (
+        has_rel_target(redis_rel_keys)
+        or has_text_match(redis_text_keys)
+        or has_path_match(redis_path_keys)
+    ):
+        return (
+            "Redis",
+            "In-Memory Cache & Store",
+            "In-memory data store for caching, key-value state, and fast retrieval (Redis)",
+        )
+
+    # 8. Prisma / SQLAlchemy / Generic Relational ORMs
+    if has_rel_target(["prisma", "@prisma/client"]) or has_path_match(["prisma"]):
+        return (
+            "Relational Database (Prisma)",
+            "Application Database",
+            "Persistent data storage for application state and records (Prisma)",
+        )
+
+    if has_rel_target(["sqlalchemy"]) or has_path_match(["sqlalchemy"]):
+        return (
+            "Relational Database (SQLAlchemy)",
+            "Application Database",
+            "Persistent data storage for application state and records (SQLAlchemy)",
+        )
+
+    return None
+
+
 def _detect_container_technology(
     container_type: str,
     container_items: List[Any],
@@ -313,6 +583,9 @@ def _detect_container_technology(
         return f"{primary_lang}"
 
     if container_type == "database":
+        db_engine = _detect_database_engine(files=container_items)
+        if db_engine:
+            return db_engine[0]
         return "Relational Database"
 
     return primary_lang
@@ -331,6 +604,14 @@ def _detect_container_description(container_type: str, cont_tech: str) -> str:
     if container_type == "cli_tool":
         return f"Command-line interface utility and developer tool ({cont_tech})"
     if container_type == "database":
+        if "mongo" in cont_tech.lower():
+            return f"Document database storing application collections and state ({cont_tech})"
+        if "redis" in cont_tech.lower():
+            return f"In-memory data store for caching, key-value state, and fast retrieval ({cont_tech})"
+        if "sqlite" in cont_tech.lower():
+            return f"Embedded database storing application state and local schemas ({cont_tech})"
+        if "dynamo" in cont_tech.lower():
+            return f"NoSQL document and key-value database ({cont_tech})"
         return f"Persistent data storage for application state and records ({cont_tech})"
     return f"Core application business logic and execution components ({cont_tech})"
 
@@ -1421,34 +1702,47 @@ class C4ArchitectureExporter:
                 container_type="api",
             )
 
-        # Attach database container if models exist (and not a pure frontend app unless DB client detected)
-        has_db_client = any(
-            "prisma" in f.path.lower()
-            or "mongoose" in f.path.lower()
-            or "alembic" in f.path.lower()
-            or "dexie" in f.path.lower()
-            or "supabase" in f.path.lower()
+        # Attach database container if models exist or database client/engine detected
+        detected_db_engine = _detect_database_engine(
+            files=files,
+            relationships=context.relationships,
+            evidence=context.evidence,
+            symbols=symbols,
+            components=list(components_map.values()),
+        )
+
+        has_db_model = any(
+            any(
+                kw in f.path.lower()
+                for kw in [
+                    "model",
+                    "models",
+                    "schema",
+                    "schemas",
+                    "entity",
+                    "entities",
+                    "repository",
+                    "repositories",
+                    "db",
+                ]
+            )
             for f in files
         )
-        has_db_model = any("model" in f.path.lower() or "db" in f.path.lower() for f in files)
-        has_db = has_db_client or (has_db_model and repo_layout != "frontend_app")
+        has_db = bool(detected_db_engine) or (has_db_model and repo_layout != "frontend_app")
 
         if has_db:
-            db_tech = "Relational Database"
-            if any("mongo" in f.path.lower() or "mongoose" in f.path.lower() for f in files):
-                db_tech = "MongoDB"
-            elif any("postgres" in f.path.lower() or "pg" in f.path.lower() for f in files):
-                db_tech = "PostgreSQL"
-            elif any("sqlite" in f.path.lower() for f in files):
-                db_tech = "SQLite"
-            elif any("mysql" in f.path.lower() for f in files):
-                db_tech = "MySQL"
+            if detected_db_engine:
+                db_tech, db_name, db_desc = detected_db_engine
+            else:
+                db_tech = "Relational Database"
+                db_name = "Application Database"
+                db_desc = "Persistent data storage for application state and records (Relational Database)"
 
             containers_map["container_db"] = C4Container(
                 id="container_db",
-                name="Application Database",
+                name=db_name,
                 technology=db_tech,
-                description=f"Persistent data storage for application state and records ({db_tech})",
+                description=db_desc,
                 container_type="database",
             )
 
@@ -1550,16 +1844,38 @@ class C4ArchitectureExporter:
                 )
             )
 
-        if "container_backend" in containers_map and "container_db" in containers_map:
-            relationships.append(
-                C4Relationship(
-                    source_id="container_backend",
-                    target_id="container_db",
-                    description="Reads and writes persistent data",
-                    technology=containers_map["container_db"].technology,
-                    relationship_type="queries",
+        if "container_db" in containers_map:
+            backend_candidates = [
+                cid
+                for cid, c in containers_map.items()
+                if cid in ("container_backend", "container_api", "container_core", "container_server")
+                or c.container_type in ("api", "worker")
+            ]
+            backend_cont_id = (
+                "container_backend"
+                if "container_backend" in containers_map
+                else (
+                    "container_core"
+                    if "container_core" in containers_map
+                    else (backend_candidates[0] if backend_candidates else None)
                 )
             )
+            if backend_cont_id:
+                db_tech_val = containers_map["container_db"].technology
+                query_desc = (
+                    "Reads and writes persistent documents"
+                    if "mongo" in db_tech_val.lower()
+                    else "Reads and writes persistent data"
+                )
+                relationships.append(
+                    C4Relationship(
+                        source_id=backend_cont_id,
+                        target_id="container_db",
+                        description=query_desc,
+                        technology=db_tech_val,
+                        relationship_type="queries",
+                    )
+                )
 
         if has_github_integration:
             gh_caller = (
