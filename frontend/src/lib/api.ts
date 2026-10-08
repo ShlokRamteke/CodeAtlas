@@ -40,6 +40,7 @@ import type {
   ReviewerRecommendation,
   AuthorCommitStat,
   RepositoryOverviewResponse,
+  ComponentDetailResponse,
 } from "@codeatlas/contracts";
 
 
@@ -413,8 +414,14 @@ export async function fetchRepositoryArchitecture(
         name: c.name,
         path: c.path,
         symbolCount: c.symbol_count,
-        dependencies: c.dependencies,
+        fileCount: c.file_count,
+        dependencies: c.dependencies || [],
         testedBy: c.tested_by,
+        dominantRole: c.dominant_role,
+        symbolRoles: c.symbol_roles || {},
+        inboundCallers: c.inbound_callers || [],
+        files: c.files || [],
+        testCoverageStatus: c.test_coverage_status || "untested",
       })),
       relationships: data.relationships.map((r: any) => ({
         sourceName: r.source_name,
@@ -423,6 +430,52 @@ export async function fetchRepositoryArchitecture(
         targetPath: r.target_path,
         type: r.type,
       })),
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function fetchComponentDetail(
+  repositoryId: string,
+  componentPath: string
+): Promise<ComponentDetailResponse | null> {
+  try {
+    const encodedPath = encodeURIComponent(componentPath).replace(/%2F/g, "/");
+    const res = await fetch(
+      `${API_BASE}/api/v1/repositories/${repositoryId}/components/${encodedPath}/overview`,
+      {
+        cache: "no-store",
+      }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      repositoryId: data.repository_id,
+      name: data.name,
+      path: data.path,
+      dominantRole: data.dominant_role,
+      symbolRoles: data.symbol_roles || {},
+      symbolCount: data.symbol_count,
+      fileCount: data.file_count,
+      files: data.files || [],
+      symbols: (data.symbols || []).map((s: any) => ({
+        id: s.id,
+        fileId: s.file_id,
+        filePath: s.file_path,
+        name: s.name,
+        kind: s.kind,
+        lineStart: s.line_start,
+        lineEnd: s.line_end,
+        signature: s.signature,
+        docstring: s.docstring,
+        architecturalRole: s.architectural_role,
+      })),
+      dependencies: data.dependencies || [],
+      inboundCallers: data.inbound_callers || [],
+      testedBy: data.tested_by,
+      testCoverageStatus: data.test_coverage_status || "untested",
+      originCommit: data.origin_commit,
     };
   } catch (error) {
     return null;

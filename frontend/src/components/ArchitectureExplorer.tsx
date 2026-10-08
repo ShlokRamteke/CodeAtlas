@@ -80,6 +80,7 @@ import { HistoricalTimelineViewer } from "./HistoricalTimelineViewer";
 import { PreChangeInvestigationViewer } from "./PreChangeInvestigationViewer";
 import { C4ArchitectureViewer } from "./C4ArchitectureViewer";
 import { RepositoryOverviewViewer } from "./RepositoryOverviewViewer";
+import { ComponentExplorerViewer } from "./ComponentExplorerViewer";
 
 
 
@@ -856,9 +857,12 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
             Loading architecture graph...
           </div>
         ) : activeTab === "components" ? (
-
           <div>
-            {!architecture || architecture.majorComponents.length === 0 ? (
+            {!architecture ? (
+              <div className="py-12 text-center text-slate-500 text-sm">
+                Loading architecture components...
+              </div>
+            ) : architecture.majorComponents.length === 0 ? (
               <div className="py-12 text-center">
                 <FolderTree className="w-8 h-8 text-slate-600 mx-auto mb-3" />
                 <p className="text-slate-400 text-sm font-medium">No components indexed yet.</p>
@@ -873,84 +877,25 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {architecture.majorComponents.map((comp) => (
-                  <div
-                    key={comp.path}
-                    className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 transition"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="text-sm font-semibold text-white flex items-center gap-2">
-                          <FileCode className="w-4 h-4 text-indigo-400" />
-                          {comp.name}
-                        </div>
-                        <div className="text-xs font-mono text-slate-400 mt-0.5">{comp.path}</div>
-                      </div>
-                      <span className="text-xs px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-medium">
-                        {comp.symbolCount} symbols
-                      </span>
-                    </div>
-
-                    {/* Linked Tests */}
-                    <div className="mt-3 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                      <span className="text-slate-500">Test Relationship:</span>
-                      {comp.testedBy ? (
-                        <span className="text-emerald-400 flex items-center gap-1 font-mono text-[11px]">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          {comp.testedBy}
-                        </span>
-                      ) : (
-                        <span className="text-slate-500 italic">No direct test match</span>
-                      )}
-                    </div>
-
-                    {/* Dependencies */}
-                    {comp.dependencies.length > 0 && (
-                      <div className="mt-2 text-xs flex items-center gap-1.5 flex-wrap">
-                        <span className="text-slate-500">Imports:</span>
-                        {comp.dependencies.slice(0, 3).map((dep) => (
-                          <span
-                            key={dep}
-                            className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[10px]"
-                          >
-                            {dep}
-                          </span>
-                        ))}
-                        {comp.dependencies.length > 3 && (
-                          <span className="text-slate-500 text-[10px]">
-                            +{comp.dependencies.length - 3} more
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Direct Links to Timeline and Context */}
-                    <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between">
-                      <button
-                        onClick={() => {
-                          setSelectedTimelineComponent(comp.path);
-                          setHistorySubTab("timeline");
-                          setActiveTab("git_history");
-                        }}
-                        className="inline-flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 font-medium transition"
-                      >
-                        <History className="w-3.5 h-3.5" />
-                        Evolution Timeline &rarr;
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSelectedContextComp(comp.path);
-                          setActiveTab("project_context");
-                        }}
-                        className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-slate-200 transition"
-                      >
-                        Context &rarr;
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <ComponentExplorerViewer
+                repository={repository}
+                architecture={architecture}
+                onNavigateTab={(tab, target) => {
+                  if (tab === "investigation" && target) {
+                    setPrefilledInvestigationTarget(target);
+                  }
+                  setActiveTab(tab as any);
+                }}
+                onSelectComponentForContext={(path) => {
+                  setSelectedContextComp(path);
+                  setActiveTab("project_context");
+                }}
+                onSelectComponentForTimeline={(path) => {
+                  setSelectedTimelineComponent(path);
+                  setHistorySubTab("timeline");
+                  setActiveTab("git_history");
+                }}
+              />
             )}
           </div>
         ) : activeTab === "symbols" ? (
