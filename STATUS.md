@@ -6,11 +6,11 @@ Phase 6 &mdash; SaaS Experience & Core (In Progress)
 
 ## Current Task
 
-PH6-01 Complete &mdash; Repository Overview & Health Indicators
+PH6-02 Complete &mdash; Architecture & Component Explorer
 
 ## Status
 
-IN PROGRESS &mdash; Phase 6 Task PH6-01 Complete / Ready for PH6-02
+IN PROGRESS &mdash; Phase 6 Task PH6-02 Complete / Ready for PH6-03
 
 
 
@@ -234,12 +234,16 @@ developer understand a proposed change before implementation.
   - REST endpoint: added `GET /api/v1/repositories/{id}/overview` returning structured `RepositoryOverviewResponse`.
   - Contracts & Frontend UI: added `HealthMetricDetail`, `RepositoryHealthIndicators`, `HotspotFileItem`, `TopContributorItem`, and `RepositoryOverviewResponse` to `@codeatlas/contracts`.
   - Implemented interactive `RepositoryOverviewViewer` dashboard in Next.js UI as default active tab in `ArchitectureExplorer` with health score gauge, 6 indicator cards, hotspot table with 1-click investigation navigation, maintainer cards, and architectural composition metrics.
-  - Connected hotspot investigation trigger to prefill target files in `PreChangeInvestigationViewer`.
-  - 100% automated test pass rate across 212 pytest tests (4 new unit/integration tests), ruff format/lint clean, and clean contracts/frontend production builds.
+- **Phase 6 — Task PH6-02 (Architecture & Component Explorer)**:
+  - `RelationshipAnalyzer`: enriched `ComponentInfo` with dominant architectural roles (`service`, `controller`, `repository`, `entity`, `middleware`, `utility`), per-role symbol distribution, cross-component inbound callers (fan-in), outbound dependencies (fan-out), contained files, and test coverage status (`guarded` vs `untested`).
+  - REST endpoints: enhanced `GET /api/v1/repositories/{id}/architecture` with enriched component metadata; added `GET /api/v1/repositories/{id}/components/{component_path:path}/overview` returning structured `ComponentDetailResponse` with contained AST symbols, signatures, line spans, docstrings, callers, dependencies, test bindings, and origin commit.
+  - Contracts & API Client: added `ComponentOverviewItem`, `ComponentSymbolDetail`, and `ComponentDetailResponse` to `@codeatlas/contracts` and implemented `fetchComponentDetail` in `frontend/src/lib/api.ts`.
+  - Frontend SaaS Experience: created interactive `ComponentExplorerViewer.tsx` featuring high-level architecture metrics (component count, coupling density, guarded ratio, role distribution), dual view switcher (Component Directory Grid vs Coupling Topology Matrix), role/coverage filters, sort controls, and interactive component inspection modal with 1-click **Investigate Change on Component** prefill.
+  - 100% automated test pass rate across 215 pytest tests (3 new unit/integration tests in `test_component_explorer.py`), ruff format/lint clean, and clean contracts/frontend production builds.
 
 ## Remaining
 
-- **Phase 6**: SaaS Experience & Core (Architecture/component explorer, historical timeline and evolution view, change-investigation entry flow, GitHub App, async indexing workers).
+- **Phase 6**: SaaS Experience & Core (Historical timeline and evolution view, change-investigation entry flow, GitHub App, async indexing workers).
 - **Phase 7**: Model Context Protocol (MCP) Integration.
 - **Phase 8**: Evaluation & Production Hardening.
 
@@ -249,7 +253,7 @@ None known.
 
 ## Next Action
 
-Continue Phase 6 (SaaS Experience & Core): Task PH6-02 (Architecture & Component Explorer).
+Continue Phase 6 (SaaS Experience & Core): Task PH6-03 (Historical Timeline & Evolution View).
 
 
 ## Session Rule

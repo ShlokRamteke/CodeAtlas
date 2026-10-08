@@ -212,19 +212,57 @@ export interface ContextBriefResponse {
 }
 
 
+export interface ComponentOverviewItem {
+  name: string;
+  path: string;
+  symbolCount: number;
+  fileCount?: number;
+  dependencies: string[];
+  testedBy?: string | null;
+  dominantRole?: ArchitecturalRole | string | null;
+  symbolRoles?: Record<string, number>;
+  inboundCallers?: string[];
+  files?: string[];
+  testCoverageStatus?: 'guarded' | 'untested' | string;
+}
+
+export interface ComponentSymbolDetail {
+  id: string;
+  fileId: string;
+  filePath?: string | null;
+  name: string;
+  kind: SymbolKind | string;
+  lineStart: number;
+  lineEnd: number;
+  signature?: string | null;
+  docstring?: string | null;
+  architecturalRole?: ArchitecturalRole | string | null;
+}
+
+export interface ComponentDetailResponse {
+  repositoryId: string;
+  name: string;
+  path: string;
+  dominantRole?: ArchitecturalRole | string | null;
+  symbolRoles: Record<string, number>;
+  symbolCount: number;
+  fileCount: number;
+  files: string[];
+  symbols: ComponentSymbolDetail[];
+  dependencies: string[];
+  inboundCallers: string[];
+  testedBy?: string | null;
+  testCoverageStatus: string;
+  originCommit?: string | null;
+}
+
 export interface ArchitectureOverview {
   repositoryId: string;
   fileCount: number;
   symbolCount: number;
   dependencyCount: number;
   languages: Record<string, number>;
-  majorComponents: Array<{
-    name: string;
-    path: string;
-    symbolCount: number;
-    dependencies: string[];
-    testedBy?: string | null;
-  }>;
+  majorComponents: ComponentOverviewItem[];
   relationships: ComponentRelationship[];
 }
 
