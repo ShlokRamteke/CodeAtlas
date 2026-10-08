@@ -69,12 +69,21 @@ class ContainerClassifier:
         manifest_lower = (manifest_content or "").lower()
 
         # 1. Database container check
-        if any(p in parts for p in ["db", "database", "postgres", "mysql", "migrations"]) or any(
-            fn in file_names for fn in ["schema.sql", "schema.prisma"]
+        if (
+            any(
+                p in parts
+                for p in ["db", "database", "postgres", "mysql", "mongo", "mongodb", "migrations"]
+            )
+            or any(fn in file_names for fn in ["schema.sql", "schema.prisma"])
+            or any(k in manifest_lower for k in ["mongoose", "mongodb", "pymongo"])
         ):
             # Only classify as database if primarily data/migrations or explicitly named
-            if any(p in ["db", "database", "migrations"] for p in parts) or all(
-                f.endswith((".sql", ".prisma")) or "migration" in f for f in file_list if f
+            if (
+                any(p in ["db", "database", "migrations", "mongo", "mongodb"] for p in parts)
+                or all(
+                    f.endswith((".sql", ".prisma")) or "migration" in f for f in file_list if f
+                )
+                or any(k in manifest_lower for k in ["mongoose", "mongodb", "pymongo"])
             ):
                 return ContainerRole.DATABASE
 

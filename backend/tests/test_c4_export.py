@@ -9,6 +9,7 @@ from app.architecture.c4_exporter import (
 from app.context_builder.project_context import (
     ContextDesignConstraint,
     ContextEntity,
+    ContextEvidence,
     ContextRelationship,
     ProjectContext,
 )
@@ -891,3 +892,232 @@ async def test_export_from_project_context_async_systemone():
 
     assert container_map["container_job_runner"].container_type == "worker"
     assert container_map["container_billing_api"].container_type == "api"
+
+
+def test_c4_export_mongodb_detection_via_mongoose():
+    """Verify MongoDB is verified as the database technology and correctly described
+
+    in C4 containers, Mermaid C4 container diagram, and flowchart when mongoose is imported.
+    """
+    entities = [
+        ContextEntity(
+            id="f1",
+            name="src/models/user.ts",
+            kind="file",
+            path="src/models/user.ts",
+            language="TypeScript",
+        ),
+        ContextEntity(
+            id="f2",
+            name="src/routes/users.ts",
+            kind="file",
+            path="src/routes/users.ts",
+            language="TypeScript",
+        ),
+        ContextEntity(
+            id="f3",
+            name="src/server.ts",
+            kind="file",
+            path="src/server.ts",
+            language="TypeScript",
+        ),
+        ContextEntity(
+            id="s1",
+            name="UserSchema",
+            kind="symbol",
+            path="src/models/user.ts",
+            signature="const UserSchema = new mongoose.Schema({ name: String, email: String });",
+            architectural_role="data_model",
+        ),
+    ]
+
+    relationships = [
+        ContextRelationship(
+            source_name="user",
+            source_path="src/models/user.ts",
+            target_name="mongoose",
+            target_path="mongoose",
+            type="imports",
+            confidence=1.0,
+            resolution_method="tree_sitter_ast",
+        ),
+        ContextRelationship(
+            source_name="server",
+            source_path="src/server.ts",
+            target_name="users",
+            target_path="src/routes/users.ts",
+            type="imports",
+            confidence=1.0,
+            resolution_method="tree_sitter_ast",
+        ),
+    ]
+
+    evidence = [
+        ContextEvidence(
+            id="ev1",
+            source_path="src/models/user.ts",
+            kind="import_statement",
+            content="import mongoose, { Schema } from 'mongoose';",
+            confidence=1.0,
+            provenance="tree_sitter_ast",
+        ),
+        ContextEvidence(
+            id="ev2",
+            source_path="src/server.ts",
+            kind="import_statement",
+            content="mongoose.connect(process.env.MONGODB_URI);",
+            confidence=1.0,
+            provenance="tree_sitter_ast",
+        ),
+    ]
+
+    ctx = ProjectContext(
+        target_type="repository",
+        target_id="repo-mongo-test",
+        target_name="ECommerceAPI",
+        summary="API with MongoDB backend",
+        entities=entities,
+        relationships=relationships,
+        evidence=evidence,
+    )
+
+    model = C4ArchitectureExporter.export_from_project_context(
+        ctx,
+        repo_name="ECommerceAPI",
+        repo_description="E-commerce backend with MongoDB database",
+    )
+
+    container_map = {c.id: c for c in model.containers}
+    assert "container_db" in container_map
+    db_container = container_map["container_db"]
+
+    # Verify database technology and description are verified as MongoDB
+    assert db_container.technology == "MongoDB"
+    assert db_container.name == "Application Database"
+    assert "Document database storing application collections and state (MongoDB)" in db_container.description
+    assert db_container.container_type == "database"
+
+    # Verify Mermaid C4 Container Diagram renders ContainerDb with MongoDB
+    mermaid_cont = model.to_mermaid_container()
+    assert 'ContainerDb(container_db, "Application Database", "MongoDB"' in mermaid_cont
+
+    # Verify Mermaid Flowchart renders subgraph with MongoDB
+    flowchart = model.to_mermaid_flowchart("TB")
+    assert 'subgraph container_db["Application Database (MongoDB)"]' in flowchart
+
+    # Verify backend queries container_db relationship
+    db_rel = next((r for r in model.relationships if r.target_id == "container_db"), None)
+    assert db_rel is not None
+    assert db_rel.technology == "MongoDB"
+    assert "queries" in db_rel.relationship_type.lower()
+
+
+def test_c4_export_mongodb_detection_via_pymongo():
+    """Verify MongoDB detection for Python repositories importing pymongo or motor."""
+    entities = [
+        ContextEntity(
+            id="f1",
+            name="app/database.py",
+            kind="file",
+            path="app/database.py",
+            language="Python",
+        ),
+        ContextEntity(
+            id="f2",
+            name="app/main.py",
+            kind="file",
+            path="app/main.py",
+            language="Python",
+        ),
+        ContextEntity(
+            id="s1",
+            name="get_mongo_client",
+            kind="symbol",
+            path="app/database.py",
+            signature="def get_mongo_client() -> MongoClient:",
+            architectural_role="storage",
+        ),
+    ]
+
+    relationships = [
+        ContextRelationship(
+            source_name="database",
+            source_path="app/database.py",
+            target_name="pymongo",
+            target_path="pymongo",
+            type="imports",
+        )
+    ]
+
+    evidence = [
+        ContextEvidence(
+            id="ev1",
+            source_path="app/database.py",
+            kind="import_statement",
+            content="from pymongo import MongoClient",
+        )
+    ]
+
+    ctx = ProjectContext(
+        target_type="repository",
+        target_id="repo-pymongo",
+        target_name="PythonMongoApp",
+        summary="Python app with PyMongo",
+        entities=entities,
+        relationships=relationships,
+        evidence=evidence,
+    )
+
+    model = C4ArchitectureExporter.export_from_project_context(ctx, repo_name="PythonMongoApp")
+    db_cont = next((c for c in model.containers if c.id == "container_db"), None)
+    assert db_cont is not None
+    assert db_cont.technology == "MongoDB"
+    assert "MongoDB" in db_cont.description
+
+
+def test_c4_export_postgresql_and_sqlite_detection():
+    """Verify PostgreSQL and SQLite databases are accurately detected from driver imports."""
+    # Test PostgreSQL
+    pg_ctx = ProjectContext(
+        target_type="repository",
+        target_id="repo-pg",
+        target_name="PostgresApp",
+        summary="Postgres app",
+        entities=[
+            ContextEntity(id="f1", name="src/db.ts", kind="file", path="src/db.ts", language="TypeScript"),
+            ContextEntity(id="f2", name="src/server.ts", kind="file", path="src/server.ts", language="TypeScript"),
+        ],
+        relationships=[
+            ContextRelationship(source_name="db", source_path="src/db.ts", target_name="pg", target_path="pg", type="imports"),
+        ],
+        evidence=[
+            ContextEvidence(id="e1", source_path="src/db.ts", kind="import_statement", content="import { Pool } from 'pg';"),
+        ],
+    )
+    pg_model = C4ArchitectureExporter.export_from_project_context(pg_ctx, repo_name="PostgresApp")
+    pg_db = next((c for c in pg_model.containers if c.id == "container_db"), None)
+    assert pg_db is not None
+    assert pg_db.technology == "PostgreSQL"
+
+    # Test SQLite
+    sqlite_ctx = ProjectContext(
+        target_type="repository",
+        target_id="repo-sqlite",
+        target_name="SQLiteApp",
+        summary="SQLite app",
+        entities=[
+            ContextEntity(id="f1", name="src/data.db", kind="file", path="src/data.db", language="Binary"),
+            ContextEntity(id="f2", name="src/app.py", kind="file", path="src/app.py", language="Python"),
+        ],
+        relationships=[
+            ContextRelationship(source_name="app", source_path="src/app.py", target_name="sqlite3", target_path="sqlite3", type="imports"),
+        ],
+        evidence=[
+            ContextEvidence(id="e1", source_path="src/app.py", kind="import_statement", content="import sqlite3"),
+        ],
+    )
+    sqlite_model = C4ArchitectureExporter.export_from_project_context(sqlite_ctx, repo_name="SQLiteApp")
+    sqlite_db = next((c for c in sqlite_model.containers if c.id == "container_db"), None)
+    assert sqlite_db is not None
+    assert sqlite_db.technology == "SQLite"
+
