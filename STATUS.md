@@ -237,6 +237,15 @@ developer understand a proposed change before implementation.
   - Connected hotspot investigation trigger to prefill target files in `PreChangeInvestigationViewer`.
   - 100% automated test pass rate across 212 pytest tests (4 new unit/integration tests), ruff format/lint clean, and clean contracts/frontend production builds.
 
+- **Bugfix — C4 MongoDB & Multi-Database Verification in Architecture Exports (`fix/c4-mongodb-database-detection`)**:
+  - `_detect_database_engine` in `app.architecture.c4_exporter`: multi-signal database detector inspecting AST imports, relationships, evidence snippets, connection strings (`mongodb://`, `mongodb+srv://`, `MONGO_URI`), and symbols (`MongoClient`, `Schema`, `ObjectId`, etc.).
+  - Resolves issue where MongoDB repositories defaulted to generic `"Relational Database"` because file paths like `src/models/user.ts` or `src/config/db.js` omit `"mongo"`.
+  - Added support for MongoDB, PostgreSQL, MySQL, SQLite, Redis, DynamoDB, Supabase, and ORMs.
+  - Dynamically formats NoSQL/document database container description: `Document database storing application collections and state (MongoDB)`.
+  - Updated `ContainerClassifier.heuristic_classify` in `app.semantic.container_classifier` to recognize `mongo` / `mongodb` directories and manifest dependencies.
+  - Connected primary backend callers (`container_backend`, `container_core`, `container_api`) to `container_db` in C4 container and component diagrams.
+  - Added 3 unit tests in `backend/tests/test_c4_export.py`. All 215 backend tests passed; clean ruff lint/format and Next.js frontend production build.
+
 ## Remaining
 
 - **Phase 6**: SaaS Experience & Core (Architecture/component explorer, historical timeline and evolution view, change-investigation entry flow, GitHub App, async indexing workers).
@@ -267,7 +276,7 @@ receive scoped views of that model.
 
 ## Last Updated
 
-2026-10-07
+2026-10-13
 
 
 
