@@ -994,7 +994,10 @@ def test_c4_export_mongodb_detection_via_mongoose():
     # Verify database technology and description are verified as MongoDB
     assert db_container.technology == "MongoDB"
     assert db_container.name == "Application Database"
-    assert "Document database storing application collections and state (MongoDB)" in db_container.description
+    assert (
+        "Document database storing application collections and state (MongoDB)"
+        in db_container.description
+    )
     assert db_container.container_type == "database"
 
     # Verify Mermaid C4 Container Diagram renders ContainerDb with MongoDB
@@ -1084,14 +1087,33 @@ def test_c4_export_postgresql_and_sqlite_detection():
         target_name="PostgresApp",
         summary="Postgres app",
         entities=[
-            ContextEntity(id="f1", name="src/db.ts", kind="file", path="src/db.ts", language="TypeScript"),
-            ContextEntity(id="f2", name="src/server.ts", kind="file", path="src/server.ts", language="TypeScript"),
+            ContextEntity(
+                id="f1", name="src/db.ts", kind="file", path="src/db.ts", language="TypeScript"
+            ),
+            ContextEntity(
+                id="f2",
+                name="src/server.ts",
+                kind="file",
+                path="src/server.ts",
+                language="TypeScript",
+            ),
         ],
         relationships=[
-            ContextRelationship(source_name="db", source_path="src/db.ts", target_name="pg", target_path="pg", type="imports"),
+            ContextRelationship(
+                source_name="db",
+                source_path="src/db.ts",
+                target_name="pg",
+                target_path="pg",
+                type="imports",
+            ),
         ],
         evidence=[
-            ContextEvidence(id="e1", source_path="src/db.ts", kind="import_statement", content="import { Pool } from 'pg';"),
+            ContextEvidence(
+                id="e1",
+                source_path="src/db.ts",
+                kind="import_statement",
+                content="import { Pool } from 'pg';",
+            ),
         ],
     )
     pg_model = C4ArchitectureExporter.export_from_project_context(pg_ctx, repo_name="PostgresApp")
@@ -1106,18 +1128,31 @@ def test_c4_export_postgresql_and_sqlite_detection():
         target_name="SQLiteApp",
         summary="SQLite app",
         entities=[
-            ContextEntity(id="f1", name="src/data.db", kind="file", path="src/data.db", language="Binary"),
-            ContextEntity(id="f2", name="src/app.py", kind="file", path="src/app.py", language="Python"),
+            ContextEntity(
+                id="f1", name="src/data.db", kind="file", path="src/data.db", language="Binary"
+            ),
+            ContextEntity(
+                id="f2", name="src/app.py", kind="file", path="src/app.py", language="Python"
+            ),
         ],
         relationships=[
-            ContextRelationship(source_name="app", source_path="src/app.py", target_name="sqlite3", target_path="sqlite3", type="imports"),
+            ContextRelationship(
+                source_name="app",
+                source_path="src/app.py",
+                target_name="sqlite3",
+                target_path="sqlite3",
+                type="imports",
+            ),
         ],
         evidence=[
-            ContextEvidence(id="e1", source_path="src/app.py", kind="import_statement", content="import sqlite3"),
+            ContextEvidence(
+                id="e1", source_path="src/app.py", kind="import_statement", content="import sqlite3"
+            ),
         ],
     )
-    sqlite_model = C4ArchitectureExporter.export_from_project_context(sqlite_ctx, repo_name="SQLiteApp")
+    sqlite_model = C4ArchitectureExporter.export_from_project_context(
+        sqlite_ctx, repo_name="SQLiteApp"
+    )
     sqlite_db = next((c for c in sqlite_model.containers if c.id == "container_db"), None)
     assert sqlite_db is not None
     assert sqlite_db.technology == "SQLite"
-

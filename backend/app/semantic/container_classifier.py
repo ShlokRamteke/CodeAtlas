@@ -80,9 +80,7 @@ class ContainerClassifier:
             # Only classify as database if primarily data/migrations or explicitly named
             if (
                 any(p in ["db", "database", "migrations", "mongo", "mongodb"] for p in parts)
-                or all(
-                    f.endswith((".sql", ".prisma")) or "migration" in f for f in file_list if f
-                )
+                or all(f.endswith((".sql", ".prisma")) or "migration" in f for f in file_list if f)
                 or any(k in manifest_lower for k in ["mongoose", "mongodb", "pymongo"])
             ):
                 return ContainerRole.DATABASE

@@ -200,7 +200,6 @@ def _infer_file_technology(path: str, language: Optional[str] = None) -> str:
     return "Unknown"
 
 
-
 def _detect_database_engine(
     files: Sequence[Any] = (),
     relationships: Sequence[Any] = (),
@@ -240,9 +239,7 @@ def _detect_database_engine(
 
     # 4. Evidence snippets (import statements, AST symbols, configs)
     evidence_texts: List[str] = [
-        getattr(ev, "content", "").lower()
-        for ev in evidence
-        if getattr(ev, "content", None)
+        getattr(ev, "content", "").lower() for ev in evidence if getattr(ev, "content", None)
     ]
 
     # 5. Symbol signatures, names, and docstrings
@@ -260,10 +257,7 @@ def _detect_database_engine(
     def has_rel_target(keywords: Sequence[str]) -> bool:
         return any(
             any(
-                kw == t
-                or t.startswith(f"{kw}/")
-                or t.startswith(f"@{kw}/")
-                or f"/{kw}" in t
+                kw == t or t.startswith(f"{kw}/") or t.startswith(f"@{kw}/") or f"/{kw}" in t
                 for kw in keywords
             )
             for t in rel_targets
@@ -351,11 +345,7 @@ def _detect_database_engine(
     ]
     pg_path_keys = ["postgres", "psql", "alembic"]
 
-    if (
-        has_rel_target(pg_rel_keys)
-        or has_text_match(pg_text_keys)
-        or has_path_match(pg_path_keys)
-    ):
+    if has_rel_target(pg_rel_keys) or has_text_match(pg_text_keys) or has_path_match(pg_path_keys):
         return (
             "PostgreSQL",
             "Application Database",
@@ -1848,7 +1838,8 @@ class C4ArchitectureExporter:
             backend_candidates = [
                 cid
                 for cid, c in containers_map.items()
-                if cid in ("container_backend", "container_api", "container_core", "container_server")
+                if cid
+                in ("container_backend", "container_api", "container_core", "container_server")
                 or c.container_type in ("api", "worker")
             ]
             backend_cont_id = (
