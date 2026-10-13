@@ -137,10 +137,8 @@ Repositories can be indexed with rich architectural roles, semantic invariants, 
 Turn the change-investigation engine into a clear developer-facing web experience and secure multi-tenant SaaS product.
 
 ### Structured Tasks
-- **PH6-01 — Repository Overview & Health Indicators** *(Completed)*: Deterministic 6-dimension health scorecard (testing protection, bus factor / ownership concentration, defect pressure, architectural modularity, governance invariants, concurrent PR collision risk) and interactive executive dashboard.
-- **PH6-02 — Architecture / Component Explorer**
-
-- Historical timeline and evolution view
+- **PH6-02 — Architecture / Component Explorer** *(Completed)*: Interactive component directory, architectural role tags, test coverage badges, fan-in/fan-out coupling metrics, coupling topology matrix, and component detail inspection modal with 1-click change investigation prefill.
+- **PH6-03 — Historical Timeline & Evolution View**
 - Change-investigation entry flow (target + proposed change)
 - Pre-Change Investigation Brief interactive UI
 - GitHub App integration and multi-tenant isolation

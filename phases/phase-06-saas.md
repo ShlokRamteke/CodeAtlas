@@ -12,7 +12,7 @@ Phase 4 complete.
 
 ### SaaS Experience
 - [x] Repository overview and health indicators
-- [ ] Architecture and component explorer
+- [x] Architecture and component explorer
 
 - [ ] Historical timeline and evolution view
 - [ ] Change-investigation entry flow (target selection + proposed change input)

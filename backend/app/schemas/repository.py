@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.dependency import DependencyKind
 from app.models.repository import RepositoryStatus
@@ -69,6 +69,41 @@ class ComponentOverview(BaseModel):
     file_count: int
     dependencies: List[str]
     tested_by: Optional[str] = None
+    dominant_role: Optional[str] = None
+    symbol_roles: Dict[str, int] = Field(default_factory=dict)
+    inbound_callers: List[str] = Field(default_factory=list)
+    files: List[str] = Field(default_factory=list)
+    test_coverage_status: str = "untested"
+
+
+class ComponentSymbolItem(BaseModel):
+    id: uuid.UUID
+    file_id: uuid.UUID
+    file_path: Optional[str] = None
+    name: str
+    kind: SymbolKind
+    line_start: int
+    line_end: int
+    signature: Optional[str] = None
+    docstring: Optional[str] = None
+    architectural_role: Optional[ArchitecturalRole] = None
+
+
+class ComponentDetailResponse(BaseModel):
+    repository_id: uuid.UUID
+    name: str
+    path: str
+    dominant_role: Optional[str] = None
+    symbol_roles: Dict[str, int] = Field(default_factory=dict)
+    symbol_count: int
+    file_count: int
+    files: List[str] = Field(default_factory=list)
+    symbols: List[ComponentSymbolItem] = Field(default_factory=list)
+    dependencies: List[str] = Field(default_factory=list)
+    inbound_callers: List[str] = Field(default_factory=list)
+    tested_by: Optional[str] = None
+    test_coverage_status: str = "untested"
+    origin_commit: Optional[str] = None
 
 
 class ComponentRelationshipSchema(BaseModel):

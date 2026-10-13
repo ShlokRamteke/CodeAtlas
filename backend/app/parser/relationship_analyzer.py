@@ -16,6 +16,11 @@ class ComponentInfo:
     file_count: int = 0
     dependencies: List[str] = field(default_factory=list)
     tested_by: Optional[str] = None
+    dominant_role: Optional[str] = None
+    symbol_roles: Dict[str, int] = field(default_factory=dict)
+    inbound_callers: List[str] = field(default_factory=list)
+    files: List[str] = field(default_factory=list)
+    test_coverage_status: str = "untested"
 
 
 @dataclass
@@ -219,8 +224,14 @@ class RelationshipAnalyzer:
             comp = component_map[comp_dir]
             comp.symbol_count += sym_count
             comp.file_count += 1
+            comp.files.append(f.path)
             if f.path in test_links:
                 comp.tested_by = test_links[f.path]
+
+            for sym in f.symbols:
+                if sym.architectural_role:
+                    r_name = str(sym.architectural_role).lower()
+                    comp.symbol_roles[r_name] = comp.symbol_roles.get(r_name, 0) + 1
 
             # Dependencies to relationships
             for dep in f.dependencies:
@@ -257,6 +268,47 @@ class RelationshipAnalyzer:
                     resolution_method="filename_heuristic",
                 )
             )
+
+        # Resolve dominant roles, test coverage status, and inbound callers
+        file_to_comp: Dict[str, str] = {}
+        for comp_path, comp in component_map.items():
+            comp.test_coverage_status = "guarded" if comp.tested_by else "untested"
+            if comp.symbol_roles:
+                comp.dominant_role = max(comp.symbol_roles.items(), key=lambda x: x[1])[0]
+            else:
+                low_p = comp.path.lower()
+                if any(k in low_p for k in ["controller", "route", "endpoint", "api"]):
+                    comp.dominant_role = "controller"
+                elif any(k in low_p for k in ["service", "business"]):
+                    comp.dominant_role = "service"
+                elif any(k in low_p for k in ["repo", "dao", "store"]):
+                    comp.dominant_role = "repository"
+                elif any(k in low_p for k in ["model", "schema", "entity"]):
+                    comp.dominant_role = "entity"
+                elif any(k in low_p for k in ["middleware", "auth", "guard"]):
+                    comp.dominant_role = "middleware"
+                elif any(k in low_p for k in ["util", "helper", "lib", "common"]):
+                    comp.dominant_role = "utility"
+                elif any(k in low_p for k in ["component", "ui", "view"]):
+                    comp.dominant_role = "utility"
+
+            for fp in comp.files:
+                file_to_comp[fp] = comp_path
+                file_to_comp[fp.lower()] = comp_path
+
+        # Compute cross-component inbound callers (fan-in)
+        for comp_path, comp in component_map.items():
+            for dep_target in comp.dependencies:
+                target_comp = file_to_comp.get(dep_target) or file_to_comp.get(dep_target.lower())
+                if not target_comp:
+                    for cp in component_map:
+                        if dep_target.startswith(cp) and cp != "root":
+                            target_comp = cp
+                            break
+                if target_comp and target_comp != comp_path:
+                    tgt = component_map[target_comp]
+                    if comp_path not in tgt.inbound_callers:
+                        tgt.inbound_callers.append(comp_path)
 
         return ArchitectureGraph(
             file_count=len(parsed_files),

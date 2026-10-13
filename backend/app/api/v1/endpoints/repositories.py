@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import uuid
 from dataclasses import asdict
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse, Response
@@ -43,8 +43,10 @@ from app.schemas.repository import (
     ArchitectureOverviewResponse,
     CodeDependencyRead,
     ComponentBriefSchema,
+    ComponentDetailResponse,
     ComponentOverview,
     ComponentRelationshipSchema,
+    ComponentSymbolItem,
     ConnectGitHubRequest,
     ConnectGitHubResponse,
     ContextBriefResponse,
@@ -57,6 +59,22 @@ from app.schemas.repository import (
 )
 
 router = APIRouter()
+
+
+def _to_component_overview(c: Any) -> ComponentOverview:
+    return ComponentOverview(
+        name=c.name,
+        path=c.path,
+        symbol_count=c.symbol_count,
+        file_count=c.file_count,
+        dependencies=c.dependencies,
+        tested_by=c.tested_by,
+        dominant_role=getattr(c, "dominant_role", None),
+        symbol_roles=getattr(c, "symbol_roles", {}),
+        inbound_callers=getattr(c, "inbound_callers", []),
+        files=getattr(c, "files", []),
+        test_coverage_status=getattr(c, "test_coverage_status", "untested"),
+    )
 
 
 @router.post("/connect-github", response_model=ConnectGitHubResponse)
@@ -161,17 +179,7 @@ async def connect_and_ingest_github_repo(
                 symbol_count=arch.symbol_count,
                 dependency_count=arch.dependency_count,
                 languages=arch.languages,
-                major_components=[
-                    ComponentOverview(
-                        name=c.name,
-                        path=c.path,
-                        symbol_count=c.symbol_count,
-                        file_count=c.file_count,
-                        dependencies=c.dependencies,
-                        tested_by=c.tested_by,
-                    )
-                    for c in arch.major_components
-                ],
+                major_components=[_to_component_overview(c) for c in arch.major_components],
                 relationships=[
                     ComponentRelationshipSchema(
                         source_name=r.source_name,
@@ -282,17 +290,7 @@ async def reindex_repository(
                 symbol_count=arch.symbol_count,
                 dependency_count=arch.dependency_count,
                 languages=arch.languages,
-                major_components=[
-                    ComponentOverview(
-                        name=c.name,
-                        path=c.path,
-                        symbol_count=c.symbol_count,
-                        file_count=c.file_count,
-                        dependencies=c.dependencies,
-                        tested_by=c.tested_by,
-                    )
-                    for c in arch.major_components
-                ],
+                major_components=[_to_component_overview(c) for c in arch.major_components],
                 relationships=[
                     ComponentRelationshipSchema(
                         source_name=r.source_name,
@@ -405,17 +403,7 @@ async def ingest_repository_files(
         symbol_count=arch.symbol_count,
         dependency_count=arch.dependency_count,
         languages=arch.languages,
-        major_components=[
-            ComponentOverview(
-                name=c.name,
-                path=c.path,
-                symbol_count=c.symbol_count,
-                file_count=c.file_count,
-                dependencies=c.dependencies,
-                tested_by=c.tested_by,
-            )
-            for c in arch.major_components
-        ],
+        major_components=[_to_component_overview(c) for c in arch.major_components],
         relationships=[
             ComponentRelationshipSchema(
                 source_name=r.source_name,
@@ -519,6 +507,7 @@ async def get_repository_architecture(
                     line_end=s.line_end,
                     signature=s.signature,
                     docstring=s.docstring,
+                    architectural_role=s.architectural_role.value if s.architectural_role else None,
                 )
                 for s in file_symbols.get(f.id, [])
             ],
@@ -543,17 +532,7 @@ async def get_repository_architecture(
         symbol_count=arch.symbol_count,
         dependency_count=arch.dependency_count,
         languages=arch.languages,
-        major_components=[
-            ComponentOverview(
-                name=c.name,
-                path=c.path,
-                symbol_count=c.symbol_count,
-                file_count=c.file_count,
-                dependencies=c.dependencies,
-                tested_by=c.tested_by,
-            )
-            for c in arch.major_components
-        ],
+        major_components=[_to_component_overview(c) for c in arch.major_components],
         relationships=[
             ComponentRelationshipSchema(
                 source_name=r.source_name,
@@ -566,6 +545,136 @@ async def get_repository_architecture(
             )
             for r in arch.relationships
         ],
+    )
+
+
+@router.get(
+    "/{repository_id}/components/{component_path:path}/overview",
+    response_model=ComponentDetailResponse,
+)
+async def get_component_detail(
+    repository_id: uuid.UUID,
+    component_path: str,
+    db: AsyncSession = Depends(get_db),
+) -> ComponentDetailResponse:
+    """Retrieve structured details for an architectural component."""
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Repository not found",
+        )
+
+    # 1. Fetch files and symbols
+    files_stmt = select(SourceFile).where(SourceFile.repository_id == repository_id)
+    files = list((await db.execute(files_stmt)).scalars().all())
+
+    symbols_stmt = select(Symbol).where(Symbol.repository_id == repository_id)
+    all_symbols = list((await db.execute(symbols_stmt)).scalars().all())
+
+    deps_stmt = select(CodeDependency).where(CodeDependency.repository_id == repository_id)
+    all_deps = list((await db.execute(deps_stmt)).scalars().all())
+
+    file_symbols: dict[uuid.UUID, list[Symbol]] = {f.id: [] for f in files}
+    for s in all_symbols:
+        if s.file_id in file_symbols:
+            file_symbols[s.file_id].append(s)
+
+    file_deps: dict[uuid.UUID, list[CodeDependency]] = {f.id: [] for f in files}
+    for d in all_deps:
+        if d.source_file_id in file_deps:
+            file_deps[d.source_file_id].append(d)
+
+    parsed_files = [
+        ParsedFileResult(
+            path=f.path,
+            language=f.language,
+            symbols=[
+                ExtractedSymbol(
+                    name=s.name,
+                    kind=s.kind.value,
+                    line_start=s.line_start,
+                    line_end=s.line_end,
+                    signature=s.signature,
+                    docstring=s.docstring,
+                    architectural_role=s.architectural_role.value if s.architectural_role else None,
+                )
+                for s in file_symbols.get(f.id, [])
+            ],
+            dependencies=[
+                ExtractedDependency(
+                    target_path=d.target_path,
+                    imported_symbol=d.imported_symbol,
+                    kind=d.kind.value,
+                )
+                for d in file_deps.get(f.id, [])
+            ],
+        )
+        for f in files
+    ]
+
+    analyzer = RelationshipAnalyzer()
+    arch = analyzer.analyze_repository(parsed_files)
+
+    target_comp = None
+    for c in arch.major_components:
+        if c.path == component_path or c.path.lower() == component_path.lower():
+            target_comp = c
+            break
+
+    if not target_comp:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Component '{component_path}' not found",
+        )
+
+    comp_files_set = set(target_comp.files)
+    file_id_to_path = {f.id: f.path for f in files}
+
+    comp_symbols: list[ComponentSymbolItem] = []
+    for s in all_symbols:
+        f_p = file_id_to_path.get(s.file_id)
+        if f_p and (f_p in comp_files_set or f_p.startswith(target_comp.path)):
+            comp_symbols.append(
+                ComponentSymbolItem(
+                    id=s.id,
+                    file_id=s.file_id,
+                    file_path=f_p,
+                    name=s.name,
+                    kind=s.kind,
+                    line_start=s.line_start,
+                    line_end=s.line_end,
+                    signature=s.signature,
+                    docstring=s.docstring,
+                    architectural_role=s.architectural_role,
+                )
+            )
+
+    origin_commit = None
+    try:
+        from app.history.git_indexer import GitHistoryIndexer
+
+        indexer = GitHistoryIndexer()
+        hist = await indexer.get_component_history(repository_id, target_comp.path, db)
+        origin_commit = hist.get("introducing_commit")
+    except Exception:
+        pass
+
+    return ComponentDetailResponse(
+        repository_id=repository_id,
+        name=target_comp.name,
+        path=target_comp.path,
+        dominant_role=target_comp.dominant_role,
+        symbol_roles=target_comp.symbol_roles,
+        symbol_count=target_comp.symbol_count,
+        file_count=target_comp.file_count,
+        files=target_comp.files,
+        symbols=comp_symbols,
+        dependencies=target_comp.dependencies,
+        inbound_callers=target_comp.inbound_callers,
+        tested_by=target_comp.tested_by,
+        test_coverage_status=target_comp.test_coverage_status,
+        origin_commit=origin_commit,
     )
 
 

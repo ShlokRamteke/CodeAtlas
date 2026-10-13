@@ -20,6 +20,7 @@ class ExtractedSymbol:
     docstring: Optional[str] = None
     decorators: List[str] = field(default_factory=list)
     method_names: List[str] = field(default_factory=list)
+    architectural_role: Optional[str] = None
 
 
 @dataclass
