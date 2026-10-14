@@ -14,7 +14,7 @@ Phase 4 complete.
 - [x] Repository overview and health indicators
 - [x] Architecture and component explorer
 
-- [ ] Historical timeline and evolution view
+- [x] Historical timeline and evolution view
 - [ ] Change-investigation entry flow (target selection + proposed change input)
 - [ ] Pre-Change Investigation Brief interactive UI
 - [ ] Evidence navigation and source deep links

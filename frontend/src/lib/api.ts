@@ -41,6 +41,8 @@ import type {
   AuthorCommitStat,
   RepositoryOverviewResponse,
   ComponentDetailResponse,
+  TimelineStats,
+  RepositoryTimelineResponse,
 } from "@codeatlas/contracts";
 
 
@@ -1075,10 +1077,40 @@ function mapMilestoneEvent(m: any): ComponentMilestoneEvent {
     insertions: m.insertions,
     deletions: m.deletions,
     filesChanged: m.files_changed || m.filesChanged,
+    touchedFiles: m.touched_files || m.touchedFiles || [],
     linkedPullRequests: m.linked_pull_requests || m.linkedPullRequests || [],
     linkedIssues: m.linked_issues || m.linkedIssues || [],
     linkedAdrs: m.linked_adrs || m.linkedAdrs || [],
     citations: m.citations || [],
+  };
+}
+
+function mapTimelineStats(s: any): TimelineStats | null {
+  if (!s) return null;
+  return {
+    totalMilestones: s.total_milestones ?? s.totalMilestones ?? 0,
+    totalCommits: s.total_commits ?? s.totalCommits ?? 0,
+    totalInsertions: s.total_insertions ?? s.totalInsertions ?? 0,
+    totalDeletions: s.total_deletions ?? s.totalDeletions ?? 0,
+    netChurn: s.net_churn ?? s.netChurn ?? 0,
+    defectFixesCount: s.defect_fixes_count ?? s.defectFixesCount ?? 0,
+    adrsCount: s.adrs_count ?? s.adrsCount ?? 0,
+    activeAuthorsCount: s.active_authors_count ?? s.activeAuthorsCount ?? 0,
+    milestoneBreakdown: s.milestone_breakdown ?? s.milestoneBreakdown ?? {},
+    dateRange: {
+      start: s.date_range?.start ?? s.dateRange?.start ?? null,
+      end: s.date_range?.end ?? s.dateRange?.end ?? null,
+    },
+    velocity: (s.velocity || []).map((v: any) => ({
+      month: v.month,
+      totalEvents: v.total_events ?? v.totalEvents ?? 0,
+      features: v.features ?? 0,
+      bugFixes: v.bug_fixes ?? v.bugFixes ?? 0,
+      refactors: v.refactors ?? 0,
+      adrs: v.adrs ?? 0,
+      insertions: v.insertions ?? 0,
+      deletions: v.deletions ?? 0,
+    })),
   };
 }
 
@@ -1104,6 +1136,37 @@ export async function fetchComponentTimeline(
         name: a.name,
         commits: a.commits,
       })),
+      stats: mapTimelineStats(data.stats),
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function fetchRepositoryTimeline(
+  repositoryId: string,
+  componentPath?: string
+): Promise<RepositoryTimelineResponse | null> {
+  try {
+    const url = new URL(`${API_BASE}/api/v1/repositories/${repositoryId}/timeline`);
+    if (componentPath && componentPath !== "all") {
+      url.searchParams.set("component_path", componentPath);
+    }
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      repositoryId: data.repository_id || data.repositoryId,
+      componentPath: data.component_path || data.componentPath || "all",
+      totalEvents: data.total_events || data.totalEvents || 0,
+      introducingEvent: data.introducing_event ? mapMilestoneEvent(data.introducing_event) : null,
+      milestones: (data.milestones || []).map(mapMilestoneEvent),
+      summary: data.summary || "",
+      topAuthors: (data.top_authors || data.topAuthors || []).map((a: any) => ({
+        name: a.name,
+        commits: a.commits,
+      })),
+      stats: mapTimelineStats(data.stats),
     };
   } catch (error) {
     return null;

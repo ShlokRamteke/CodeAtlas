@@ -249,13 +249,41 @@ class ComponentMilestoneEvent(BaseModel):
     timestamp: str
     author: Optional[str] = None
     commit_hash: Optional[str] = None
+    commit_intent: Optional[str] = None
+    is_defect_fix: Optional[bool] = False
     insertions: Optional[int] = None
     deletions: Optional[int] = None
     files_changed: Optional[int] = None
+    touched_files: List[str] = []
     linked_pull_requests: List[Dict[str, Any]] = []
     linked_issues: List[Dict[str, Any]] = []
     linked_adrs: List[Dict[str, Any]] = []
     citations: List[str] = []
+
+
+class TimelineVelocityItem(BaseModel):
+    month: str
+    total_events: int
+    features: int = 0
+    bug_fixes: int = 0
+    refactors: int = 0
+    adrs: int = 0
+    insertions: int = 0
+    deletions: int = 0
+
+
+class TimelineStats(BaseModel):
+    total_milestones: int
+    total_commits: int
+    total_insertions: int
+    total_deletions: int
+    net_churn: int
+    defect_fixes_count: int
+    adrs_count: int
+    active_authors_count: int
+    milestone_breakdown: Dict[str, int] = {}
+    date_range: Dict[str, Optional[str]] = {}
+    velocity: List[TimelineVelocityItem] = []
 
 
 class ComponentTimelineResponse(BaseModel):
@@ -266,3 +294,8 @@ class ComponentTimelineResponse(BaseModel):
     milestones: List[ComponentMilestoneEvent] = []
     summary: str
     top_authors: List[Dict[str, Any]] = []
+    stats: Optional[TimelineStats] = None
+
+
+class RepositoryTimelineResponse(ComponentTimelineResponse):
+    component_path: Optional[str] = "all"

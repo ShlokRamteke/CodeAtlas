@@ -6,11 +6,11 @@ Phase 6 &mdash; SaaS Experience & Core (In Progress)
 
 ## Current Task
 
-PH6-02 Complete &mdash; Architecture & Component Explorer
+PH6-03 Complete &mdash; Historical Timeline & Evolution View
 
 ## Status
 
-IN PROGRESS &mdash; Phase 6 Task PH6-02 Complete / Ready for PH6-03
+IN PROGRESS &mdash; Phase 6 Task PH6-03 Complete / Ready for PH6-04
 
 
 
@@ -241,9 +241,20 @@ developer understand a proposed change before implementation.
   - Frontend SaaS Experience: created interactive `ComponentExplorerViewer.tsx` featuring high-level architecture metrics (component count, coupling density, guarded ratio, role distribution), dual view switcher (Component Directory Grid vs Coupling Topology Matrix), role/coverage filters, sort controls, and interactive component inspection modal with 1-click **Investigate Change on Component** prefill.
   - 100% automated test pass rate across 215 pytest tests (3 new unit/integration tests in `test_component_explorer.py`), ruff format/lint clean, and clean contracts/frontend production builds.
 
+- **Phase 6 — Task PH6-03 (Historical Timeline & Evolution View)**:
+  - `GitHistoryIndexer.get_component_timeline`: generalized to support repository-wide evolution timelines (`component_path="all"` or `None`) alongside component-scoped timelines.
+  - Multi-dimensional timeline telemetry (`TimelineStats`): computes total milestones, total commits, ADRs count, total insertions/deletions, net churn, defect repair frequency, active authors count, date range, and milestone breakdown across `introduction`, `feature_addition`, `refactor`, `bug_fix`, `architectural_decision`, and `maintenance`.
+  - Monthly activity cadence & velocity ribbon (`TimelineVelocityItem`): aggregates chronological month-by-month velocity with segmented feature, bugfix, refactor, and ADR distribution bars.
+  - Touched files provenance: extracts and persists touched file paths per milestone, enabling 1-click pre-change investigation prefill directly from any historical milestone.
+  - REST endpoints: added `GET /api/v1/repositories/{id}/timeline` returning `RepositoryTimelineResponse` with `stats` and enriched `GET /api/v1/repositories/{id}/components/{component_path:path}/timeline`.
+  - Contracts & API Client: added `TimelineVelocityItem`, `TimelineStats`, and `RepositoryTimelineResponse` to `@codeatlas/contracts` and implemented `fetchRepositoryTimeline` in `frontend/src/lib/api.ts`.
+  - Frontend SaaS Experience: elevated `HistoricalTimelineViewer.tsx` into a full SaaS Evolution View with dual scope switcher (All Repository vs By Component), executive metrics scorecard, interactive monthly cadence ribbon with 1-click month drilldown, category filter chips with live counts, defect fixes only filter, chronological sort toggle (newest/oldest), touched files inspector, copy buttons for commit hashes and citations, and 1-click **Investigate Touched Files** routing to `PreChangeInvestigationViewer`.
+  - Integrated as top-level **Evolution Timeline** tab in `ArchitectureExplorer.tsx` and connected 1-click navigation shortcuts from `RepositoryOverviewViewer` and `ComponentExplorerViewer`.
+  - 100% automated test pass rate across 217 pytest tests (2 new unit and integration tests in `test_evolution_timeline.py`), ruff format/lint clean, and clean contracts/frontend Next.js production builds.
+
 ## Remaining
 
-- **Phase 6**: SaaS Experience & Core (Historical timeline and evolution view, change-investigation entry flow, GitHub App, async indexing workers).
+- **Phase 6**: SaaS Experience & Core (Change-investigation entry flow, Pre-Change Investigation Brief interactive UI, GitHub App, async indexing workers).
 - **Phase 7**: Model Context Protocol (MCP) Integration.
 - **Phase 8**: Evaluation & Production Hardening.
 
@@ -253,7 +264,7 @@ None known.
 
 ## Next Action
 
-Continue Phase 6 (SaaS Experience & Core): Task PH6-03 (Historical Timeline & Evolution View).
+Continue Phase 6 (SaaS Experience & Core): Task PH6-04 (Change-Investigation Entry Flow).
 
 
 ## Session Rule
@@ -271,7 +282,7 @@ receive scoped views of that model.
 
 ## Last Updated
 
-2026-10-07
+2026-10-14
 
 
 
