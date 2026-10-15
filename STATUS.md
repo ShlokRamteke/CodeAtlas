@@ -254,7 +254,9 @@ developer understand a proposed change before implementation.
 
 ## Remaining
 
-- **Phase 6**: SaaS Experience & Core (Change-investigation entry flow, Pre-Change Investigation Brief interactive UI, GitHub App, async indexing workers).
+- **Phase 6**: SaaS Experience & Core:
+  - *Part A (SaaS Experience & Investigation UI)*: PH6-04 (Entry Flow), PH6-05 (Brief UI Polish), PH6-06 (Evidence Deep Links & Source Inspector), PH6-07 (Unknowns, Risk & Confidence).
+  - *Part B (SaaS Core, Multi-Tenancy & Security)*: PH6-08 (GitHub App), PH6-09 (Multi-Tenant Data Isolation), PH6-10 (Async Indexing Workers), PH6-11 (Rate Limiting & Token Budgets), PH6-12 (Caching & Audit Logging).
 - **Phase 7**: Model Context Protocol (MCP) Integration.
 - **Phase 8**: Evaluation & Production Hardening.
 
