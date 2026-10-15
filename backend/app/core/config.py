@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     OPENROUTER_API_KEY: str | None = None
     OPENROUTER_MODEL: str = "anthropic/claude-3.5-sonnet"
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+    OPENROUTER_TIMEOUT: float = 90.0
 
     # Semantic Decision Models (System One / Laya)
     DECISION_MODEL_URL: str = "http://localhost:8081"

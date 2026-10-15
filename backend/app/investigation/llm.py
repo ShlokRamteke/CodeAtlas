@@ -170,10 +170,12 @@ class OpenRouterLLMProvider:
         api_key: Optional[str] = None,
         model: Optional[str] = None,
         base_url: Optional[str] = None,
+        timeout: Optional[float] = None,
     ):
         self.api_key = api_key or settings.OPENROUTER_API_KEY or settings.OPENAI_API_KEY
         self.model = model or settings.OPENROUTER_MODEL or settings.OPENAI_MODEL
         self.base_url = (base_url or settings.OPENROUTER_BASE_URL).rstrip("/")
+        self.timeout = timeout or settings.OPENROUTER_TIMEOUT
 
     @property
     def headers(self) -> Dict[str, str]:
@@ -232,7 +234,7 @@ class OpenRouterLLMProvider:
         sys_prompt, user_msg = build_planner_prompt(intent, context_preview)
 
         try:
-            async with httpx.AsyncClient(timeout=35.0) as client:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
                 data = await self._post_chat_completion(
                     client,
                     [
@@ -322,7 +324,7 @@ class OpenRouterLLMProvider:
         )
 
         try:
-            async with httpx.AsyncClient(timeout=40.0) as client:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
                 data = await self._post_chat_completion(
                     client,
                     [
