@@ -302,7 +302,17 @@ class OpenRouterLLMProvider:
                 }
                 for tf in (intent.target_files or ["app/main.py"])
             ]
-            return summary, claims, {"prompt_tokens": 0, "completion_tokens": 0}, code_changes
+            return (
+                summary,
+                claims,
+                {
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "is_fallback": True,
+                    "fallback_reason": "No LLM API key configured",
+                },
+                code_changes,
+            )
 
         sys_prompt, user_msg = build_reasoner_prompt(
             intent=intent,
@@ -401,7 +411,12 @@ class OpenRouterLLMProvider:
                         confidence=0.5,
                     )
                 ],
-                {"prompt_tokens": 0, "completion_tokens": 0},
+                {
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "is_fallback": True,
+                    "fallback_reason": f"OpenRouter call failed or timed out: {e}",
+                },
                 fallback_changes,
             )
 

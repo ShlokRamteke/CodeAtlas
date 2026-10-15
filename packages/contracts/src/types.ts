@@ -628,6 +628,8 @@ export interface InvestigationResponse {
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
+    isFallback?: boolean;
+    fallbackReason?: string;
   };
   latencyMs?: number;
   createdAt: string;

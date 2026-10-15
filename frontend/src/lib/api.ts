@@ -591,6 +591,16 @@ function mapInvestigation(data: any): InvestigationResponse {
       promptTokens: data.token_usage.prompt_tokens || 0,
       completionTokens: data.token_usage.completion_tokens || 0,
       totalTokens: data.token_usage.total_tokens || 0,
+      isFallback: Boolean(
+        data.token_usage.is_fallback ||
+        (data.token_usage.total_tokens === 0 && data.status === "completed") ||
+        (data.claims && data.claims.some((c: any) => c.id && String(c.id).includes("fallback")))
+      ),
+      fallbackReason: data.token_usage.fallback_reason || (
+        data.token_usage.total_tokens === 0 && data.status === "completed"
+          ? "AI model reasoning timed out or was unavailable; pre-change brief synthesized using deterministic code analysis"
+          : undefined
+      ),
     } : undefined,
     latencyMs: data.latency_ms,
     createdAt: data.created_at,

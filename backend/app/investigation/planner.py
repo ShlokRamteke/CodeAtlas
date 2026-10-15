@@ -807,6 +807,8 @@ class InvestigationEngine:
 
         if not state.can_call_model:
             # Model budget reached: fallback to deterministic synthesis
+            state.token_usage["is_fallback"] = True
+            state.token_usage["fallback_reason"] = "Model call budget reached"
             claims = [
                 InvestigationClaim(
                     id="claim-fallback-1",
@@ -887,11 +889,16 @@ class InvestigationEngine:
                 prompt_tokens=tokens.get("prompt_tokens", 0),
                 completion_tokens=tokens.get("completion_tokens", 0),
             )
+            if tokens.get("is_fallback"):
+                state.token_usage["is_fallback"] = True
+                state.token_usage["fallback_reason"] = tokens.get("fallback_reason")
             state.claims = claims
             state.code_changes = code_changes
             return claims
         except Exception as e:
             logger.warning(f"Reasoner LLM call failed, fallback: {e}")
+            state.token_usage["is_fallback"] = True
+            state.token_usage["fallback_reason"] = f"Reasoner LLM call failed: {e}"
             claims = [
                 InvestigationClaim(
                     id="claim-1",
