@@ -39,6 +39,7 @@ from app.schemas.history import (
     LinkedIssueRead,
     LinkedPullRequestRead,
     PullRequestRead,
+    RepositoryTimelineResponse,
     SymbolHistoryResponse,
 )
 
@@ -349,6 +350,39 @@ async def get_component_history(
 
 
 @router.get(
+    "/{repository_id}/timeline",
+    response_model=RepositoryTimelineResponse,
+)
+async def get_repository_timeline(
+    repository_id: uuid.UUID,
+    component_path: Optional[str] = Query(
+        default=None, description="Optional component path to filter timeline"
+    ),
+    db: AsyncSession = Depends(get_db),
+) -> RepositoryTimelineResponse:
+    """Retrieve structured chronological evolution timeline with classified milestones, velocity, and evidence for the repository or a component."""
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Repository not found",
+        )
+
+    indexer = GitHistoryIndexer()
+    result = await indexer.get_component_timeline(repository_id, component_path or "all", db)
+    return RepositoryTimelineResponse(
+        repository_id=result["repository_id"],
+        component_path=result["component_path"],
+        total_events=result["total_events"],
+        introducing_event=result["introducing_event"],
+        milestones=result["milestones"],
+        summary=result["summary"],
+        top_authors=result["top_authors"],
+        stats=result.get("stats"),
+    )
+
+
+@router.get(
     "/{repository_id}/components/{component_path:path}/timeline",
     response_model=ComponentTimelineResponse,
 )
@@ -375,6 +409,7 @@ async def get_component_timeline(
         milestones=result["milestones"],
         summary=result["summary"],
         top_authors=result["top_authors"],
+        stats=result.get("stats"),
     )
 
 

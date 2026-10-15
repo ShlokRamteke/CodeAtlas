@@ -137,16 +137,25 @@ Repositories can be indexed with rich architectural roles, semantic invariants, 
 Turn the change-investigation engine into a clear developer-facing web experience and secure multi-tenant SaaS product.
 
 ### Structured Tasks
+
+#### Part A: SaaS Experience & Pre-Change Investigation UI
+- **PH6-01 — Repository Overview & Health Indicators** *(Completed)*: Deterministic 6-dimension health scorecard (testing protection, bus factor / ownership concentration, defect pressure, architectural modularity, governance invariants, concurrent PR collision risk) and interactive executive dashboard.
 - **PH6-02 — Architecture / Component Explorer** *(Completed)*: Interactive component directory, architectural role tags, test coverage badges, fan-in/fan-out coupling metrics, coupling topology matrix, and component detail inspection modal with 1-click change investigation prefill.
-- **PH6-03 — Historical Timeline & Evolution View**
-- Change-investigation entry flow (target + proposed change)
-- Pre-Change Investigation Brief interactive UI
-- GitHub App integration and multi-tenant isolation
-- Asynchronous indexing workers (Inngest)
-- Rate limiting, token tracking, and cost controls
+- **PH6-03 — Historical Timeline & Evolution View** *(Completed)*: Dual repository-wide and component-scoped evolution timeline, monthly activity cadence & velocity ribbon, commit intent and defect repair badges, net churn telemetry, touched files inspector, and 1-click pre-change investigation prefill.
+- **PH6-04 — Change-Investigation Entry Flow**: Interactive target selector with Phase 2 AST files/symbols, component scope, and open PR prefill.
+- **PH6-05 — Pre-Change Investigation Brief Interactive UI**: Comprehensive visual brief unifying all Phase 4 & 5 synthesized intelligence cards with dual-format projections.
+- **PH6-06 — Evidence Navigation & Source Deep Links**: Interactive source code inspector modal, GitHub URLs, and cross-tab navigation.
+- **PH6-07 — Unknowns, Risk & Confidence Presentation**: Unresolved risks, missing evidence alerts, model confidence gauge, and architectural role warnings.
+
+#### Part B: SaaS Core, Multi-Tenancy & Platform Security
+- **PH6-08 — GitHub App Integration**: OAuth authentication, webhook handlers, automatic repository sync, and read-only enforcement.
+- **PH6-09 — Multi-Tenant Data Isolation & Authorization**: Tenant/User/Organization models, tenant row-level authorization, and permission enforcement.
+- **PH6-10 — Asynchronous Indexing Workers**: Background worker queue (Inngest), async repository ingestion, and real-time progress reporting.
+- **PH6-11 — Rate Limiting, Token Tracking & Cost Controls**: Per-tenant token budget enforcement, API rate limiting, and cost accounting dashboards.
+- **PH6-12 — Caching Layer & Security Audit Logging**: Redis/in-memory query caching and structured security audit logging.
 
 ### Done when
-A developer can select a target, describe a proposed change, run an investigation, and inspect the resulting evidence-backed brief through the web UI.
+A developer can select a target, describe a proposed change, run an investigation, and inspect the resulting evidence-backed brief through a secure, multi-tenant web application.
 
 ---
 

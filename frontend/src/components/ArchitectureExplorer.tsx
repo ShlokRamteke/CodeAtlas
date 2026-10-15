@@ -369,7 +369,7 @@ def test_aggregates():
 
 export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) {
   const [activeTab, setActiveTab] = useState<
-    "overview" | "components" | "symbols" | "relationships" | "git_history" | "engineering" | "project_context" | "c4_export" | "investigation" | "ingest"
+    "overview" | "components" | "timeline" | "symbols" | "relationships" | "git_history" | "engineering" | "project_context" | "c4_export" | "investigation" | "ingest"
   >("overview");
   const [prefilledInvestigationTarget, setPrefilledInvestigationTarget] = useState<string>("");
 
@@ -727,7 +727,6 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
         </button>
         <button
           onClick={() => setActiveTab("components")}
-
           className={`py-3 px-4 border-b-2 flex items-center gap-2 transition whitespace-nowrap ${
             activeTab === "components"
               ? "border-indigo-500 text-indigo-400 font-semibold"
@@ -736,6 +735,20 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
         >
           <Boxes className="w-4 h-4" />
           Components ({architecture?.majorComponents.length || 0})
+        </button>
+        <button
+          onClick={() => setActiveTab("timeline")}
+          className={`py-3 px-4 border-b-2 flex items-center gap-2 transition whitespace-nowrap ${
+            activeTab === "timeline"
+              ? "border-indigo-500 text-indigo-400 font-semibold"
+              : "border-transparent hover:text-slate-200"
+          }`}
+        >
+          <History className="w-4 h-4 text-indigo-400" />
+          Evolution Timeline
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-300">
+            PH6-03
+          </span>
         </button>
         <button
           onClick={() => setActiveTab("symbols")}
@@ -892,11 +905,32 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
                 }}
                 onSelectComponentForTimeline={(path) => {
                   setSelectedTimelineComponent(path);
-                  setHistorySubTab("timeline");
-                  setActiveTab("git_history");
+                  setActiveTab("timeline");
                 }}
               />
             )}
+          </div>
+        ) : activeTab === "timeline" ? (
+          /* Dedicated Evolution Timeline & Milestones Tab (PH6-03) */
+          <div>
+            <HistoricalTimelineViewer
+              repository={repository}
+              architecture={architecture}
+              initialComponentPath={selectedTimelineComponent || "all"}
+              onSelectComponent={(p) => setSelectedTimelineComponent(p)}
+              onNavigateToPR={(pr) => {
+                setHistorySubTab("prs");
+                setActiveTab("git_history");
+              }}
+              onNavigateToIssue={(iss) => {
+                setHistorySubTab("issues");
+                setActiveTab("git_history");
+              }}
+              onInvestigateFiles={(files) => {
+                setPrefilledInvestigationTarget(files.join(", "));
+                setActiveTab("investigation");
+              }}
+            />
           </div>
         ) : activeTab === "symbols" ? (
           <div>
@@ -1145,6 +1179,10 @@ export function ArchitectureExplorer({ repository }: ArchitectureExplorerProps) 
                 }}
                 onNavigateToIssue={() => {
                   setHistorySubTab("issues");
+                }}
+                onInvestigateFiles={(files) => {
+                  setPrefilledInvestigationTarget(files.join(", "));
+                  setActiveTab("investigation");
                 }}
               />
             )}

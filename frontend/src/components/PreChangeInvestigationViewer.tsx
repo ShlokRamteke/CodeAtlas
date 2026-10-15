@@ -54,6 +54,23 @@ interface PreChangeInvestigationViewerProps {
   initialTargetPath?: string;
 }
 
+function isFallbackInvestigation(inv: InvestigationResponse | null): boolean {
+  if (!inv) return false;
+  const isCompleted = inv.status.toLowerCase() === "completed";
+  if (!isCompleted) return false;
+  if (inv.tokenUsage?.isFallback) return true;
+  if (inv.tokenUsage && inv.tokenUsage.totalTokens === 0) return true;
+  if (
+    inv.claims &&
+    inv.claims.some(
+      (c) => c.id.includes("fallback") || c.statement.startsWith("Change targets")
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export function PreChangeInvestigationViewer({
   repository,
   initialTargetPath,
@@ -432,7 +449,13 @@ export function PreChangeInvestigationViewer({
                     <div className="flex items-center gap-3 text-[10px] text-slate-500">
                       <span>{new Date(inv.createdAt).toLocaleTimeString()}</span>
                       {inv.tokenUsage && (
-                        <span>{inv.tokenUsage.totalTokens} tokens</span>
+                        isFallbackInvestigation(inv) ? (
+                          <span className="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 font-mono">
+                            0 tokens (fallback)
+                          </span>
+                        ) : (
+                          <span>{inv.tokenUsage.totalTokens} tokens</span>
+                        )
                       )}
                       {inv.latencyMs && <span>{inv.latencyMs}ms</span>}
                     </div>
@@ -463,12 +486,24 @@ export function PreChangeInvestigationViewer({
                   {/* Telemetry Chips */}
                   <div className="flex items-center gap-2 font-mono text-xs">
                     {selectedInv.tokenUsage && (
-                      <div className="flex items-center gap-1 px-2.5 py-1 rounded bg-purple-500/10 border border-purple-500/20 text-purple-300">
-                        <Coins className="w-3.5 h-3.5 text-purple-400" />
-                        <span>
-                          {selectedInv.tokenUsage.totalTokens} tokens ({selectedInv.tokenUsage.promptTokens} in / {selectedInv.tokenUsage.completionTokens} out)
-                        </span>
-                      </div>
+                      isFallbackInvestigation(selectedInv) ? (
+                        <div
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300 font-sans"
+                          title={selectedInv.tokenUsage.fallbackReason || "Upstream LLM provider timed out or was unreachable; deterministic fallback applied"}
+                          role="status"
+                        >
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          <span className="font-semibold text-xs">Deterministic Fallback</span>
+                          <span className="font-mono text-[11px] text-amber-400/80">(0 tokens)</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 px-2.5 py-1 rounded bg-purple-500/10 border border-purple-500/20 text-purple-300">
+                          <Coins className="w-3.5 h-3.5 text-purple-400" />
+                          <span>
+                            {selectedInv.tokenUsage.totalTokens} tokens ({selectedInv.tokenUsage.promptTokens} in / {selectedInv.tokenUsage.completionTokens} out)
+                          </span>
+                        </div>
+                      )
                     )}
                     {selectedInv.latencyMs && (
                       <div className="flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 border border-slate-700 text-slate-300">
@@ -485,6 +520,26 @@ export function PreChangeInvestigationViewer({
                     <p className="text-sm text-slate-300 mt-2 leading-relaxed bg-slate-950/60 p-3 rounded-lg border border-slate-800/80">
                       {selectedInv.summary}
                     </p>
+                  )}
+                  {isFallbackInvestigation(selectedInv) && (
+                    <div
+                      className="mt-3 p-3.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-3"
+                      role="status"
+                    >
+                      <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <div className="font-semibold text-amber-300 flex items-center gap-2">
+                          <span>AI Reasoning Fallback Activated</span>
+                          <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            0 Model Tokens
+                          </span>
+                        </div>
+                        <p className="text-amber-200/80 leading-relaxed font-sans">
+                          {selectedInv.tokenUsage?.fallbackReason ||
+                            "The upstream AI reasoning provider timed out or was unreachable. This pre-change brief was synthesized using 100% deterministic repository intelligence (Tree-sitter AST, Kamei change risk, reach-ranked guarding tests, and governing invariants)."}
+                        </p>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1747,7 +1802,7 @@ export function PreChangeInvestigationViewer({
                     Synthesized Findings &amp; Claims ({selectedInv.claims?.length || 0})
                   </h4>
                   <span className="text-xs text-slate-500">
-                    Classified via OpenRouter
+                    {isFallbackInvestigation(selectedInv) ? "Deterministic Analysis" : "Classified via OpenRouter"}
                   </span>
                 </div>
 

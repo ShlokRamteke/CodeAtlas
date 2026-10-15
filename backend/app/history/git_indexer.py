@@ -356,24 +356,38 @@ class GitHistoryIndexer:
     async def get_component_timeline(
         self,
         repository_id: uuid.UUID,
-        component_path: str,
-        db: AsyncSession,
+        component_path: Optional[str] = "all",
+        db: AsyncSession = None,
     ) -> Dict[str, Any]:
         """
-        Build an interactive component evolution timeline with classified milestones
-        (introduction, feature_addition, refactor, bug_fix, architectural_decision, maintenance)
-        and linked evidence across commits, PRs, issues, and ADRs.
+        Build an interactive component or repository evolution timeline with classified milestones
+        (introduction, feature_addition, refactor, bug_fix, architectural_decision, maintenance),
+        linked evidence across commits, PRs, issues, ADRs, touched files, and velocity metrics.
         """
-        file_clause = self._build_component_file_clause(component_path)
-        stmt = (
-            select(Commit, CommitFileChange)
-            .join(CommitFileChange, Commit.id == CommitFileChange.commit_id)
-            .where(
-                Commit.repository_id == repository_id,
-                file_clause,
+        clean_comp = (component_path or "").strip()
+        is_all_repo = not clean_comp or clean_comp.lower() in ("all", "*")
+
+        if not is_all_repo:
+            file_clause = self._build_component_file_clause(clean_comp)
+            stmt = (
+                select(Commit, CommitFileChange)
+                .join(CommitFileChange, Commit.id == CommitFileChange.commit_id)
+                .where(
+                    Commit.repository_id == repository_id,
+                    file_clause,
+                )
+                .order_by(Commit.committed_at.asc())
             )
-            .order_by(Commit.committed_at.asc())
-        )
+        else:
+            stmt = (
+                select(Commit, CommitFileChange)
+                .outerjoin(CommitFileChange, Commit.id == CommitFileChange.commit_id)
+                .where(
+                    Commit.repository_id == repository_id,
+                )
+                .order_by(Commit.committed_at.asc())
+            )
+
         rows = (await db.execute(stmt)).all()
 
         # Group file changes by commit
@@ -402,15 +416,23 @@ class GitHistoryIndexer:
                     "deletions": 0,
                     "files_changed": 0,
                     "has_added": False,
+                    "touched_files": [],
                     "linked_prs": linked_prs,
                     "linked_issues": linked_issues,
                 }
 
-            commits_map[commit.id]["insertions"] += change.insertions or 0
-            commits_map[commit.id]["deletions"] += change.deletions or 0
-            commits_map[commit.id]["files_changed"] += 1
-            if change.change_type == ChangeType.ADDED:
-                commits_map[commit.id]["has_added"] = True
+            if change:
+                commits_map[commit.id]["insertions"] += change.insertions or 0
+                commits_map[commit.id]["deletions"] += change.deletions or 0
+                commits_map[commit.id]["files_changed"] += 1
+                if change.change_type == ChangeType.ADDED:
+                    commits_map[commit.id]["has_added"] = True
+                if (
+                    change.file_path
+                    and change.file_path not in commits_map[commit.id]["touched_files"]
+                ):
+                    if len(commits_map[commit.id]["touched_files"]) < 12:
+                        commits_map[commit.id]["touched_files"].append(change.file_path)
 
         authors_map: Dict[str, int] = {}
         milestones: List[Dict[str, Any]] = []
@@ -430,7 +452,7 @@ class GitHistoryIndexer:
             intent = getattr(c, "commit_intent", None)
             is_defect = getattr(c, "is_defect_fix", False)
 
-            if idx == 0 or (entry["has_added"] and idx <= 1):
+            if idx == 0 or (idx == 1 and not sorted_commits[0]["has_added"] and entry["has_added"]):
                 event_type = "introduction"
             elif (
                 is_defect
@@ -511,6 +533,7 @@ class GitHistoryIndexer:
                     "insertions": ins,
                     "deletions": dels,
                     "files_changed": entry["files_changed"],
+                    "touched_files": entry["touched_files"],
                     "linked_pull_requests": entry["linked_prs"],
                     "linked_issues": entry["linked_issues"],
                     "linked_adrs": [],
@@ -526,9 +549,9 @@ class GitHistoryIndexer:
         docs = (await db.execute(doc_stmt)).scalars().all()
 
         linked_adrs_count = 0
-        clean_comp = (component_path or "").strip().rstrip("/")
-        is_root = clean_comp in ("root", ".", "")
-        comp_name = clean_comp.split("/")[-1].lower() if clean_comp else ""
+        norm_comp = clean_comp.rstrip("/")
+        is_root = norm_comp in ("root", ".", "")
+        comp_name = norm_comp.split("/")[-1].lower() if norm_comp else ""
 
         for doc in docs:
             doc_content = (doc.raw_content or "").lower()
@@ -536,11 +559,11 @@ class GitHistoryIndexer:
             doc_path = (doc.path or "").lower()
 
             matches = False
-            if is_root:
-                # For root, include repo-level architectural decisions
+            if is_all_repo or is_root:
+                # Include repo-level architectural decisions
                 matches = True
             else:
-                if clean_comp.lower() in doc_path or clean_comp.lower() in doc_title:
+                if norm_comp.lower() in doc_path or norm_comp.lower() in doc_title:
                     matches = True
                 elif (
                     comp_name
@@ -584,9 +607,12 @@ class GitHistoryIndexer:
                         "timestamp": ts,
                         "author": doc.deciders or "Architecture Decision",
                         "commit_hash": None,
+                        "commit_intent": "architecture",
+                        "is_defect_fix": False,
                         "insertions": None,
                         "deletions": None,
                         "files_changed": None,
+                        "touched_files": [doc.path] if doc.path else [],
                         "linked_pull_requests": [],
                         "linked_issues": [],
                         "linked_adrs": [adr_dict],
@@ -603,20 +629,105 @@ class GitHistoryIndexer:
             for k, v in sorted(authors_map.items(), key=lambda x: x[1], reverse=True)
         ]
 
+        # Compute TimelineStats and monthly velocity
+        milestone_breakdown: Dict[str, int] = {
+            "introduction": 0,
+            "feature_addition": 0,
+            "refactor": 0,
+            "bug_fix": 0,
+            "architectural_decision": 0,
+            "maintenance": 0,
+        }
+        total_insertions = 0
+        total_deletions = 0
+        defect_fixes_count = 0
+        adrs_count = 0
+        monthly_map: Dict[str, Dict[str, int]] = {}
+
+        for m in milestones:
+            etype = m["event_type"]
+            milestone_breakdown[etype] = milestone_breakdown.get(etype, 0) + 1
+            if m.get("is_defect_fix") or etype == "bug_fix":
+                defect_fixes_count += 1
+            if etype == "architectural_decision":
+                adrs_count += 1
+            ins = m.get("insertions") or 0
+            dels = m.get("deletions") or 0
+            total_insertions += ins
+            total_deletions += dels
+
+            # Monthly velocity
+            ts = m.get("timestamp")
+            if ts and len(ts) >= 7:
+                month_key = ts[:7]
+                if month_key not in monthly_map:
+                    monthly_map[month_key] = {
+                        "month": month_key,
+                        "total_events": 0,
+                        "features": 0,
+                        "bug_fixes": 0,
+                        "refactors": 0,
+                        "adrs": 0,
+                        "insertions": 0,
+                        "deletions": 0,
+                    }
+                monthly_map[month_key]["total_events"] += 1
+                if etype in ("feature_addition", "introduction"):
+                    monthly_map[month_key]["features"] += 1
+                elif etype == "bug_fix":
+                    monthly_map[month_key]["bug_fixes"] += 1
+                elif etype == "refactor":
+                    monthly_map[month_key]["refactors"] += 1
+                elif etype == "architectural_decision":
+                    monthly_map[month_key]["adrs"] += 1
+                monthly_map[month_key]["insertions"] += ins
+                monthly_map[month_key]["deletions"] += dels
+
+        velocity_list = [monthly_map[k] for k in sorted(monthly_map.keys())]
+        date_range = {
+            "start": milestones[0]["timestamp"] if milestones else None,
+            "end": milestones[-1]["timestamp"] if milestones else None,
+        }
+
+        stats = {
+            "total_milestones": len(milestones),
+            "total_commits": len(sorted_commits),
+            "total_insertions": total_insertions,
+            "total_deletions": total_deletions,
+            "net_churn": total_insertions - total_deletions,
+            "defect_fixes_count": defect_fixes_count,
+            "adrs_count": adrs_count,
+            "active_authors_count": len(authors_map),
+            "milestone_breakdown": milestone_breakdown,
+            "date_range": date_range,
+            "velocity": velocity_list,
+        }
+
+        scope_desc = "Repository" if is_all_repo else f"Component '{clean_comp}'"
         summary = (
-            f"Component '{component_path}' evolution timeline with {len(milestones)} milestones "
+            f"{scope_desc} evolution timeline with {len(milestones)} milestones "
             f"across {len(sorted_commits)} commits and {linked_adrs_count} ADRs by {len(top_authors)} authors."
         )
 
         return {
             "repository_id": repository_id,
-            "component_path": component_path,
+            "component_path": "all" if is_all_repo else clean_comp,
             "total_events": len(milestones),
             "introducing_event": introducing_event,
             "milestones": milestones,
             "summary": summary,
             "top_authors": top_authors,
+            "stats": stats,
         }
+
+    async def get_repository_timeline(
+        self,
+        repository_id: uuid.UUID,
+        db: AsyncSession,
+        component_path: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Retrieve full repository evolution timeline or component-filtered timeline with velocity metrics."""
+        return await self.get_component_timeline(repository_id, component_path or "all", db)
 
     @staticmethod
     def parse_synthetic_payload(payload: List[Dict[str, Any]]) -> List[ParsedCommit]:

@@ -386,6 +386,7 @@ export interface ComponentMilestoneEvent {
   insertions?: number | null;
   deletions?: number | null;
   filesChanged?: number | null;
+  touchedFiles?: string[];
   linkedPullRequests?: Array<{
     pr_number: number;
     link_type: string;
@@ -406,6 +407,31 @@ export interface ComponentMilestoneEvent {
   citations?: string[];
 }
 
+export interface TimelineVelocityItem {
+  month: string;
+  totalEvents: number;
+  features: number;
+  bugFixes: number;
+  refactors: number;
+  adrs: number;
+  insertions: number;
+  deletions: number;
+}
+
+export interface TimelineStats {
+  totalMilestones: number;
+  totalCommits: number;
+  totalInsertions: number;
+  totalDeletions: number;
+  netChurn: number;
+  defectFixesCount: number;
+  adrsCount: number;
+  activeAuthorsCount: number;
+  milestoneBreakdown: Record<string, number>;
+  dateRange: { start?: string | null; end?: string | null };
+  velocity: TimelineVelocityItem[];
+}
+
 export interface ComponentTimelineResponse {
   repositoryId: string;
   componentPath: string;
@@ -414,7 +440,10 @@ export interface ComponentTimelineResponse {
   milestones: ComponentMilestoneEvent[];
   summary: string;
   topAuthors: Array<{ name: string; commits: number }>;
+  stats?: TimelineStats | null;
 }
+
+export type RepositoryTimelineResponse = ComponentTimelineResponse;
 
 export interface HistoricalTraceItem {
   commitHash: string;
@@ -599,6 +628,8 @@ export interface InvestigationResponse {
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
+    isFallback?: boolean;
+    fallbackReason?: string;
   };
   latencyMs?: number;
   createdAt: string;
