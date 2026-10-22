@@ -43,7 +43,11 @@ import type {
   ComponentDetailResponse,
   TimelineStats,
   RepositoryTimelineResponse,
+  RepositoryFileItem,
+  PreFlightImpactRequest,
+  PreFlightImpactResponse,
 } from "@codeatlas/contracts";
+
 
 
 
@@ -498,8 +502,35 @@ export async function fetchRepositoryOverview(
   }
 }
 
-export async function fetchRepositorySymbols(
+export async function fetchRepositoryFiles(
+  repositoryId: string,
+  search?: string,
+  language?: string
+): Promise<RepositoryFileItem[]> {
+  try {
+    const params = new URLSearchParams();
+    if (search) params.append("search", search);
+    if (language) params.append("language", language);
+    const res = await fetch(
+      `${API_BASE}/api/v1/repositories/${repositoryId}/files?${params.toString()}`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.map((f: any) => ({
+      id: f.id,
+      repositoryId: f.repository_id,
+      path: f.path,
+      language: f.language,
+      sizeBytes: f.size_bytes,
+      symbolCount: f.symbol_count ?? 0,
+    }));
+  } catch (error) {
+    return [];
+  }
+}
 
+export async function fetchRepositorySymbols(
   repositoryId: string,
   name?: string,
   kind?: string,
@@ -527,12 +558,14 @@ export async function fetchRepositorySymbols(
       signature: s.signature,
       docstring: s.docstring,
       architecturalRole: s.architectural_role,
+      filePath: s.file_path || s.filePath || null,
       createdAt: s.created_at,
     }));
   } catch (error) {
     return [];
   }
 }
+
 
 export async function fetchRepositoryDependencies(
   repositoryId: string,
@@ -690,6 +723,49 @@ export async function previewInvestigationIntent(
     return null;
   }
 }
+
+export async function previewInvestigationImpact(
+  payload: PreFlightImpactRequest
+): Promise<PreFlightImpactResponse | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/investigations/preview-impact`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        repository_id: payload.repositoryId,
+        query: payload.query,
+        target_path: payload.targetPath,
+        target_symbol: payload.targetSymbol,
+        target_files: payload.targetFiles || [],
+        diff: payload.diff,
+      }),
+    });
+    if (!res.ok) return null;
+    const raw = await res.json();
+    return {
+      normalizedIntent: {
+        rawQuery: raw.normalized_intent?.raw_query || "",
+        actionVerbs: raw.normalized_intent?.action_verbs || [],
+        targetFiles: raw.normalized_intent?.target_files || [],
+        targetSymbols: raw.normalized_intent?.target_symbols || [],
+        targetComponents: raw.normalized_intent?.target_components || [],
+        intentSummary: raw.normalized_intent?.intent_summary || "",
+        isAmbiguous: !!raw.normalized_intent?.is_ambiguous,
+      },
+      targetFiles: raw.target_files || [],
+      targetSymbols: raw.target_symbols || [],
+      blastRadius: raw.blast_radius || {},
+      guardingTests: raw.guarding_tests || {},
+      changeRisk: raw.change_risk || {},
+      concurrentOverlaps: raw.concurrent_overlaps || {},
+      governingConstraintsCount: raw.governing_constraints_count ?? 0,
+      estimatedModelCalls: raw.estimated_model_calls ?? 1,
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
 
 export async function fetchInvestigationProjection(
   investigationId: string,

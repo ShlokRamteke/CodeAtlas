@@ -35,6 +35,17 @@ class RepositoryRead(RepositoryBase):
     updated_at: datetime
 
 
+class RepositoryFileItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    repository_id: uuid.UUID
+    path: str
+    language: str
+    size_bytes: int
+    symbol_count: int = 0
+
+
 class SymbolRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -48,6 +59,7 @@ class SymbolRead(BaseModel):
     signature: Optional[str] = None
     docstring: Optional[str] = None
     architectural_role: Optional[ArchitecturalRole] = None
+    file_path: Optional[str] = None
 
 
 class CodeDependencyRead(BaseModel):

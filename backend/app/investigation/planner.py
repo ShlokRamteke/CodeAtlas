@@ -1315,3 +1315,220 @@ class InvestigationEngine:
             await db.commit()
 
         return state
+
+    async def preview_impact(
+        self,
+        repository_id: uuid.UUID,
+        db: AsyncSession,
+        query: Optional[str] = None,
+        target_path: Optional[str] = None,
+        target_symbol: Optional[str] = None,
+        target_files: Optional[List[str]] = None,
+        diff: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Fast, 100% deterministic pre-flight impact preview without LLM reasoning or database persistence."""
+        sf_query = select(SourceFile.path).where(SourceFile.repository_id == repository_id)
+        sf_res = await db.execute(sf_query)
+        all_repo_files = [r for r in sf_res.scalars().all()]
+
+        raw_query = query.strip() if query and query.strip() else ""
+        intent = IntentNormalizer.normalize(
+            raw_query=raw_query,
+            target_path=target_path,
+            target_symbol=target_symbol,
+            known_files=all_repo_files,
+        )
+
+        resolved_targets: List[str] = list(intent.target_files)
+        if target_files:
+            for tf in target_files:
+                if tf and tf not in resolved_targets:
+                    resolved_targets.append(tf)
+
+        if diff:
+            parsed = parse_unified_diff(diff)
+            for ps in parsed:
+                if ps.path not in resolved_targets:
+                    resolved_targets.append(ps.path)
+
+        resolved_symbols = list(intent.target_symbols)
+        if target_symbol and target_symbol not in resolved_symbols:
+            resolved_symbols.append(target_symbol)
+
+        if not resolved_targets and resolved_symbols:
+            sym_stmt = (
+                select(SourceFile.path)
+                .join(Symbol, Symbol.file_id == SourceFile.id)
+                .where(
+                    SourceFile.repository_id == repository_id,
+                    Symbol.name.in_(resolved_symbols),
+                )
+            )
+            sym_res = await db.execute(sym_stmt)
+            for p in sym_res.scalars().all():
+                if p not in resolved_targets:
+                    resolved_targets.append(p)
+
+        dep_query = select(CodeDependency).where(CodeDependency.repository_id == repository_id)
+        dep_res = await db.execute(dep_query)
+        db_deps = dep_res.scalars().all()
+        static_edges = [(d.source_path, d.target_path) for d in db_deps]
+
+        blast_data: Dict[str, Any] = {}
+        blast_files: List[str] = []
+        if resolved_targets:
+            blast_radius = BlastRadiusAnalyzer.compute_blast_radius(
+                target_files=resolved_targets,
+                dependency_edges=static_edges,
+                max_depth=3,
+            )
+            blast_files = blast_radius.transitive_files
+            blast_data = {
+                "target_files": blast_radius.target_files,
+                "upstream_callers": [
+                    {
+                        "path": n.path,
+                        "depth": n.depth,
+                        "direction": n.direction,
+                        "component": n.component,
+                    }
+                    for n in blast_radius.upstream_callers
+                ],
+                "downstream_dependencies": [
+                    {
+                        "path": n.path,
+                        "depth": n.depth,
+                        "direction": n.direction,
+                        "component": n.component,
+                    }
+                    for n in blast_radius.downstream_dependencies
+                ],
+                "transitive_files": blast_radius.transitive_files,
+                "affected_components": blast_radius.affected_components,
+                "max_depth_reached": blast_radius.max_depth_reached,
+                "total_affected_count": blast_radius.total_affected_count,
+            }
+
+        guarding_data: Dict[str, Any] = {}
+        if resolved_targets:
+            diff_files = set(resolved_targets)
+            if diff:
+                parsed_diff = parse_unified_diff(diff)
+                diff_files |= {p.path for p in parsed_diff}
+            coverage_mapping = build_test_coverage_mapping(
+                target_files=set(resolved_targets),
+                dependency_edges=static_edges,
+                all_files=all_repo_files,
+            )
+            guarding_report = analyze_guarding_tests(
+                proposed_files=set(resolved_targets),
+                file_to_covering_tests=coverage_mapping,
+                files_in_diff=diff_files,
+            )
+            guarding_data = guarding_report.to_dict()
+
+        risk_data: Dict[str, Any] = {}
+        if resolved_targets:
+            file_stats = []
+            if diff:
+                file_stats = parse_unified_diff(diff)
+            if not file_stats:
+                clean_target_set = {f.lstrip("/") for f in resolved_targets}
+                cfc_stats_query = (
+                    select(
+                        CommitFileChange.file_path,
+                        CommitFileChange.insertions,
+                        CommitFileChange.deletions,
+                    )
+                    .join(Commit, CommitFileChange.commit_id == Commit.id)
+                    .where(
+                        Commit.repository_id == repository_id,
+                        CommitFileChange.file_path.in_(clean_target_set),
+                    )
+                )
+                cfc_stats_res = await db.execute(cfc_stats_query)
+                cfc_stat_rows = cfc_stats_res.all()
+                per_file_avg = defaultdict(list)
+                for f_path, ins, dels in cfc_stat_rows:
+                    per_file_avg[f_path].append((ins, dels))
+                for tf in resolved_targets:
+                    clean_tf = tf.lstrip("/")
+                    if clean_tf in per_file_avg and per_file_avg[clean_tf]:
+                        entries = per_file_avg[clean_tf]
+                        avg_ins = max(1, sum(x[0] for x in entries) // len(entries))
+                        avg_del = max(0, sum(x[1] for x in entries) // len(entries))
+                        file_stats.append(
+                            FileChangeStat(
+                                path=clean_tf, lines_added=avg_ins, lines_deleted=avg_del
+                            )
+                        )
+                    else:
+                        file_stats.append(
+                            FileChangeStat(path=clean_tf, lines_added=30, lines_deleted=10)
+                        )
+
+            defect_pressure, fix_commits = await mine_defect_pressure_from_db(
+                db=db,
+                repository_id=repository_id,
+                target_files=set(resolved_targets),
+                limit=1000,
+                half_life_days=365.0,
+            )
+            risk_report = assess_change_risk(
+                changes=file_stats,
+                commits=fix_commits,
+            )
+            risk_data = {
+                "risk_score": risk_report.risk_score,
+                "risk_level": risk_report.risk_level,
+                "lines_added": risk_report.kamei_metrics.lines_added,
+                "lines_deleted": risk_report.kamei_metrics.lines_deleted,
+                "file_count": risk_report.kamei_metrics.files_touched,
+                "distinct_directories": risk_report.kamei_metrics.distinct_directories,
+                "distinct_subsystems": risk_report.kamei_metrics.distinct_subsystems,
+                "shannon_entropy": risk_report.kamei_metrics.shannon_entropy,
+                "defect_pressure": risk_report.defect_pressure,
+                "fix_commit_count": risk_report.fix_commit_count,
+                "explanatory_factors": risk_report.explanatory_factors,
+            }
+
+        overlap_data: Dict[str, Any] = {}
+        if resolved_targets:
+            overlap_detector = ConcurrentOverlapDetector()
+            overlap_report = await overlap_detector.detect_overlaps(
+                db=db,
+                repository_id=repository_id,
+                target_files=resolved_targets,
+                blast_radius_files=blast_files,
+            )
+            overlap_data = overlap_report.to_dict()
+
+        gov_count = 0
+        if resolved_targets:
+            invariants = await InvariantSynthesizer.synthesize_invariants(
+                repository_id=repository_id,
+                target_files=resolved_targets,
+                target_symbols=resolved_symbols,
+                db=db,
+            )
+            gov_count = sum(1 for inv in invariants if inv.governing_status == "governing")
+
+        return {
+            "normalized_intent": {
+                "raw_query": intent.raw_query,
+                "action_verbs": intent.action_verbs,
+                "target_files": resolved_targets,
+                "target_symbols": resolved_symbols,
+                "target_components": intent.target_components,
+                "intent_summary": intent.intent_summary,
+                "is_ambiguous": intent.is_ambiguous,
+            },
+            "target_files": resolved_targets,
+            "target_symbols": resolved_symbols,
+            "blast_radius": blast_data,
+            "guarding_tests": guarding_data,
+            "change_risk": risk_data,
+            "concurrent_overlaps": overlap_data,
+            "governing_constraints_count": gov_count,
+            "estimated_model_calls": 1 if not diff else 2,
+        }

@@ -48,6 +48,8 @@ import {
   fetchInvestigationReference,
   fetchInvestigationOwnership,
 } from "@/lib/api";
+import { InvestigationEntryFlow } from "./InvestigationEntryFlow";
+
 
 interface PreChangeInvestigationViewerProps {
   repository: Repository;
@@ -79,24 +81,9 @@ export function PreChangeInvestigationViewer({
   const [selectedInv, setSelectedInv] = useState<InvestigationResponse | null>(null);
   const [loadingList, setLoadingList] = useState(false);
 
-  // Form state
-  const [query, setQuery] = useState(initialTargetPath ? `Investigate changes in ${initialTargetPath}` : "");
-  const [targetPath, setTargetPath] = useState(initialTargetPath || "");
-  const [targetSymbol, setTargetSymbol] = useState("");
-
-  useEffect(() => {
-    if (initialTargetPath) {
-      setTargetPath(initialTargetPath);
-      if (!query) {
-        setQuery(`Investigate changes in ${initialTargetPath}`);
-      }
-    }
-  }, [initialTargetPath]);
-
-  const [diff, setDiff] = useState("");
-  const [showDiffInput, setShowDiffInput] = useState(false);
   const [running, setRunning] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
 
   // Projection and Token Budget state
   const [activeTab, setActiveTab] = useState<"visual" | "markdown" | "json">("visual");
@@ -206,9 +193,14 @@ export function PreChangeInvestigationViewer({
     setTimeout(() => setCopied(false), 2000);
   }
 
-  async function handleRunInvestigation(e: React.FormEvent) {
-    e.preventDefault();
-    if (!query.trim()) return;
+  async function handleRunInvestigation(params: {
+    query: string;
+    targetPath?: string;
+    targetSymbol?: string;
+    targetFiles?: string[];
+    diff?: string;
+  }) {
+    if (!params.query.trim()) return;
 
     setRunning(true);
     setErrorMsg(null);
@@ -217,11 +209,11 @@ export function PreChangeInvestigationViewer({
       // 1. Create investigation record
       const created = await createInvestigation({
         repositoryId: repository.id,
-        query: query.trim(),
+        query: params.query.trim(),
         type: "before_change",
-        targetPath: targetPath.trim() || undefined,
-        targetSymbol: targetSymbol.trim() || undefined,
-        diff: diff.trim() || undefined,
+        targetPath: params.targetPath?.trim() || undefined,
+        targetSymbol: params.targetSymbol?.trim() || undefined,
+        diff: params.diff?.trim() || undefined,
       });
 
       if (!created) {
@@ -231,9 +223,9 @@ export function PreChangeInvestigationViewer({
       // 2. Execute bounded investigation engine with LLM
       const executed = await runInvestigation(
         created.id,
-        targetPath.trim() || undefined,
-        targetSymbol.trim() || undefined,
-        diff.trim() || undefined
+        params.targetPath?.trim() || undefined,
+        params.targetSymbol?.trim() || undefined,
+        params.diff?.trim() || undefined
       );
 
       if (!executed) {
@@ -249,26 +241,6 @@ export function PreChangeInvestigationViewer({
     }
   }
 
-  const PRESETS = [
-    {
-      label: "Refactor Query Parser",
-      q: "Refactor ingest_query in gitingest/query_parser.py",
-      path: "gitingest/query_parser.py",
-      sym: "ingest_query",
-    },
-    {
-      label: "Auth Token Rotation",
-      q: "Upgrade session authentication token rotation and timeout handling",
-      path: "backend/app/auth/session.py",
-      sym: "SessionManager",
-    },
-    {
-      label: "Payment Interface",
-      q: "Replace payment gateway provider with multi-vendor adapter interface",
-      path: "backend/app/payments/gateway.py",
-      sym: "PaymentHandler",
-    },
-  ];
 
   return (
     <div className="space-y-8">
@@ -293,123 +265,15 @@ export function PreChangeInvestigationViewer({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Column: Form & History (5 cols) */}
         <div className="lg:col-span-5 space-y-6">
-          {/* Form Card */}
-          <div className="p-6 rounded-xl bg-slate-900/80 border border-slate-800 space-y-4 shadow-lg">
-            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Zap className="w-4 h-4 text-indigo-400" />
-              Propose a Code Change
-            </h3>
+          {/* Enhanced Investigation Entry Flow Card */}
+          <InvestigationEntryFlow
+            repository={repository}
+            initialTargetPath={initialTargetPath}
+            onRunInvestigation={handleRunInvestigation}
+            running={running}
+            errorMsg={errorMsg}
+          />
 
-            {/* Quick Presets */}
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {PRESETS.map((p, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => {
-                    setQuery(p.q);
-                    setTargetPath(p.path);
-                    setTargetSymbol(p.sym);
-                  }}
-                  className="px-2.5 py-1 text-xs rounded-md bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 border border-slate-700/60 transition-colors"
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-
-            <form onSubmit={handleRunInvestigation} className="space-y-4 pt-2">
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  Change Intent Query <span className="text-rose-400">*</span>
-                </label>
-                <textarea
-                  rows={3}
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="e.g. Refactor ingest_query in gitingest/query_parser.py to support custom branch parameters"
-                  className="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-white placeholder:text-slate-600 resize-none font-sans"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Target File (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={targetPath}
-                    onChange={(e) => setTargetPath(e.target.value)}
-                    placeholder="path/to/file.py"
-                    className="w-full px-3 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-white font-mono placeholder:text-slate-600"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Target Symbol (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={targetSymbol}
-                    onChange={(e) => setTargetSymbol(e.target.value)}
-                    placeholder="SymbolName"
-                    className="w-full px-3 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-white font-mono placeholder:text-slate-600"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-medium text-slate-300">
-                    Proposed Git Diff / Patch (Optional)
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setShowDiffInput(!showDiffInput)}
-                    className="text-[11px] text-indigo-400 hover:text-indigo-300 font-mono"
-                  >
-                    {showDiffInput ? "Hide Diff" : "+ Add Diff"}
-                  </button>
-                </div>
-                {showDiffInput && (
-                  <textarea
-                    rows={4}
-                    value={diff}
-                    onChange={(e) => setDiff(e.target.value)}
-                    placeholder="Paste git diff here to evaluate exact Kamei metrics (LA, LD, NF, ND, NS, entropy)..."
-                    className="w-full px-3 py-2 text-xs rounded-lg bg-slate-950 border border-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-white font-mono placeholder:text-slate-600 resize-y"
-                  />
-                )}
-              </div>
-
-              {errorMsg && (
-                <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                  <span>{errorMsg}</span>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={running || !query.trim()}
-                className="w-full py-2.5 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
-              >
-                {running ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Investigating via OpenRouter...</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-4 h-4 fill-current" />
-                    <span>Run Pre-Change Investigation</span>
-                  </>
-                )}
-              </button>
-            </form>
-          </div>
 
           {/* Past Investigations List */}
           <div className="p-5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3">
