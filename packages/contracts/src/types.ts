@@ -38,6 +38,15 @@ export type SymbolKind = 'function' | 'class' | 'interface' | 'type' | 'variable
 
 export type ArchitecturalRole = 'controller' | 'service' | 'repository' | 'entity' | 'middleware' | 'utility';
 
+export interface RepositoryFileItem {
+  id: string;
+  repositoryId: string;
+  path: string;
+  language: string;
+  sizeBytes: number;
+  symbolCount: number;
+}
+
 export interface SymbolItem {
   id: string;
   fileId: string;
@@ -49,8 +58,10 @@ export interface SymbolItem {
   signature?: string | null;
   docstring?: string | null;
   architecturalRole?: ArchitecturalRole | null;
+  filePath?: string | null;
   createdAt: string;
 }
+
 
 export interface CodeDependencyItem {
   id: string;
@@ -1162,10 +1173,70 @@ export interface RepositoryOverviewResponse {
   componentCount?: number;
 }
 
+export interface PreFlightImpactRequest {
+  repositoryId: string;
+  query?: string;
+  targetPath?: string;
+  targetSymbol?: string;
+  targetFiles?: string[];
+  diff?: string;
+}
 
-
-
-
-
-
+export interface PreFlightImpactResponse {
+  normalizedIntent: {
+    rawQuery: string;
+    actionVerbs: string[];
+    targetFiles: string[];
+    targetSymbols: string[];
+    targetComponents: string[];
+    intentSummary: string;
+    isAmbiguous: boolean;
+  };
+  targetFiles: string[];
+  targetSymbols: string[];
+  blastRadius: {
+    target_files?: string[];
+    upstream_callers?: Array<{ path: string; depth: number; direction: string; component?: string }>;
+    downstream_dependencies?: Array<{ path: string; depth: number; direction: string; component?: string }>;
+    transitive_files?: string[];
+    affected_components?: string[];
+    max_depth_reached?: number;
+    total_affected_count?: number;
+  };
+  guardingTests: {
+    total_guarding_tests?: number;
+    ranked_tests?: Array<{ test_file: string; target_files_covered: string[]; reach_count: number }>;
+    untested_changes?: Array<{ target_file: string; reason: string }>;
+    stale_test_candidates?: Array<{ target_file: string; covering_test: string; reason: string }>;
+  };
+  changeRisk: {
+    risk_score?: number;
+    risk_level?: string;
+    lines_added?: number;
+    lines_deleted?: number;
+    file_count?: number;
+    distinct_directories?: number;
+    distinct_subsystems?: number;
+    shannon_entropy?: number;
+    defect_pressure?: number;
+    fix_commit_count?: number;
+    explanatory_factors?: string[];
+  };
+  concurrentOverlaps: {
+    target_files?: string[];
+    overlapping_pr_count?: number;
+    highest_risk_level?: string;
+    overlapping_prs?: Array<{
+      pr_number: number;
+      pr_title: string;
+      pr_author: string;
+      head_branch?: string;
+      overlapping_files: string[];
+      risk_level: string;
+    }>;
+    summary?: string;
+  };
+  governingConstraintsCount: number;
+  estimatedModelCalls: number;
+}
 

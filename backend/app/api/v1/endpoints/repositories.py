@@ -7,7 +7,7 @@ from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse, Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.architecture.c4_exporter import C4ArchitectureExporter
@@ -53,6 +53,7 @@ from app.schemas.repository import (
     IngestFilesRequest,
     ProjectContextRead,
     RepositoryCreate,
+    RepositoryFileItem,
     RepositoryOverviewResponse,
     RepositoryRead,
     SymbolRead,
@@ -417,6 +418,55 @@ async def ingest_repository_files(
     )
 
 
+@router.get("/{repository_id}/files", response_model=List[RepositoryFileItem])
+async def list_repository_files(
+    repository_id: uuid.UUID,
+    search: Optional[str] = Query(None, description="Search file path"),
+    language: Optional[str] = Query(None, description="Filter by language"),
+    db: AsyncSession = Depends(get_db),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(250, ge=1, le=1000),
+) -> List[RepositoryFileItem]:
+    """List source code files in repository with symbol counts for target selection."""
+    repo = await db.get(Repository, repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Repository not found",
+        )
+
+    stmt = select(SourceFile).where(SourceFile.repository_id == repository_id)
+    if search:
+        stmt = stmt.where(SourceFile.path.ilike(f"%{search}%"))
+    if language:
+        stmt = stmt.where(SourceFile.language == language.lower())
+    stmt = stmt.order_by(SourceFile.path.asc()).offset(skip).limit(limit)
+    files = list((await db.execute(stmt)).scalars().all())
+
+    counts_map = {}
+    if files:
+        file_ids = [f.id for f in files]
+        sym_counts_stmt = (
+            select(Symbol.file_id, func.count(Symbol.id))
+            .where(Symbol.file_id.in_(file_ids))
+            .group_by(Symbol.file_id)
+        )
+        counts_res = await db.execute(sym_counts_stmt)
+        counts_map = dict(counts_res.all())
+
+    return [
+        RepositoryFileItem(
+            id=f.id,
+            repository_id=f.repository_id,
+            path=f.path,
+            language=f.language,
+            size_bytes=f.size_bytes,
+            symbol_count=counts_map.get(f.id, 0),
+        )
+        for f in files
+    ]
+
+
 @router.get("/{repository_id}/symbols", response_model=List[SymbolRead])
 async def list_repository_symbols(
     repository_id: uuid.UUID,
@@ -426,8 +476,12 @@ async def list_repository_symbols(
     db: AsyncSession = Depends(get_db),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
-) -> List[Symbol]:
-    stmt = select(Symbol).where(Symbol.repository_id == repository_id)
+) -> List[SymbolRead]:
+    stmt = (
+        select(Symbol, SourceFile.path.label("file_path"))
+        .join(SourceFile, Symbol.file_id == SourceFile.id)
+        .where(Symbol.repository_id == repository_id)
+    )
     if name:
         stmt = stmt.where(Symbol.name.ilike(f"%{name}%"))
     if kind:
@@ -436,7 +490,26 @@ async def list_repository_symbols(
         stmt = stmt.where(Symbol.architectural_role == role)
     stmt = stmt.offset(skip).limit(limit).order_by(Symbol.name.asc())
     result = await db.execute(stmt)
-    return list(result.scalars().all())
+    rows = result.all()
+
+    symbols: List[SymbolRead] = []
+    for sym, fpath in rows:
+        symbols.append(
+            SymbolRead(
+                id=sym.id,
+                file_id=sym.file_id,
+                repository_id=sym.repository_id,
+                name=sym.name,
+                kind=sym.kind,
+                line_start=sym.line_start,
+                line_end=sym.line_end,
+                signature=sym.signature,
+                docstring=sym.docstring,
+                architectural_role=sym.architectural_role,
+                file_path=fpath,
+            )
+        )
+    return symbols
 
 
 @router.get("/{repository_id}/dependencies", response_model=List[CodeDependencyRead])

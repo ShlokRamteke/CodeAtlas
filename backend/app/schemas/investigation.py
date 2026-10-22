@@ -320,3 +320,24 @@ class CodeOwnershipReportSchema(BaseModel):
     overall_bus_factor: int = 1
     knowledge_loss_warnings: List[str] = Field(default_factory=list)
     summary: str = ""
+
+
+class PreFlightImpactRequest(BaseModel):
+    repository_id: uuid.UUID
+    query: Optional[str] = None
+    target_path: Optional[str] = None
+    target_symbol: Optional[str] = None
+    target_files: List[str] = Field(default_factory=list)
+    diff: Optional[str] = None
+
+
+class PreFlightImpactResponse(BaseModel):
+    normalized_intent: NormalizedChangeIntentSchema
+    target_files: List[str] = Field(default_factory=list)
+    target_symbols: List[str] = Field(default_factory=list)
+    blast_radius: Dict[str, Any] = Field(default_factory=dict)
+    guarding_tests: Dict[str, Any] = Field(default_factory=dict)
+    change_risk: Dict[str, Any] = Field(default_factory=dict)
+    concurrent_overlaps: Dict[str, Any] = Field(default_factory=dict)
+    governing_constraints_count: int = 0
+    estimated_model_calls: int = 1

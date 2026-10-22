@@ -6,11 +6,11 @@ Phase 6 &mdash; SaaS Experience & Core (In Progress)
 
 ## Current Task
 
-PH6-03 Complete &mdash; Historical Timeline & Evolution View
+PH6-04 Complete &mdash; Change-Investigation Entry Flow & Multi-Target Selector
 
 ## Status
 
-IN PROGRESS &mdash; Phase 6 Task PH6-03 Complete / Ready for PH6-04
+IN PROGRESS &mdash; Phase 6 Task PH6-04 Complete / Ready for PH6-05
 
 
 
@@ -260,10 +260,21 @@ developer understand a proposed change before implementation.
   - Connected primary backend callers (`container_backend`, `container_core`, `container_api`) to `container_db` in C4 container and component diagrams.
   - Added 3 unit tests in `backend/tests/test_c4_export.py`. All 217 backend tests passed; clean ruff lint/format and Next.js frontend production build.
 
+- **Phase 6 — Task PH6-04 (Change-Investigation Entry Flow & Multi-Target Selector)**:
+  - Repository Files API: Added `GET /api/v1/repositories/{id}/files` endpoint and updated symbol listing endpoint to join `SourceFile` and populate canonical `file_path`.
+  - Deterministic Pre-Flight Impact Preview (`InvestigationEngine.preview_impact`): Computes blast radius, reach-ranked guarding test count, Kamei JIT change risk score/tier, defect pressure score, concurrent open PR collisions, and governing invariant count in <100ms with 0 LLM calls or DB writes.
+  - REST endpoints: Added `POST /api/v1/investigations/preview-impact` endpoint accepting target files, symbols, and change description.
+  - Contracts & API Client: Added `RepositoryFileItem`, `PreFlightImpactRequest`, `PreFlightImpactResponse`, and optional `filePath` on `SymbolItem` in `@codeatlas/contracts`, and added `fetchRepositoryFiles` and `previewInvestigationImpact` in `frontend/src/lib/api.ts`.
+  - Frontend SaaS Entry Flow: Built `InvestigationEntryFlow.tsx` replacing legacy manual typing card with:
+    - 3-mode selector: Accessible combobox over AST files and symbols with fuzzy autocomplete and keyboard navigation (`ArrowUp`, `ArrowDown`, `Enter`, `Escape`), 1-click Component-Scoped selector auto-populating canonical component files, and In-Flight PR selector with live concurrent target collision badges.
+    - Intent Presets: 1-click query framing chips ("Refactor API", "Schema Migration", "Bug Fix", "Add Endpoint", "Security Patch").
+    - Pre-flight Impact Scorecard: Instant blast radius, guarding tests count, change risk tier, and PR collision warning banner, plus "Copy Impact Summary" action.
+  - 100% automated test pass rate across 221 pytest tests (4 new unit/integration tests in `test_investigation_entry_flow.py`), ruff format/lint clean, and clean contracts and Next.js frontend production builds.
+
 ## Remaining
 
 - **Phase 6**: SaaS Experience & Core:
-  - *Part A (SaaS Experience & Investigation UI)*: PH6-04 (Entry Flow), PH6-05 (Brief UI Polish), PH6-06 (Evidence Deep Links & Source Inspector), PH6-07 (Unknowns, Risk & Confidence).
+  - *Part A (SaaS Experience & Investigation UI)*: PH6-05 (Brief UI Polish), PH6-06 (Evidence Deep Links & Source Inspector), PH6-07 (Unknowns, Risk & Confidence).
   - *Part B (SaaS Core, Multi-Tenancy & Security)*: PH6-08 (GitHub App), PH6-09 (Multi-Tenant Data Isolation), PH6-10 (Async Indexing Workers), PH6-11 (Rate Limiting & Token Budgets), PH6-12 (Caching & Audit Logging).
 - **Phase 7**: Model Context Protocol (MCP) Integration.
 - **Phase 8**: Evaluation & Production Hardening.
@@ -274,8 +285,7 @@ None known.
 
 ## Next Action
 
-Continue Phase 6 (SaaS Experience & Core): Task PH6-04 (Change-Investigation Entry Flow).
-
+Continue Phase 6 (SaaS Experience & Core): Task PH6-05 (Pre-Change Investigation Brief Interactive UI Polish).
 
 ## Session Rule
 
@@ -292,11 +302,7 @@ receive scoped views of that model.
 
 ## Last Updated
 
-<<<<<<< HEAD
-2026-10-14
-=======
-2026-10-13
->>>>>>> main
+2026-10-22
 
 
 

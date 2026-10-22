@@ -84,12 +84,13 @@ To avoid cognitive overload, feature bloat, and visual noise, the CodeAtlas UI s
 - [x] Interactive UI in `HistoricalTimelineViewer.tsx` promoted to dedicated top-level "Evolution Timeline" tab.
 - [x] REST endpoint `GET /api/v1/repositories/{id}/timeline` returning `RepositoryTimelineResponse`.
 
-#### PH6-04: Change-Investigation Entry Flow & Multi-Target Selector
-- [ ] Accessible, keyboard-navigable target selector with fuzzy autocomplete over Phase 2 Tree-sitter AST files and symbols (replaces raw manual string typing).
-- [ ] Component-scoped selector: 1-click component picking auto-populates canonical target files without manual path hunting.
-- [ ] In-flight PR selector: accessible dropdown linking open PRs and branch targets with live concurrent collision badges.
-- [ ] Intent templates: 1-click presets ("Refactor API", "Schema Migration", "Bug Fix", "Add Endpoint") for instant query framing.
-- [ ] Pre-flight impact preview: instant blast radius & risk summary before launching the model pipeline, avoiding unnecessary runs.
+#### PH6-04: Change-Investigation Entry Flow & Multi-Target Selector *(Completed)*
+- [x] Accessible, keyboard-navigable target selector with fuzzy autocomplete over Phase 2 Tree-sitter AST files and symbols (replaces raw manual string typing).
+- [x] Component-scoped selector: 1-click component picking auto-populates canonical target files without manual path hunting.
+- [x] In-flight PR selector: accessible dropdown linking open PRs and branch targets with live concurrent collision badges.
+- [x] Intent templates: 1-click presets ("Refactor API", "Schema Migration", "Bug Fix", "Add Endpoint", "Security Patch") for instant query framing.
+- [x] Pre-flight impact preview: instant blast radius & risk summary before launching the model pipeline, avoiding unnecessary runs.
+
 
 #### PH6-05: Pre-Change Investigation Brief Interactive UI
 - [ ] Executive decision header: 4 high-signal summary tiles (Blast Radius size, Quantitative Risk Tier, Invariants at Risk, Guarding Tests Count).
@@ -149,7 +150,8 @@ To avoid cognitive overload, feature bloat, and visual noise, the CodeAtlas UI s
 - [x] **PH6-01**: Repository overview computes 6 health dimensions and renders executive scorecard with hotspot files.
 - [x] **PH6-02**: Component explorer provides interactive component directory, role filters, and coupling topology matrix.
 - [x] **PH6-03**: Evolution timeline supports repository-wide and component-scoped views with monthly velocity and net churn.
-- [ ] **PH6-04**: Developers can select investigation targets via accessible autocomplete dropdown, component picker, or open PRs without raw manual typing.
+- [x] **PH6-04**: Developers can select investigation targets via accessible autocomplete dropdown, component picker, or open PRs without raw manual typing.
+
 - [ ] **PH6-05**: Pre-Change Investigation Brief interactive UI presents actionable conclusions first (blast radius, risk tier, guarding tests, broken invariants) with deep statistical math (Kamei metrics, Shannon entropy, split decomposition) accessible via progressive disclosure drawers.
 - [ ] **PH6-06**: Every evidence citation deep-links to GitHub or opens in the syntax-highlighted source code inspector with keyboard navigation (`Esc` dismiss).
 - [ ] **PH6-07**: Unknowns, missing evidence, and confidence metrics are clearly presented with high-contrast alert badges and clear remediation guidance.

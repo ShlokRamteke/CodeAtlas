@@ -30,6 +30,8 @@ from app.schemas.investigation import (
     InvestigationRunRequest,
     NormalizedChangeIntentSchema,
     OmissionMarkerSchema,
+    PreFlightImpactRequest,
+    PreFlightImpactResponse,
     ReferenceDetailResponse,
 )
 
@@ -120,6 +122,32 @@ async def preview_intent(
         intent_summary=intent.intent_summary,
         is_ambiguous=intent.is_ambiguous,
     )
+
+
+@router.post("/preview-impact", response_model=PreFlightImpactResponse)
+async def preview_impact(
+    payload: PreFlightImpactRequest,
+    db: AsyncSession = Depends(get_db),
+) -> PreFlightImpactResponse:
+    """Pre-flight impact preview computing blast radius, guarding tests, risk tier, and PR overlaps deterministically."""
+    repo = await db.get(Repository, payload.repository_id)
+    if not repo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Repository not found",
+        )
+
+    engine = InvestigationEngine()
+    result = await engine.preview_impact(
+        repository_id=payload.repository_id,
+        db=db,
+        query=payload.query,
+        target_path=payload.target_path,
+        target_symbol=payload.target_symbol,
+        target_files=payload.target_files,
+        diff=payload.diff,
+    )
+    return PreFlightImpactResponse(**result)
 
 
 @router.post("/{investigation_id}/run", response_model=InvestigationRead)
