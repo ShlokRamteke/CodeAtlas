@@ -6,11 +6,11 @@ Phase 6 &mdash; SaaS Experience & Core (In Progress)
 
 ## Current Task
 
-PH6-02 Complete &mdash; Architecture & Component Explorer
+PH6-03 Complete &mdash; Historical Timeline & Evolution View
 
 ## Status
 
-IN PROGRESS &mdash; Phase 6 Task PH6-02 Complete / Ready for PH6-03
+IN PROGRESS &mdash; Phase 6 Task PH6-03 Complete / Ready for PH6-04
 
 
 
@@ -241,6 +241,16 @@ developer understand a proposed change before implementation.
   - Frontend SaaS Experience: created interactive `ComponentExplorerViewer.tsx` featuring high-level architecture metrics (component count, coupling density, guarded ratio, role distribution), dual view switcher (Component Directory Grid vs Coupling Topology Matrix), role/coverage filters, sort controls, and interactive component inspection modal with 1-click **Investigate Change on Component** prefill.
   - 100% automated test pass rate across 215 pytest tests (3 new unit/integration tests in `test_component_explorer.py`), ruff format/lint clean, and clean contracts/frontend production builds.
 
+- **Phase 6 — Task PH6-03 (Historical Timeline & Evolution View)**:
+  - `GitHistoryIndexer.get_component_timeline`: generalized to support repository-wide evolution timelines (`component_path="all"` or `None`) alongside component-scoped timelines.
+  - Multi-dimensional timeline telemetry (`TimelineStats`): computes total milestones, total commits, ADRs count, total insertions/deletions, net churn, defect repair frequency, active authors count, date range, and milestone breakdown across `introduction`, `feature_addition`, `refactor`, `bug_fix`, `architectural_decision`, and `maintenance`.
+  - Monthly activity cadence & velocity ribbon (`TimelineVelocityItem`): aggregates chronological month-by-month velocity with segmented feature, bugfix, refactor, and ADR distribution bars.
+  - Touched files provenance: extracts and persists touched file paths per milestone, enabling 1-click pre-change investigation prefill directly from any historical milestone.
+  - REST endpoints: added `GET /api/v1/repositories/{id}/timeline` returning `RepositoryTimelineResponse` with `stats` and enriched `GET /api/v1/repositories/{id}/components/{component_path:path}/timeline`.
+  - Contracts & API Client: added `TimelineVelocityItem`, `TimelineStats`, and `RepositoryTimelineResponse` to `@codeatlas/contracts` and implemented `fetchRepositoryTimeline` in `frontend/src/lib/api.ts`.
+  - Frontend SaaS Experience: elevated `HistoricalTimelineViewer.tsx` into a full SaaS Evolution View with dual scope switcher (All Repository vs By Component), executive metrics scorecard, interactive monthly cadence ribbon with 1-click month drilldown, category filter chips with live counts, defect fixes only filter, chronological sort toggle (newest/oldest), touched files inspector, copy buttons for commit hashes and citations, and 1-click **Investigate Touched Files** routing to `PreChangeInvestigationViewer`.
+  - Integrated as top-level **Evolution Timeline** tab in `ArchitectureExplorer.tsx` and connected 1-click navigation shortcuts from `RepositoryOverviewViewer` and `ComponentExplorerViewer`.
+  - 100% automated test pass rate across 217 pytest tests (2 new unit and integration tests in `test_evolution_timeline.py`), ruff format/lint clean, and clean contracts/frontend Next.js production builds.
 - **Bugfix — C4 MongoDB & Multi-Database Verification in Architecture Exports (`fix/c4-mongodb-database-detection`)**:
   - `_detect_database_engine` in `app.architecture.c4_exporter`: multi-signal database detector inspecting AST imports, relationships, evidence snippets, connection strings (`mongodb://`, `mongodb+srv://`, `MONGO_URI`), and symbols (`MongoClient`, `Schema`, `ObjectId`, etc.).
   - Resolves issue where MongoDB repositories defaulted to generic `"Relational Database"` because file paths like `src/models/user.ts` or `src/config/db.js` omit `"mongo"`.
@@ -248,11 +258,13 @@ developer understand a proposed change before implementation.
   - Dynamically formats NoSQL/document database container description: `Document database storing application collections and state (MongoDB)`.
   - Updated `ContainerClassifier.heuristic_classify` in `app.semantic.container_classifier` to recognize `mongo` / `mongodb` directories and manifest dependencies.
   - Connected primary backend callers (`container_backend`, `container_core`, `container_api`) to `container_db` in C4 container and component diagrams.
-  - Added 3 unit tests in `backend/tests/test_c4_export.py`. All 215 backend tests passed; clean ruff lint/format and Next.js frontend production build.
+  - Added 3 unit tests in `backend/tests/test_c4_export.py`. All 217 backend tests passed; clean ruff lint/format and Next.js frontend production build.
 
 ## Remaining
 
-- **Phase 6**: SaaS Experience & Core (Historical timeline and evolution view, change-investigation entry flow, GitHub App, async indexing workers).
+- **Phase 6**: SaaS Experience & Core:
+  - *Part A (SaaS Experience & Investigation UI)*: PH6-04 (Entry Flow), PH6-05 (Brief UI Polish), PH6-06 (Evidence Deep Links & Source Inspector), PH6-07 (Unknowns, Risk & Confidence).
+  - *Part B (SaaS Core, Multi-Tenancy & Security)*: PH6-08 (GitHub App), PH6-09 (Multi-Tenant Data Isolation), PH6-10 (Async Indexing Workers), PH6-11 (Rate Limiting & Token Budgets), PH6-12 (Caching & Audit Logging).
 - **Phase 7**: Model Context Protocol (MCP) Integration.
 - **Phase 8**: Evaluation & Production Hardening.
 
@@ -262,7 +274,7 @@ None known.
 
 ## Next Action
 
-Continue Phase 6 (SaaS Experience & Core): Task PH6-03 (Historical Timeline & Evolution View).
+Continue Phase 6 (SaaS Experience & Core): Task PH6-04 (Change-Investigation Entry Flow).
 
 
 ## Session Rule
@@ -280,7 +292,11 @@ receive scoped views of that model.
 
 ## Last Updated
 
+<<<<<<< HEAD
+2026-10-14
+=======
 2026-10-13
+>>>>>>> main
 
 
 

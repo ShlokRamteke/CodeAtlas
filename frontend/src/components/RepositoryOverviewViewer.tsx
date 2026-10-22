@@ -25,6 +25,7 @@ import {
   CircleDot,
   Clock,
   Compass,
+  History,
 } from "lucide-react";
 
 interface RepositoryOverviewViewerProps {
@@ -212,13 +213,22 @@ export function RepositoryOverviewViewer({
                 <ArrowRight className="w-3.5 h-3.5 text-indigo-200" />
               </button>
 
-              <button
-                onClick={() => onNavigateTab("c4_export")}
-                className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 text-xs font-medium border border-slate-700 transition"
-              >
-                <Layers className="w-3.5 h-3.5 text-cyan-400" />
-                <span>View C4 Architecture</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => onNavigateTab("timeline")}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 text-xs font-medium border border-slate-700 transition"
+                >
+                  <History className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Evolution Timeline</span>
+                </button>
+                <button
+                  onClick={() => onNavigateTab("c4_export")}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 text-xs font-medium border border-slate-700 transition"
+                >
+                  <Layers className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>C4 Architecture</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
