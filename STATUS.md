@@ -251,6 +251,14 @@ developer understand a proposed change before implementation.
   - Frontend SaaS Experience: elevated `HistoricalTimelineViewer.tsx` into a full SaaS Evolution View with dual scope switcher (All Repository vs By Component), executive metrics scorecard, interactive monthly cadence ribbon with 1-click month drilldown, category filter chips with live counts, defect fixes only filter, chronological sort toggle (newest/oldest), touched files inspector, copy buttons for commit hashes and citations, and 1-click **Investigate Touched Files** routing to `PreChangeInvestigationViewer`.
   - Integrated as top-level **Evolution Timeline** tab in `ArchitectureExplorer.tsx` and connected 1-click navigation shortcuts from `RepositoryOverviewViewer` and `ComponentExplorerViewer`.
   - 100% automated test pass rate across 217 pytest tests (2 new unit and integration tests in `test_evolution_timeline.py`), ruff format/lint clean, and clean contracts/frontend Next.js production builds.
+- **Bugfix — C4 MongoDB & Multi-Database Verification in Architecture Exports (`fix/c4-mongodb-database-detection`)**:
+  - `_detect_database_engine` in `app.architecture.c4_exporter`: multi-signal database detector inspecting AST imports, relationships, evidence snippets, connection strings (`mongodb://`, `mongodb+srv://`, `MONGO_URI`), and symbols (`MongoClient`, `Schema`, `ObjectId`, etc.).
+  - Resolves issue where MongoDB repositories defaulted to generic `"Relational Database"` because file paths like `src/models/user.ts` or `src/config/db.js` omit `"mongo"`.
+  - Added support for MongoDB, PostgreSQL, MySQL, SQLite, Redis, DynamoDB, Supabase, and ORMs.
+  - Dynamically formats NoSQL/document database container description: `Document database storing application collections and state (MongoDB)`.
+  - Updated `ContainerClassifier.heuristic_classify` in `app.semantic.container_classifier` to recognize `mongo` / `mongodb` directories and manifest dependencies.
+  - Connected primary backend callers (`container_backend`, `container_core`, `container_api`) to `container_db` in C4 container and component diagrams.
+  - Added 3 unit tests in `backend/tests/test_c4_export.py`. All 217 backend tests passed; clean ruff lint/format and Next.js frontend production build.
 
 ## Remaining
 
@@ -284,7 +292,11 @@ receive scoped views of that model.
 
 ## Last Updated
 
+<<<<<<< HEAD
 2026-10-14
+=======
+2026-10-13
+>>>>>>> main
 
 
 
